@@ -2,6 +2,7 @@ package com.focal.data.notification
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import androidx.room.Room
 import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
@@ -36,13 +37,19 @@ class FocalNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        Log.d("FocalListener", "onNotificationPosted: ${sbn?.packageName} - ${sbn?.notification?.extras?.getCharSequence("android.title")}")
         sbn ?: return
         if (sbn.packageName == packageName) return
         if (NotificationExtractor.IGNORED_PACKAGES.contains(sbn.packageName)) return
         if (sbn.isOngoing) return
 
         serviceScope.launch {
-            val entity = extractor.extract(sbn) ?: return@launch
+            val entity = extractor.extract(sbn)
+            if (entity == null) {
+                Log.w("FocalListener", "Failed to extract notification from ${sbn.packageName}")
+                return@launch
+            }
+            Log.d("FocalListener", "Captured: ${entity.appName} - ${entity.title}: ${entity.content}")
 
             val ruleResult = rulesEngine.classify(entity)
             val classified = if (ruleResult != null) {
@@ -57,6 +64,7 @@ class FocalNotificationListener : NotificationListenerService() {
             }
 
             repository.saveNotification(classified)
+            Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy})")
         }
     }
 
