@@ -5,6 +5,8 @@ import android.service.notification.StatusBarNotification
 import androidx.room.Room
 import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.RulesEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +18,7 @@ class FocalNotificationListener : NotificationListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var extractor: NotificationExtractor
     private lateinit var repository: NotificationRepository
+    private lateinit var rulesEngine: RulesEngine
 
     override fun onCreate() {
         super.onCreate()
@@ -26,7 +29,10 @@ class FocalNotificationListener : NotificationListenerService() {
             FocalDatabase::class.java,
             "focal_database"
         ).build()
+
         repository = NotificationRepository(db.notificationDao(), db.appProfileDao())
+        val ruleRepository = RuleRepository(db.ruleDao(), db.correctionDao())
+        rulesEngine = RulesEngine(ruleRepository)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -37,7 +43,20 @@ class FocalNotificationListener : NotificationListenerService() {
 
         serviceScope.launch {
             val entity = extractor.extract(sbn) ?: return@launch
-            repository.saveNotification(entity)
+
+            val ruleResult = rulesEngine.classify(entity)
+            val classified = if (ruleResult != null) {
+                entity.copy(
+                    category = ruleResult.category,
+                    classifiedBy = ruleResult.classifiedBy,
+                    ruleId = ruleResult.ruleId,
+                    processedAt = System.currentTimeMillis()
+                )
+            } else {
+                entity
+            }
+
+            repository.saveNotification(classified)
         }
     }
 
