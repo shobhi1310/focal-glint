@@ -7,25 +7,51 @@ object LlmResponseParser {
 
     fun parseClassification(raw: String): ClassificationResult? {
         return try {
-            val jsonStr = extractJson(raw) ?: return null
-            val json = JSONObject(jsonStr)
+            // Try JSON first
+            val jsonStr = extractJson(raw)
+            if (jsonStr != null) {
+                val json = JSONObject(jsonStr)
+                val category = json.optString("category", "").lowercase().trim()
+                if (category in VALID_CATEGORIES) {
+                    val reason = if (json.has("reason")) json.getString("reason") else null
+                    val confidence = json.optDouble("confidence", 0.5).toFloat().coerceIn(0f, 1f)
+                    return ClassificationResult(
+                        category = category,
+                        classifiedBy = "llm",
+                        confidence = confidence,
+                        reason = reason
+                    )
+                }
+            }
 
-            val category = json.optString("category", "").lowercase().trim()
-            if (category !in listOf("urgent", "informational", "noise")) return null
-
-            val reason = if (json.has("reason")) json.getString("reason") else null
-            val confidence = json.optDouble("confidence", 0.5).toFloat().coerceIn(0f, 1f)
-
-            ClassificationResult(
-                category = category,
-                classifiedBy = "llm",
-                confidence = confidence,
-                reason = reason
-            )
+            // Fallback: parse markdown/text format (e.g. "**Category:** noise")
+            parseMarkdownFormat(raw)
         } catch (e: Exception) {
             Log.w("LlmResponseParser", "Failed to parse LLM response: ${raw.take(200)}", e)
             null
         }
+    }
+
+    private val VALID_CATEGORIES = listOf("urgent", "informational", "noise")
+
+    private fun parseMarkdownFormat(raw: String): ClassificationResult? {
+        val text = raw.lowercase()
+
+        val categoryPattern = Regex("\\*?\\*?category\\*?\\*?:?\\s*\\*?\\*?\\s*(urgent|informational|noise)")
+        val category = categoryPattern.find(text)?.groupValues?.get(1) ?: return null
+
+        val reasonPattern = Regex("\\*?\\*?reason\\*?\\*?:?\\s*\\*?\\*?\\s*(.+)")
+        val reason = reasonPattern.find(text)?.groupValues?.get(1)?.trim()
+
+        val confidencePattern = Regex("\\*?\\*?confidence\\*?\\*?:?\\s*\\*?\\*?\\s*([0-9.]+)")
+        val confidence = confidencePattern.find(text)?.groupValues?.get(1)?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.5f
+
+        return ClassificationResult(
+            category = category,
+            classifiedBy = "llm",
+            confidence = confidence,
+            reason = reason
+        )
     }
 
     fun parseSummary(raw: String): String? {
@@ -45,8 +71,10 @@ object LlmResponseParser {
             if (endIndex > 0) return trimmed.substring(0, endIndex + 1)
         }
 
-        val codeBlockPattern = Regex("```(?:json)?\\s*\\n?(\\{[^}]+})", RegexOption.DOT_MATCHES_ALL)
-        codeBlockPattern.find(trimmed)?.let { return it.groupValues[1] }
+        try {
+            val codeBlockPattern = Regex("`{3}(?:json)?\\s*\\n?(\\{[^}]+})", RegexOption.DOT_MATCHES_ALL)
+            codeBlockPattern.find(trimmed)?.let { return it.groupValues[1] }
+        } catch (_: Exception) { /* ICU regex fallback */ }
 
         val jsonPattern = Regex("\\{[^}]*\"category\"[^}]*}")
         jsonPattern.find(trimmed)?.let { return it.value }
