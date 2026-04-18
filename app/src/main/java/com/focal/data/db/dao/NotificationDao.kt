@@ -34,6 +34,9 @@ interface NotificationDao {
     @Query("SELECT COUNT(*) FROM notifications WHERE posted_at > :since")
     fun countSince(since: Long): Flow<Int>
 
+    @Query("SELECT * FROM notifications WHERE posted_at > :since ORDER BY posted_at DESC")
+    suspend fun getRecentSnapshot(since: Long): List<NotificationEntity>
+
     @Query("DELETE FROM notifications WHERE posted_at < :before")
     suspend fun deleteOlderThan(before: Long)
 }

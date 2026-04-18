@@ -58,6 +58,11 @@ class NotificationRepository(
         )
     }
 
+    suspend fun getRecentNotificationsSnapshot(): List<NotificationEntity> {
+        val since = System.currentTimeMillis() - twentyFourHoursMs
+        return notificationDao.getRecentSnapshot(since)
+    }
+
     suspend fun purgeOld() {
         val cutoff = System.currentTimeMillis() - twentyFourHoursMs
         notificationDao.deleteOlderThan(cutoff)

@@ -3,12 +3,14 @@ package com.focal.di
 import android.content.Context
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.data.repository.TopicRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.Summarizer
+import com.focal.intelligence.TopicEngine
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,5 +57,16 @@ object IntelligenceModule {
         notificationRepository: NotificationRepository
     ): Summarizer {
         return Summarizer(inferenceProvider, notificationRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTopicEngine(
+        inferenceProvider: InferenceProvider,
+        notificationRepository: NotificationRepository,
+        topicRepository: TopicRepository,
+        summarizer: Summarizer
+    ): TopicEngine {
+        return TopicEngine(inferenceProvider, notificationRepository, topicRepository, summarizer)
     }
 }
