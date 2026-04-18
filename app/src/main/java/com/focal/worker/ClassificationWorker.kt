@@ -7,7 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
-import com.focal.intelligence.Summarizer
+import com.focal.intelligence.TopicEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -17,48 +17,37 @@ class ClassificationWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val notificationRepository: NotificationRepository,
     private val classifier: Classifier,
-    private val summarizer: Summarizer
+    private val topicEngine: TopicEngine
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.d("ClassificationWorker", "Starting batch classification")
+        Log.d("ClassificationWorker", "Starting batch processing")
 
         val pending = notificationRepository.getPendingForClassification()
-        if (pending.isEmpty()) {
-            Log.d("ClassificationWorker", "No pending notifications")
-            return Result.success()
-        }
-
-        Log.d("ClassificationWorker", "Processing ${pending.size} pending notifications")
-
-        var classified = 0
-        for (notification in pending) {
-            try {
-                val result = classifier.classify(notification)
-                notificationRepository.markClassified(
-                    notification = notification,
-                    category = result.category,
-                    classifiedBy = result.classifiedBy
-                )
-                classified++
-            } catch (e: Exception) {
-                Log.e("ClassificationWorker", "Failed to classify ${notification.id}", e)
-            }
-        }
-
-        Log.d("ClassificationWorker", "Classified $classified/${pending.size} notifications")
-
-        val appPackages = pending.map { it.packageName }.distinct()
-        for (packageName in appPackages) {
-            try {
-                val summary = summarizer.summarizeForApp(packageName)
-                if (summary != null) {
-                    notificationRepository.saveNotification(summary)
-                    Log.d("ClassificationWorker", "Summarized: ${summary.appName}")
+        if (pending.isNotEmpty()) {
+            Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications")
+            var classified = 0
+            for (notification in pending) {
+                try {
+                    val result = classifier.classify(notification)
+                    notificationRepository.markClassified(
+                        notification = notification,
+                        category = result.category,
+                        classifiedBy = result.classifiedBy
+                    )
+                    classified++
+                } catch (e: Exception) {
+                    Log.e("ClassificationWorker", "Failed to classify ${notification.id}", e)
                 }
-            } catch (e: Exception) {
-                Log.e("ClassificationWorker", "Failed to summarize $packageName", e)
             }
+            Log.d("ClassificationWorker", "Classified $classified/${pending.size}")
+        }
+
+        try {
+            topicEngine.generateTopics()
+            Log.d("ClassificationWorker", "Topic generation complete")
+        } catch (e: Exception) {
+            Log.e("ClassificationWorker", "Topic generation failed", e)
         }
 
         return Result.success()
