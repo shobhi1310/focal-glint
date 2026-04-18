@@ -33,6 +33,11 @@ class RuleRepository(
         ruleDao.insertAll(rules)
     }
 
+    suspend fun replaceSystemDefaults(rules: List<RuleEntity>) {
+        ruleDao.deleteSystemDefaults()
+        ruleDao.insertAll(rules)
+    }
+
     suspend fun incrementHitCount(rule: RuleEntity) {
         ruleDao.update(rule.copy(hitCount = rule.hitCount + 1))
     }

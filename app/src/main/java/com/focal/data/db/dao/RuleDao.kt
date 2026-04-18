@@ -36,4 +36,7 @@ interface RuleDao {
 
     @Query("DELETE FROM rules WHERE id = :ruleId")
     suspend fun delete(ruleId: String)
+
+    @Query("DELETE FROM rules WHERE source = 'system_default'")
+    suspend fun deleteSystemDefaults()
 }
