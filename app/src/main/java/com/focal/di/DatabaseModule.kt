@@ -7,6 +7,7 @@ import com.focal.data.db.dao.AppProfileDao
 import com.focal.data.db.dao.CorrectionDao
 import com.focal.data.db.dao.NotificationDao
 import com.focal.data.db.dao.RuleDao
+import com.focal.data.db.dao.TopicDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,7 +26,9 @@ object DatabaseModule {
             context,
             FocalDatabase::class.java,
             "focal_database"
-        ).build()
+        )
+            .addMigrations(FocalDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
@@ -39,4 +42,7 @@ object DatabaseModule {
 
     @Provides
     fun provideAppProfileDao(db: FocalDatabase): AppProfileDao = db.appProfileDao()
+
+    @Provides
+    fun provideTopicDao(db: FocalDatabase): TopicDao = db.topicDao()
 }

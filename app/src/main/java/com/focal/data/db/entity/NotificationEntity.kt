@@ -57,5 +57,8 @@ data class NotificationEntity(
     val summaryText: String? = null,
 
     @ColumnInfo(name = "extras_json")
-    val extrasJson: String? = null
+    val extrasJson: String? = null,
+
+    @ColumnInfo(name = "topic_id")
+    val topicId: String? = null
 )
