@@ -22,7 +22,8 @@ import javax.inject.Inject
 
 data class DigestUiState(
     val urgent: List<NotificationEntity> = emptyList(),
-    val informational: List<NotificationEntity> = emptyList(),
+    val actionable: List<NotificationEntity> = emptyList(),
+    val digest: List<NotificationEntity> = emptyList(),
     val noise: List<NotificationEntity> = emptyList(),
     val totalCount: Int = 0,
     val urgentCount: Int = 0,
@@ -37,19 +38,27 @@ class DigestViewModel @Inject constructor(
 
     private val isProcessing = MutableStateFlow(false)
 
-    val uiState: StateFlow<DigestUiState> = combine(
+    private val categoriesFlow = combine(
         notificationRepository.getByCategory(ClassificationResult.URGENT),
-        notificationRepository.getByCategory(ClassificationResult.INFORMATIONAL),
+        notificationRepository.getByCategory(ClassificationResult.ACTIONABLE),
+        notificationRepository.getByCategory(ClassificationResult.DIGEST),
         notificationRepository.getByCategory(ClassificationResult.NOISE),
+    ) { urgent, actionable, digest, noise ->
+        listOf(urgent, actionable, digest, noise)
+    }
+
+    val uiState: StateFlow<DigestUiState> = combine(
+        categoriesFlow,
         notificationRepository.totalCount(),
         isProcessing
-    ) { urgent, informational, noise, total, processing ->
+    ) { categories, total, processing ->
         DigestUiState(
-            urgent = urgent,
-            informational = informational,
-            noise = noise,
+            urgent = categories[0],
+            actionable = categories[1],
+            digest = categories[2],
+            noise = categories[3],
             totalCount = total,
-            urgentCount = urgent.size,
+            urgentCount = categories[0].size,
             isProcessing = processing
         )
     }.stateIn(

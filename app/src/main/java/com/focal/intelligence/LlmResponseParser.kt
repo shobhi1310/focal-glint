@@ -32,12 +32,12 @@ object LlmResponseParser {
         }
     }
 
-    private val VALID_CATEGORIES = listOf("urgent", "informational", "noise")
+    private val VALID_CATEGORIES = listOf("urgent", "actionable", "digest", "noise")
 
     private fun parseMarkdownFormat(raw: String): ClassificationResult? {
         val text = raw.lowercase()
 
-        val categoryPattern = Regex("\\*?\\*?category\\*?\\*?:?\\s*\\*?\\*?\\s*(urgent|informational|noise)")
+        val categoryPattern = Regex("\\*?\\*?category\\*?\\*?:?\\s*\\*?\\*?\\s*(urgent|actionable|digest|noise)")
         val category = categoryPattern.find(text)?.groupValues?.get(1) ?: return null
 
         val reasonPattern = Regex("\\*?\\*?reason\\*?\\*?:?\\s*\\*?\\*?\\s*(.+)")

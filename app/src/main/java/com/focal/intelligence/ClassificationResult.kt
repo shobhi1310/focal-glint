@@ -9,7 +9,8 @@ data class ClassificationResult(
 ) {
     companion object {
         const val URGENT = "urgent"
-        const val INFORMATIONAL = "informational"
+        const val ACTIONABLE = "actionable"
+        const val DIGEST = "digest"
         const val NOISE = "noise"
         const val UNCATEGORIZED = "uncategorized"
     }

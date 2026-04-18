@@ -91,7 +91,7 @@ class RulesEngineTest {
     fun `user_explicit rules take priority over system_default`() = runTest {
         coEvery { ruleRepository.getAllRulesOrdered() } returns listOf(
             RuleEntity(id = "r-user", type = "app_match", app = "com.whatsapp", category = "urgent", source = "user_explicit"),
-            RuleEntity(id = "r-system", type = "app_match", app = "com.whatsapp", category = "informational", source = "system_default")
+            RuleEntity(id = "r-system", type = "app_match", app = "com.whatsapp", category = "digest", source = "system_default")
         )
         val result = engine.classify(notification(packageName = "com.whatsapp"))
         assertNotNull(result)

@@ -119,6 +119,8 @@ class PromptBuilderTest {
         )
         assertTrue(prompt.contains("Respond in JSON only"))
         assertTrue(prompt.contains("\"category\""))
+        assertTrue(prompt.contains("actionable"))
+        assertTrue(prompt.contains("digest"))
     }
 
     @Test

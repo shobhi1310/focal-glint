@@ -60,7 +60,7 @@ class Summarizer(
             content = "${notifications.size} messages",
             summaryText = summaries.joinToString("\n"),
             postedAt = notifications.maxOf { it.postedAt },
-            category = ClassificationResult.INFORMATIONAL,
+            category = ClassificationResult.DIGEST,
             classifiedBy = "llm",
             processedAt = System.currentTimeMillis(),
             isSummary = true
@@ -125,7 +125,7 @@ class Summarizer(
                 content = "${notifications.size} notifications",
                 summaryText = summary,
                 postedAt = notifications.maxOf { it.postedAt },
-                category = ClassificationResult.INFORMATIONAL,
+                category = ClassificationResult.DIGEST,
                 classifiedBy = "llm",
                 processedAt = System.currentTimeMillis(),
                 isSummary = true

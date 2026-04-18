@@ -20,7 +20,12 @@ object PromptBuilder {
         val message = notification.bigText ?: notification.content
 
         val sb = StringBuilder()
-        sb.appendLine("You are a notification classifier. Categorize as: urgent, informational, or noise.")
+        sb.appendLine("You are a notification classifier. Categorize as: urgent, actionable, digest, or noise.")
+        sb.appendLine()
+        sb.appendLine("- urgent: needs immediate attention (OTP, emergency, meeting right now)")
+        sb.appendLine("- actionable: requires user action but not immediately (bill due, order to rate, reply needed)")
+        sb.appendLine("- digest: context to catch up on later (chat messages, news, updates)")
+        sb.appendLine("- noise: promotional, duplicate, or irrelevant")
         sb.appendLine()
         sb.appendLine("App: ${notification.appName} | Sender: ${notification.title} | Time: $time")
         sb.appendLine("Message: \"$message\"")

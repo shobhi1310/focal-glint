@@ -30,10 +30,35 @@ That's my classification."""
 
     @Test
     fun `parses JSON in markdown code block`() {
-        val raw = "```json\n{\"category\": \"informational\", \"reason\": \"Regular message\", \"confidence\": 0.7}\n```"
+        val raw = "```json\n{\"category\": \"actionable\", \"reason\": \"Bill payment due\", \"confidence\": 0.7}\n```"
         val result = LlmResponseParser.parseClassification(raw)
         assertNotNull(result)
-        assertEquals("informational", result!!.category)
+        assertEquals("actionable", result!!.category)
+    }
+
+    @Test
+    fun `parses actionable category`() {
+        val raw = """{"category": "actionable", "reason": "Requires user action", "confidence": 0.85}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals("actionable", result!!.category)
+        assertEquals("Requires user action", result.reason)
+    }
+
+    @Test
+    fun `parses digest category`() {
+        val raw = """{"category": "digest", "reason": "Chat message to catch up on", "confidence": 0.75}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals("digest", result!!.category)
+        assertEquals("Chat message to catch up on", result.reason)
+    }
+
+    @Test
+    fun `informational is now invalid category`() {
+        val raw = """{"category": "informational", "reason": "Regular message", "confidence": 0.7}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNull(result)
     }
 
     @Test

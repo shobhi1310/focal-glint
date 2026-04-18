@@ -67,13 +67,24 @@ fun DigestScreen(
                 )
             }
 
-            if (state.informational.isNotEmpty()) {
+            if (state.actionable.isNotEmpty()) {
                 CategorySection(
-                    label = "INFORMATIONAL",
-                    count = state.informational.size,
+                    label = "ACTIONABLE",
+                    count = state.actionable.size,
                     color = InformationalBlue,
                     containerColor = InformationalBlueContainer,
-                    notifications = state.informational,
+                    notifications = state.actionable,
+                    initiallyExpanded = true
+                )
+            }
+
+            if (state.digest.isNotEmpty()) {
+                CategorySection(
+                    label = "DIGEST",
+                    count = state.digest.size,
+                    color = InformationalBlue,
+                    containerColor = InformationalBlueContainer,
+                    notifications = state.digest,
                     initiallyExpanded = true
                 )
             }
