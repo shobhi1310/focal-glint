@@ -12,13 +12,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.focal.ui.all.AllNotificationsScreen
 import com.focal.ui.digest.DigestScreen
+import com.focal.ui.digest.TopicDetailScreen
 
-val bottomNavItems = listOf(Screen.Digest, Screen.Apps, Screen.Settings)
+val bottomNavItems = listOf(Screen.Digest, Screen.All, Screen.Settings)
 
 @Composable
 fun FocalNavigation() {
@@ -56,13 +60,25 @@ fun FocalNavigation() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Digest.route) {
-                DigestScreen()
+                DigestScreen(
+                    onTopicClick = { topicId ->
+                        navController.navigate(Screen.TopicDetail.createRoute(topicId))
+                    }
+                )
             }
-            composable(Screen.Apps.route) {
-                Text("Apps — coming soon", modifier = Modifier.padding(innerPadding))
+            composable(Screen.All.route) {
+                AllNotificationsScreen()
             }
             composable(Screen.Settings.route) {
-                Text("Settings — coming soon", modifier = Modifier.padding(innerPadding))
+                Text("Settings \u2014 coming soon")
+            }
+            composable(
+                route = Screen.TopicDetail.route,
+                arguments = listOf(navArgument("topicId") { type = NavType.StringType })
+            ) {
+                TopicDetailScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }
