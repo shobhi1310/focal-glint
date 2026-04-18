@@ -39,4 +39,10 @@ interface RuleDao {
 
     @Query("DELETE FROM rules WHERE source = 'system_default'")
     suspend fun deleteSystemDefaults()
+
+    @Query("SELECT * FROM rules WHERE source = 'user_explicit' AND type = 'app_match' AND app = :packageName LIMIT 1")
+    suspend fun getUserRuleForApp(packageName: String): RuleEntity?
+
+    @Query("DELETE FROM rules WHERE source = 'user_explicit' AND type = 'app_match' AND app = :packageName")
+    suspend fun deleteUserRuleForApp(packageName: String)
 }

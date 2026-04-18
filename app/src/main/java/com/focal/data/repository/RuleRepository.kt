@@ -63,4 +63,29 @@ class RuleRepository(
     suspend fun getCorrectionCount(): Int {
         return correctionDao.count()
     }
+
+    suspend fun getUserOverrides(): List<RuleEntity> {
+        return ruleDao.getUserRules()
+    }
+
+    suspend fun getSystemDefaults(): List<RuleEntity> {
+        return ruleDao.getSystemRules()
+    }
+
+    suspend fun setUserOverride(packageName: String, category: String) {
+        ruleDao.deleteUserRuleForApp(packageName)
+        ruleDao.insert(
+            RuleEntity(
+                type = "app_match",
+                app = packageName,
+                category = category,
+                confidence = 1.0f,
+                source = "user_explicit"
+            )
+        )
+    }
+
+    suspend fun clearUserOverride(packageName: String) {
+        ruleDao.deleteUserRuleForApp(packageName)
+    }
 }
