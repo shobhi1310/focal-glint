@@ -33,6 +33,16 @@ class TopicRepository(
         return topicDao.countByCategory(category, since)
     }
 
+    fun getBriefing(): Flow<TopicEntity?> {
+        val since = System.currentTimeMillis() - twentyFourHoursMs
+        return topicDao.getBriefing(since)
+    }
+
+    fun getStoryTopics(): Flow<List<TopicEntity>> {
+        val since = System.currentTimeMillis() - twentyFourHoursMs
+        return topicDao.getStoryTopics(since)
+    }
+
     suspend fun saveTopics(topics: List<TopicEntity>) {
         topicDao.insertAll(topics)
     }

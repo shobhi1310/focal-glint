@@ -37,6 +37,12 @@ interface TopicDao {
     @Query("DELETE FROM topics WHERE updated_at < :before")
     suspend fun deleteOlderThan(before: Long)
 
+    @Query("SELECT * FROM topics WHERE headline = 'BRIEFING' AND updated_at > :since LIMIT 1")
+    fun getBriefing(since: Long): Flow<TopicEntity?>
+
+    @Query("SELECT * FROM topics WHERE headline != 'BRIEFING' AND updated_at > :since ORDER BY updated_at DESC")
+    fun getStoryTopics(since: Long): Flow<List<TopicEntity>>
+
     @Query("DELETE FROM topics")
     suspend fun deleteAll()
 }

@@ -9,7 +9,6 @@ import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
-import com.focal.intelligence.Summarizer
 import com.focal.intelligence.TopicEngine
 import dagger.Module
 import dagger.Provides
@@ -48,21 +47,11 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideSummarizer(
-        inferenceProvider: InferenceProvider,
-        notificationRepository: NotificationRepository
-    ): Summarizer {
-        return Summarizer(inferenceProvider, notificationRepository)
-    }
-
-    @Provides
-    @Singleton
     fun provideTopicEngine(
         inferenceProvider: InferenceProvider,
         notificationRepository: NotificationRepository,
-        topicRepository: TopicRepository,
-        summarizer: Summarizer
+        topicRepository: TopicRepository
     ): TopicEngine {
-        return TopicEngine(inferenceProvider, notificationRepository, topicRepository, summarizer)
+        return TopicEngine(inferenceProvider, notificationRepository, topicRepository)
     }
 }

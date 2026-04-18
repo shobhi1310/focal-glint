@@ -10,247 +10,153 @@ import org.json.JSONArray
 class TopicEngine(
     private val inferenceProvider: InferenceProvider,
     private val notificationRepository: NotificationRepository,
-    private val topicRepository: TopicRepository,
-    private val summarizer: Summarizer
+    private val topicRepository: TopicRepository
 ) {
     companion object {
         private const val TAG = "TopicEngine"
+        private const val MAX_LLM_CALLS = 8
     }
 
     suspend fun generateTopics() {
         try {
-            val notifications = notificationRepository.getRecentNotificationsSnapshot()
-                .filter { !it.isSummary && it.category != ClassificationResult.UNCATEGORIZED }
-            if (notifications.isEmpty()) {
-                Log.d(TAG, "No recent classified notifications, skipping topic generation")
+            val allNotifications = notificationRepository.getRecentNotificationsSnapshot()
+
+            val mattersNotifications = allNotifications
+                .filter {
+                    !it.isSummary &&
+                        it.category == ClassificationResult.MATTERS
+                }
+
+            if (mattersNotifications.isEmpty()) {
+                Log.d(TAG, "No recent MATTERS notifications, skipping topic generation")
                 return
             }
 
-            val grouped = notifications.groupBy { it.packageName }
-            Log.d(TAG, "Found ${grouped.size} app groups from ${notifications.size} notifications")
+            val noiseCount = allNotifications.count {
+                !it.isSummary && it.category == ClassificationResult.NOISE
+            }
+
+            Log.d(TAG, "Processing ${mattersNotifications.size} MATTERS notifications, $noiseCount noise hidden")
+
+            // Group by app (packageName)
+            val appGroups = mattersNotifications.groupBy { it.packageName }
 
             // Sort by notification count descending, take top 10 to avoid OOM on low-memory devices
-            val topGroups = grouped.entries
+            val topAppGroups = appGroups.entries
                 .sortedByDescending { it.value.size }
                 .take(10)
 
-            // Build initial app-level topics
-            val appTopics = topGroups.mapNotNull { (packageName, notifs) ->
-                try {
-                    if (notifs.size < 3) {
-                        AppTopic(
-                            appName = notifs.first().appName,
-                            packageName = packageName,
-                            summary = notifs.first().content.take(100),
-                            category = notifs.groupBy { it.category }
-                                .maxByOrNull { it.value.size }?.key
-                                ?: ClassificationResult.MATTERS,
-                            notifications = notifs
-                        )
-                    } else {
-                        buildAppTopic(packageName, notifs)
+            var llmCallCount = 0
+            val storyTopics = mutableListOf<TopicEntity>()
+            val allNarratives = mutableListOf<String>()
+
+            for ((packageName, appNotifications) in topAppGroups) {
+                // Sub-group by conversation/sender
+                val senderGroups = appNotifications.groupBy { notif ->
+                    notif.conversation ?: notif.title
+                }
+
+                for ((_, senderNotifications) in senderGroups) {
+                    try {
+                        val topic = buildStoryTopic(
+                            senderNotifications,
+                            llmCallCount
+                        ) { llmCallCount++ }
+
+                        storyTopics.add(topic)
+                        topic.briefingContribution?.let { allNarratives.add(it) }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to build topic for sender group in $packageName, skipping", e)
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to build topic for $packageName, skipping", e)
-                    null
                 }
             }
 
-            // Skip LLM merge pass if too many groups to avoid OOM
-            val mergedTopics = if (inferenceProvider.isReady() && appTopics.size in 2..15) {
-                tryMergeTopics(appTopics)
-            } else {
-                appTopics.map { listOf(it) }
+            // Generate daily briefing
+            val allTopics = mutableListOf<TopicEntity>()
+            allTopics.addAll(storyTopics)
+
+            if (inferenceProvider.isReady() && allNarratives.isNotEmpty() && llmCallCount < MAX_LLM_CALLS) {
+                try {
+                    val briefingPrompt = PromptBuilder.buildBriefingPrompt(allNarratives, noiseCount)
+                    val briefingRaw = inferenceProvider.generate(briefingPrompt, maxTokens = 256)
+                    val briefingText = briefingRaw.trim().ifBlank { null }
+
+                    if (briefingText != null) {
+                        val briefingTopic = TopicEntity(
+                            headline = "BRIEFING",
+                            summary = briefingText.take(500),
+                            category = ClassificationResult.MATTERS,
+                            notificationIds = "[]",
+                            sourceApps = "[]"
+                        )
+                        allTopics.add(briefingTopic)
+                        Log.d(TAG, "Generated daily briefing")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to generate briefing, skipping", e)
+                }
             }
 
-            // Build final TopicEntity list
-            val topics = mergedTopics.mapNotNull { group ->
-                buildTopicEntity(group)
-            }
-
-            if (topics.isNotEmpty()) {
-                topicRepository.clearAndSaveTopics(topics)
-                Log.d(TAG, "Saved ${topics.size} topics")
+            if (allTopics.isNotEmpty()) {
+                topicRepository.clearAndSaveTopics(allTopics)
+                Log.d(TAG, "Saved ${allTopics.size} topics (${storyTopics.size} stories)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to generate topics", e)
         }
     }
 
-    private suspend fun buildAppTopic(
-        packageName: String,
-        notifications: List<NotificationEntity>
-    ): AppTopic {
+    private suspend fun buildStoryTopic(
+        notifications: List<NotificationEntity>,
+        currentLlmCallCount: Int,
+        onLlmCall: () -> Unit
+    ): TopicEntity {
         val appName = notifications.first().appName
-        val summary = try {
-            val summaryEntity = summarizer.summarizeForApp(packageName)
-            summaryEntity?.summaryText ?: notifications.first().content.take(100)
-        } catch (e: Exception) {
-            Log.w(TAG, "Summarization failed for $packageName", e)
-            notifications.first().content.take(100)
-        }
+        val packageName = notifications.first().packageName
 
-        // Determine dominant category
-        val categoryVotes = notifications.groupBy { it.category }
-        val dominantCategory = categoryVotes.maxByOrNull { it.value.size }?.key
-            ?: ClassificationResult.UNCATEGORIZED
-
-        return AppTopic(
-            appName = appName,
-            packageName = packageName,
-            summary = summary,
-            category = dominantCategory,
-            notifications = notifications
-        )
-    }
-
-    private suspend fun tryMergeTopics(appTopics: List<AppTopic>): List<List<AppTopic>> {
-        try {
-            val prompt = buildMergePrompt(appTopics)
-            val response = inferenceProvider.generate(prompt, maxTokens = 200)
-            return parseMergeResponse(response, appTopics)
-        } catch (e: Exception) {
-            Log.w(TAG, "LLM merge failed, keeping groups separate", e)
-            return appTopics.map { listOf(it) }
-        }
-    }
-
-    private fun buildMergePrompt(appTopics: List<AppTopic>): String {
-        val sb = StringBuilder()
-        sb.appendLine("Here are notification groups from the last 24 hours:")
-
-        appTopics.forEachIndexed { index, topic ->
-            sb.appendLine("${index + 1}. ${topic.appName}: ${topic.summary.take(80)}")
-        }
-
-        sb.appendLine()
-        sb.appendLine("Which groups are about the same topic? Respond as JSON array of arrays:")
-        sb.appendLine("[[1,2],[3],[4,5]]")
-
-        return sb.toString()
-    }
-
-    private fun parseMergeResponse(
-        response: String,
-        appTopics: List<AppTopic>
-    ): List<List<AppTopic>> {
-        try {
-            val jsonStr = extractJsonArray(response) ?: return appTopics.map { listOf(it) }
-            val outerArray = JSONArray(jsonStr)
-            val merged = mutableListOf<List<AppTopic>>()
-            val used = mutableSetOf<Int>()
-
-            for (i in 0 until outerArray.length()) {
-                val innerArray = outerArray.getJSONArray(i)
-                val group = mutableListOf<AppTopic>()
-                for (j in 0 until innerArray.length()) {
-                    val index = innerArray.getInt(j) - 1 // 1-based to 0-based
-                    if (index in appTopics.indices && index !in used) {
-                        group.add(appTopics[index])
-                        used.add(index)
-                    }
-                }
-                if (group.isNotEmpty()) {
-                    merged.add(group)
-                }
-            }
-
-            // Add any topics not included in merge response
-            appTopics.forEachIndexed { index, topic ->
-                if (index !in used) {
-                    merged.add(listOf(topic))
-                }
-            }
-
-            return merged
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse merge response: ${response.take(200)}", e)
-            return appTopics.map { listOf(it) }
-        }
-    }
-
-    private fun extractJsonArray(raw: String): String? {
-        val trimmed = raw.trim()
-
-        // Direct array
-        if (trimmed.startsWith("[")) {
-            val depth = IntArray(1)
-            for (i in trimmed.indices) {
-                when (trimmed[i]) {
-                    '[' -> depth[0]++
-                    ']' -> {
-                        depth[0]--
-                        if (depth[0] == 0) return trimmed.substring(0, i + 1)
-                    }
-                }
-            }
-        }
-
-        // Find array in text
-        val pattern = Regex("\\[\\s*\\[.*?]\\s*]", RegexOption.DOT_MATCHES_ALL)
-        pattern.find(trimmed)?.let { return it.value }
-
-        return null
-    }
-
-    private fun buildTopicEntity(group: List<AppTopic>): TopicEntity? {
-        if (group.isEmpty()) return null
-
-        val allNotifications = group.flatMap { it.notifications }
-        val allNotificationIds = allNotifications.map { it.id }
-        val sourceAppNames = group.map { it.appName }.distinct()
-        val sourcePackages = group.map { it.packageName }.distinct()
-
-        val headline = if (group.size == 1) {
-            val topic = group.first()
-            if (topic.notifications.size == 1) {
-                topic.notifications.first().title
-            } else {
-                "${topic.appName} \u00b7 ${topic.notifications.size} messages"
+        val headline: String
+        if (notifications.size == 1) {
+            // Single notification — use title: content snippet, no LLM needed
+            val notif = notifications.first()
+            headline = "${notif.title}: ${notif.content.take(60)}"
+        } else if (inferenceProvider.isReady() && currentLlmCallCount < MAX_LLM_CALLS) {
+            // Multiple notifications with LLM available — generate narrative
+            headline = try {
+                val prompt = PromptBuilder.buildNarrativePrompt(notifications)
+                val raw = inferenceProvider.generate(prompt, maxTokens = 128)
+                onLlmCall()
+                LlmResponseParser.parseNarrative(raw) ?: "$appName \u00b7 ${notifications.size} messages"
+            } catch (e: Exception) {
+                Log.w(TAG, "LLM narrative failed for $appName, using template", e)
+                "$appName \u00b7 ${notifications.size} messages"
             }
         } else {
-            group.joinToString(" + ") { it.appName }
+            // Fallback template
+            headline = "$appName \u00b7 ${notifications.size} messages"
         }
 
-        val summary = group.joinToString(". ") { it.summary }
+        // Detail extraction
+        val appType = DetailTemplates.detectAppType(appName, packageName)
+        val (detailJson, actionLabel) = DetailTemplates.tryExtractDetail(notifications, appType)
 
-        // Use highest-priority category from merged groups
-        val categoryPriority = listOf(
-            ClassificationResult.MATTERS,
-            ClassificationResult.NOISE,
-            ClassificationResult.UNCATEGORIZED
-        )
-        val category = group.map { it.category }
-            .minByOrNull { categoryPriority.indexOf(it).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-            ?: ClassificationResult.MATTERS
-
-        // Try detail extraction
-        val primaryApp = group.maxByOrNull { it.notifications.size } ?: group.first()
-        val appType = DetailTemplates.detectAppType(primaryApp.appName, primaryApp.packageName)
-        val (detailJson, actionLabel) = DetailTemplates.tryExtractDetail(allNotifications, appType)
-
-        // Build JSON arrays for notificationIds and sourceApps
-        val notificationIdsJson = JSONArray(allNotificationIds).toString()
-        val sourceAppsJson = JSONArray(sourceAppNames).toString()
+        // Build notification IDs and source apps
+        val notificationIds = notifications.map { it.id }
+        val notificationIdsJson = JSONArray(notificationIds).toString()
+        val sourceAppsJson = JSONArray(listOf(appName)).toString()
 
         return TopicEntity(
             headline = headline,
-            summary = summary.take(500),
-            category = category,
+            summary = notifications.joinToString(". ") {
+                (it.bigText ?: it.content).take(100)
+            }.take(500),
+            category = ClassificationResult.MATTERS,
             notificationIds = notificationIdsJson,
             sourceApps = sourceAppsJson,
-            channelCount = sourcePackages.size,
+            channelCount = 1,
             detailJson = detailJson,
             actionLabel = actionLabel,
-            actionPackage = primaryApp.packageName
+            actionPackage = packageName,
+            briefingContribution = headline
         )
     }
-
-    private data class AppTopic(
-        val appName: String,
-        val packageName: String,
-        val summary: String,
-        val category: String,
-        val notifications: List<NotificationEntity>
-    )
 }
