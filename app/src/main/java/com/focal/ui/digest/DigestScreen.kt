@@ -26,8 +26,6 @@ fun DigestScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val needAttention = state.urgentCount + state.actionableCount
-
     PullToRefreshBox(
         isRefreshing = state.isProcessing,
         onRefresh = { viewModel.onRefresh() },
@@ -46,23 +44,22 @@ fun DigestScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
-            item {
-                Text(
-                    text = buildString {
-                        append("Last 24h")
-                        append(" \u00B7 ${state.topics.size} topics")
-                        if (needAttention > 0) {
-                            append(" \u00B7 $needAttention need attention")
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+
+            // Briefing paragraph
+            if (state.briefing != null) {
+                item {
+                    Text(
+                        text = state.briefing!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
             }
 
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+            item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            if (state.topics.isEmpty() && state.totalNotifications == 0) {
+            if (state.stories.isEmpty() && state.totalNotifications == 0) {
                 item {
                     Text(
                         text = "No notifications yet. Make sure notification access is enabled in Settings.",
@@ -71,17 +68,17 @@ fun DigestScreen(
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
-            } else if (state.topics.isEmpty()) {
+            } else if (state.stories.isEmpty()) {
                 item {
                     Text(
-                        text = "Processing notifications into topics...",
+                        text = "Processing notifications into stories...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
             } else {
-                items(state.topics, key = { it.id }) { topic ->
+                items(state.stories, key = { it.id }) { topic ->
                     TopicCard(
                         topic = topic,
                         onClick = { onTopicClick(topic.id) }
@@ -92,7 +89,7 @@ fun DigestScreen(
             if (state.noiseCount > 0) {
                 item {
                     Text(
-                        text = "${state.noiseCount} noise notifications hidden",
+                        text = "${state.noiseCount} promotional notifications hidden",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         modifier = Modifier.padding(top = 8.dp)

@@ -2,13 +2,7 @@ package com.focal.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val UrgentRed = Color(0xFFFF4757)
-val UrgentRedContainer = Color(0x26FF4757)
-val InformationalBlue = Color(0xFF2E86DE)
-val InformationalBlueContainer = Color(0x1F2E86DE)
 val NoiseSurface = Color(0x0AFFFFFF)
-val ActionableAmber = Color(0xFFFFA502)
-val ActionableAmberContainer = Color(0x1AFFA502)
 val DigestBlue = Color(0xFF2E86DE)
 val DigestBlueContainer = Color(0x142E86DE)
 val FocalPrimary = Color(0xFF646CFF)

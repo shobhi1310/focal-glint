@@ -22,11 +22,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DigestUiState(
-    val topics: List<TopicEntity> = emptyList(),
-    val urgentCount: Int = 0,
-    val actionableCount: Int = 0,
-    val totalNotifications: Int = 0,
+    val briefing: String? = null,
+    val stories: List<TopicEntity> = emptyList(),
     val noiseCount: Int = 0,
+    val totalNotifications: Int = 0,
     val isProcessing: Boolean = false
 )
 
@@ -41,24 +40,23 @@ class DigestViewModel @Inject constructor(
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<DigestUiState> = combine(
-        topicRepository.getRecentTopics(),
-        notificationRepository.countByCategory(ClassificationResult.MATTERS),
-        notificationRepository.totalCount(),
+        topicRepository.getStoryTopics(),
+        topicRepository.getBriefing(),
         notificationRepository.countByCategory(ClassificationResult.NOISE),
+        notificationRepository.totalCount(),
         isProcessing
     ) { values ->
-        val topics = values[0] as List<TopicEntity>
-        val mattersCount = values[1] as Int
-        val totalNotifications = values[2] as Int
-        val noiseCount = values[3] as Int
+        val stories = values[0] as List<TopicEntity>
+        val briefingTopic = values[1] as TopicEntity?
+        val noiseCount = values[2] as Int
+        val totalNotifications = values[3] as Int
         val processing = values[4] as Boolean
 
         DigestUiState(
-            topics = topics.filter { it.category != ClassificationResult.NOISE },
-            urgentCount = mattersCount,
-            actionableCount = 0,
-            totalNotifications = totalNotifications,
+            briefing = briefingTopic?.summary,
+            stories = stories,
             noiseCount = noiseCount,
+            totalNotifications = totalNotifications,
             isProcessing = processing
         )
     }.stateIn(
