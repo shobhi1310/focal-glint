@@ -1,10 +1,6 @@
 package com.focal.intelligence
 
-import com.focal.data.db.entity.AppProfileEntity
 import com.focal.data.db.entity.NotificationEntity
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 object PromptBuilder {
 
@@ -67,7 +63,7 @@ Answer with JSON only: {"matters": true, "reason": "..."} or {"matters": false, 
         sb.appendLine("Do NOT use bullet points. Write natural sentences.")
         sb.appendLine()
         sb.appendLine("Today's stories:")
-        storyNarratives.forEachIndexed { index, narrative ->
+        storyNarratives.forEach { narrative ->
             sb.appendLine("- $narrative")
         }
         if (noiseCount > 0) {

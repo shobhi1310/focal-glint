@@ -69,12 +69,10 @@ object LlmResponseParser {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
         // Remove any preamble like "Here's a summary:" or "Summary:"
-        val cleaned = trimmed
-            .removePrefix("Here's a summary:")
-            .removePrefix("Here is a summary:")
-            .removePrefix("Summary:")
-            .removePrefix("Here's the summary:")
-            .trim()
+        val lower = trimmed.lowercase()
+        val prefixes = listOf("here's a summary:", "here is a summary:", "summary:", "here's the summary:")
+        val matchedPrefix = prefixes.firstOrNull { lower.startsWith(it) }
+        val cleaned = if (matchedPrefix != null) trimmed.drop(matchedPrefix.length).trim() else trimmed
         if (cleaned.isBlank()) return null
         // Take just the first sentence/paragraph
         return cleaned.lines().firstOrNull { it.isNotBlank() }?.trim()
