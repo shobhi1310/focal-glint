@@ -21,8 +21,10 @@ class NotificationExtractor(private val packageManager: PackageManager) {
         val appName = try {
             val appInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
             packageManager.getApplicationLabel(appInfo).toString()
-        } catch (e: PackageManager.NameNotFoundException) {
-            sbn.packageName
+        } catch (e: Exception) {
+            // Fallback: try to get app name from notification extras
+            notification.extras?.getString("android.appInfo.label")
+                ?: sbn.packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }
         }
 
         val messagesJson = extractMessagingStyle(extras)

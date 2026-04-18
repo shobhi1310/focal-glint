@@ -4,15 +4,20 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.room.Room
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.RulesEngine
+import com.focal.worker.ClassificationWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class FocalNotificationListener : NotificationListenerService() {
 
@@ -65,6 +70,16 @@ class FocalNotificationListener : NotificationListenerService() {
 
             repository.upsertNotification(classified)
             Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy})")
+
+            // Enqueue background classification/topic worker with 30s delay to batch rapid notifications
+            val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>()
+                .setInitialDelay(30, TimeUnit.SECONDS)
+                .build()
+            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                ClassificationWorker.WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                workRequest
+            )
         }
     }
 

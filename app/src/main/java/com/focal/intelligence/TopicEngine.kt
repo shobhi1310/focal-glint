@@ -20,8 +20,9 @@ class TopicEngine(
     suspend fun generateTopics() {
         try {
             val notifications = notificationRepository.getRecentNotificationsSnapshot()
+                .filter { !it.isSummary && it.category != ClassificationResult.UNCATEGORIZED }
             if (notifications.isEmpty()) {
-                Log.d(TAG, "No recent notifications, skipping topic generation")
+                Log.d(TAG, "No recent classified notifications, skipping topic generation")
                 return
             }
 
@@ -37,14 +38,19 @@ class TopicEngine(
             val appTopics = topGroups.mapNotNull { (packageName, notifs) ->
                 try {
                     if (notifs.size < 3) {
-                        // Skip LLM summarization for small groups — use app name as headline
+                        // For small groups (1-2 notifs), use notification title as headline
+                        val headline = if (notifs.size == 1) {
+                            notifs.first().title
+                        } else {
+                            "${notifs.first().appName} \u00b7 ${notifs.size} messages"
+                        }
                         AppTopic(
-                            appName = notifs.first().appName,
+                            appName = headline,
                             packageName = packageName,
                             summary = notifs.first().content.take(100),
                             category = notifs.groupBy { it.category }
                                 .maxByOrNull { it.value.size }?.key
-                                ?: ClassificationResult.UNCATEGORIZED,
+                                ?: ClassificationResult.DIGEST,
                             notifications = notifs
                         )
                     } else {
@@ -201,7 +207,14 @@ class TopicEngine(
         val sourceApps = group.map { it.packageName }.distinct()
 
         val headline = if (group.size == 1) {
-            group.first().appName
+            val topic = group.first()
+            if (topic.notifications.size == 1) {
+                // Single notification: use the notification title (e.g., "Darahas Kopparapu")
+                topic.notifications.first().title
+            } else {
+                // Multiple from same app: use app name + count
+                "${topic.appName} \u00b7 ${topic.notifications.size} messages"
+            }
         } else {
             group.joinToString(" + ") { it.appName }
         }
@@ -218,7 +231,7 @@ class TopicEngine(
         )
         val category = group.map { it.category }
             .minByOrNull { categoryPriority.indexOf(it).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-            ?: ClassificationResult.UNCATEGORIZED
+            ?: ClassificationResult.DIGEST
 
         // Try detail extraction
         val primaryApp = group.maxByOrNull { it.notifications.size } ?: group.first()
