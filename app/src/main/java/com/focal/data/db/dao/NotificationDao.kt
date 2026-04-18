@@ -42,4 +42,7 @@ interface NotificationDao {
 
     @Query("DELETE FROM notifications WHERE posted_at < :before")
     suspend fun deleteOlderThan(before: Long)
+
+    @Query("SELECT * FROM notifications WHERE notification_key = :key LIMIT 1")
+    suspend fun getByNotificationKey(key: String): NotificationEntity?
 }

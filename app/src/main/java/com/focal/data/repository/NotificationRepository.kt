@@ -47,6 +47,34 @@ class NotificationRepository(
         appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
     }
 
+    suspend fun upsertNotification(notification: NotificationEntity) {
+        val existing = if (notification.notificationKey != null) {
+            notificationDao.getByNotificationKey(notification.notificationKey)
+        } else null
+
+        if (existing != null) {
+            // Update existing -- keep the ID, update content and timestamp
+            notificationDao.update(existing.copy(
+                title = notification.title,
+                content = notification.content,
+                bigText = notification.bigText,
+                postedAt = notification.postedAt,
+                extrasJson = notification.extrasJson,
+                // Don't overwrite category if already classified
+                category = if (existing.classifiedBy != "pending") existing.category else notification.category,
+                classifiedBy = if (existing.classifiedBy != "pending") existing.classifiedBy else notification.classifiedBy,
+                processedAt = existing.processedAt
+            ))
+        } else {
+            notificationDao.insert(notification)
+            appProfileDao.insertIfNew(AppProfileEntity(
+                packageName = notification.packageName,
+                appName = notification.appName
+            ))
+            appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
+        }
+    }
+
     suspend fun markClassified(notification: NotificationEntity, category: String, classifiedBy: String, ruleId: String? = null) {
         notificationDao.update(
             notification.copy(

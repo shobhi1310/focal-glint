@@ -35,7 +35,8 @@ class NotificationExtractor(private val packageManager: PackageManager) {
             bigText = bigText,
             conversation = conversation,
             postedAt = sbn.postTime,
-            extrasJson = messagesJson
+            extrasJson = messagesJson,
+            notificationKey = sbn.key
         )
     }
 

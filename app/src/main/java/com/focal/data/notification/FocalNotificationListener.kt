@@ -63,7 +63,7 @@ class FocalNotificationListener : NotificationListenerService() {
                 entity
             }
 
-            repository.saveNotification(classified)
+            repository.upsertNotification(classified)
             Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy})")
         }
     }
