@@ -27,7 +27,7 @@ object DatabaseModule {
             FocalDatabase::class.java,
             "focal_database"
         )
-            .addMigrations(FocalDatabase.MIGRATION_1_2, FocalDatabase.MIGRATION_2_3)
+            .addMigrations(FocalDatabase.MIGRATION_1_2, FocalDatabase.MIGRATION_2_3, FocalDatabase.MIGRATION_3_4)
             .build()
     }
 

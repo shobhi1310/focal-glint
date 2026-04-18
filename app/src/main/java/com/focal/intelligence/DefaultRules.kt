@@ -1,75 +1,45 @@
 package com.focal.intelligence
 
 import com.focal.data.db.entity.RuleEntity
+import com.focal.intelligence.ClassificationResult.Companion.MATTERS
+import com.focal.intelligence.ClassificationResult.Companion.NOISE
 
 object DefaultRules {
 
     fun get(): List<RuleEntity> = listOf(
-        appNoise("com.rapido.passenger"),
-        appNoise("com.ubercab"),
-        appNoise("com.olacabs.customer"),
-        appNoise("in.swiggy.android", category = "actionable"),
-        appNoise("com.application.zomato", category = "actionable"),
-        appNoise("com.flipkart.android"),
-        appNoise("com.amazon.mShop.android.shopping"),
-        appNoise("net.one97.paytm"),
-        appNoise("com.phonepe.app"),
-        appNoise("com.google.android.apps.nbu.paisa"),
-        appNoise("com.myntra.android"),
-        appNoise("com.snapdeal.main"),
-        appNoise("com.dream11.fantasy.cricket"),
-        appNoise("com.cred.android", category = "actionable"),
+        // Noise — promotional/marketing apps
+        appRule("com.rapido.passenger", NOISE),
+        appRule("com.ubercab", NOISE),
+        appRule("com.olacabs.customer", NOISE),
+        appRule("com.flipkart.android", NOISE),
+        appRule("com.amazon.mShop.android.shopping", NOISE),
+        appRule("net.one97.paytm", NOISE),
+        appRule("com.phonepe.app", NOISE),
+        appRule("com.google.android.apps.nbu.paisa", NOISE),
+        appRule("com.myntra.android", NOISE),
+        appRule("com.snapdeal.main", NOISE),
+        appRule("com.dream11.fantasy.cricket", NOISE),
 
-        appRule("com.whatsapp", "digest"),
-        appRule("org.telegram.messenger", "digest"),
-        appRule("com.Slack", "digest"),
-        appRule("com.discord", "digest"),
-        appRule("com.google.android.apps.messaging", "digest"),
+        // Matters — personal communication
+        appRule("com.whatsapp", MATTERS),
+        appRule("org.telegram.messenger", MATTERS),
+        appRule("com.Slack", MATTERS),
+        appRule("com.discord", MATTERS),
+        appRule("com.google.android.apps.messaging", MATTERS),
 
-        keywordUrgent("otp"),
-        keywordUrgent("urgent"),
-        keywordUrgent("asap"),
-        keywordUrgent("emergency"),
-        keywordUrgent("call me"),
-        keywordUrgent("immediately"),
+        // Matters — financial
+        appRule("com.cred.android", MATTERS),
 
-        keywordActionable("bill"),
-        keywordActionable("due"),
-        keywordActionable("payment"),
-        keywordActionable("pay now"),
-        keywordActionable("expire"),
-        keywordActionable("renew"),
-    )
-
-    private fun appNoise(packageName: String, category: String = "noise") = RuleEntity(
-        type = "app_match",
-        app = packageName,
-        category = category,
-        confidence = 0.7f,
-        source = "system_default"
+        // Matters — logistics
+        appRule("in.swiggy.android", MATTERS),
+        appRule("com.application.zomato", MATTERS),
     )
 
     private fun appRule(packageName: String, category: String) = RuleEntity(
         type = "app_match",
         app = packageName,
         category = category,
-        confidence = 0.5f,
-        source = "system_default"
-    )
-
-    private fun keywordUrgent(keyword: String) = RuleEntity(
-        type = "keyword_match",
-        pattern = keyword,
-        category = "urgent",
         confidence = 0.8f,
-        source = "system_default"
-    )
-
-    private fun keywordActionable(keyword: String) = RuleEntity(
-        type = "keyword_match",
-        pattern = keyword,
-        category = "actionable",
-        confidence = 0.75f,
         source = "system_default"
     )
 }

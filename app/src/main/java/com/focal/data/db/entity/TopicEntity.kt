@@ -38,5 +38,7 @@ data class TopicEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "is_read")
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    @ColumnInfo(name = "briefing_contribution")
+    val briefingContribution: String? = null
 )

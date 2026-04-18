@@ -13,9 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 data class AllNotificationsUiState(
-    val urgent: List<NotificationEntity> = emptyList(),
-    val actionable: List<NotificationEntity> = emptyList(),
-    val digest: List<NotificationEntity> = emptyList(),
+    val matters: List<NotificationEntity> = emptyList(),
     val noise: List<NotificationEntity> = emptyList(),
     val totalCount: Int = 0
 )
@@ -30,12 +28,10 @@ class AllNotificationsViewModel @Inject constructor(
     }
 
     private val categoriesFlow = combine(
-        notificationRepository.getByCategory(ClassificationResult.URGENT),
-        notificationRepository.getByCategory(ClassificationResult.ACTIONABLE),
-        notificationRepository.getByCategory(ClassificationResult.DIGEST),
+        notificationRepository.getByCategory(ClassificationResult.MATTERS),
         notificationRepository.getByCategory(ClassificationResult.NOISE)
-    ) { urgent, actionable, digest, noise ->
-        listOf(urgent, actionable, digest, noise)
+    ) { matters, noise ->
+        listOf(matters, noise)
     }
 
     val uiState: StateFlow<AllNotificationsUiState> = combine(
@@ -43,10 +39,8 @@ class AllNotificationsViewModel @Inject constructor(
         notificationRepository.totalCount()
     ) { categories, total ->
         AllNotificationsUiState(
-            urgent = categories[0].take(MAX_PER_CATEGORY),
-            actionable = categories[1].take(MAX_PER_CATEGORY),
-            digest = categories[2].take(MAX_PER_CATEGORY),
-            noise = categories[3].take(MAX_PER_CATEGORY),
+            matters = categories[0].take(MAX_PER_CATEGORY),
+            noise = categories[1].take(MAX_PER_CATEGORY),
             totalCount = total
         )
     }.stateIn(

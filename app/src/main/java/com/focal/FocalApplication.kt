@@ -42,7 +42,7 @@ class FocalApplication : Application(), Configuration.Provider {
 
     private fun seedDefaultRules() {
         val prefs = getSharedPreferences("focal_prefs", MODE_PRIVATE)
-        val currentVersion = 3
+        val currentVersion = 4
         if (prefs.getInt("rules_seed_version", 0) < currentVersion) {
             applicationScope.launch {
                 ruleRepository.replaceSystemDefaults(DefaultRules.get())

@@ -15,13 +15,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.digest.CategorySection
-import com.focal.ui.theme.ActionableAmber
-import com.focal.ui.theme.ActionableAmberContainer
 import com.focal.ui.theme.DigestBlue
 import com.focal.ui.theme.DigestBlueContainer
 import com.focal.ui.theme.NoiseSurface
-import com.focal.ui.theme.UrgentRed
-import com.focal.ui.theme.UrgentRedContainer
 
 @Composable
 fun AllNotificationsScreen(
@@ -52,40 +48,14 @@ fun AllNotificationsScreen(
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
-        if (state.urgent.isNotEmpty()) {
+        if (state.matters.isNotEmpty()) {
             item {
                 CategorySection(
-                    label = "URGENT",
-                    count = state.urgent.size,
-                    color = UrgentRed,
-                    containerColor = UrgentRedContainer,
-                    notifications = state.urgent,
-                    initiallyExpanded = true
-                )
-            }
-        }
-
-        if (state.actionable.isNotEmpty()) {
-            item {
-                CategorySection(
-                    label = "ACTIONABLE",
-                    count = state.actionable.size,
-                    color = ActionableAmber,
-                    containerColor = ActionableAmberContainer,
-                    notifications = state.actionable,
-                    initiallyExpanded = true
-                )
-            }
-        }
-
-        if (state.digest.isNotEmpty()) {
-            item {
-                CategorySection(
-                    label = "DIGEST",
-                    count = state.digest.size,
+                    label = "MATTERS",
+                    count = state.matters.size,
                     color = DigestBlue,
                     containerColor = DigestBlueContainer,
-                    notifications = state.digest,
+                    notifications = state.matters,
                     initiallyExpanded = true
                 )
             }

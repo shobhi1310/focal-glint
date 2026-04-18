@@ -8,9 +8,7 @@ data class ClassificationResult(
     val reason: String? = null
 ) {
     companion object {
-        const val URGENT = "urgent"
-        const val ACTIONABLE = "actionable"
-        const val DIGEST = "digest"
+        const val MATTERS = "matters"
         const val NOISE = "noise"
         const val UNCATEGORIZED = "uncategorized"
     }

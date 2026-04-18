@@ -33,7 +33,54 @@ object LlmResponseParser {
         }
     }
 
-    private val VALID_CATEGORIES = listOf("urgent", "actionable", "digest", "noise")
+    fun parseMattersClassification(raw: String): ClassificationResult? {
+        return try {
+            val jsonStr = extractJson(raw)
+            if (jsonStr != null) {
+                val json = JSONObject(jsonStr)
+                val matters = json.optBoolean("matters", false)
+                val reason = if (json.has("reason")) json.getString("reason") else null
+                return ClassificationResult(
+                    category = if (matters) ClassificationResult.MATTERS else ClassificationResult.NOISE,
+                    classifiedBy = "llm",
+                    confidence = 0.8f,
+                    reason = reason
+                )
+            }
+
+            // Fallback: look for "matters" or "noise" keywords
+            val text = raw.lowercase()
+            val category = when {
+                text.contains("\"matters\": true") || text.contains("\"matters\":true") -> ClassificationResult.MATTERS
+                text.contains("\"matters\": false") || text.contains("\"matters\":false") -> ClassificationResult.NOISE
+                text.contains("matters") && !text.contains("doesn't matter") && !text.contains("does not matter") -> ClassificationResult.MATTERS
+                text.contains("noise") || text.contains("promotional") || text.contains("doesn't matter") -> ClassificationResult.NOISE
+                else -> return null
+            }
+
+            ClassificationResult(category = category, classifiedBy = "llm", confidence = 0.6f)
+        } catch (e: Exception) {
+            Log.w("LlmResponseParser", "Failed to parse matters response: ${raw.take(200)}", e)
+            null
+        }
+    }
+
+    fun parseNarrative(raw: String): String? {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return null
+        // Remove any preamble like "Here's a summary:" or "Summary:"
+        val cleaned = trimmed
+            .removePrefix("Here's a summary:")
+            .removePrefix("Here is a summary:")
+            .removePrefix("Summary:")
+            .removePrefix("Here's the summary:")
+            .trim()
+        if (cleaned.isBlank()) return null
+        // Take just the first sentence/paragraph
+        return cleaned.lines().firstOrNull { it.isNotBlank() }?.trim()
+    }
+
+    private val VALID_CATEGORIES = listOf("matters", "noise")
 
     /**
      * Normalize fuzzy LLM category responses to valid categories.
@@ -42,9 +89,8 @@ object LlmResponseParser {
     internal fun normalizeCategory(raw: String): String? {
         if (raw in VALID_CATEGORIES) return raw
         return when {
-            raw == "action" || raw == "act" -> "actionable"
-            raw == "info" || raw == "informational" || raw == "information" -> "digest"
-            raw == "urg" -> "urgent"
+            raw == "promo" || raw == "promotional" || raw == "spam" -> "noise"
+            raw == "matter" || raw == "important" || raw == "personal" -> "matters"
             else -> null
         }
     }
@@ -92,7 +138,7 @@ object LlmResponseParser {
             codeBlockPattern.find(trimmed)?.let { return it.groupValues[1] }
         } catch (_: Exception) { /* ICU regex fallback */ }
 
-        val jsonPattern = Regex("\\{[^}]*\"category\"[^}]*}")
+        val jsonPattern = Regex("\\{[^}]*\"(?:category|matters)\"[^}]*}")
         jsonPattern.find(trimmed)?.let { return it.value }
 
         return null

@@ -42,12 +42,8 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideClassifier(
-        inferenceProvider: InferenceProvider,
-        notificationRepository: NotificationRepository,
-        ruleRepository: RuleRepository
-    ): Classifier {
-        return Classifier(inferenceProvider, notificationRepository, ruleRepository)
+    fun provideClassifier(inferenceProvider: InferenceProvider): Classifier {
+        return Classifier(inferenceProvider)
     }
 
     @Provides

@@ -44,7 +44,7 @@ class TopicEngine(
                             summary = notifs.first().content.take(100),
                             category = notifs.groupBy { it.category }
                                 .maxByOrNull { it.value.size }?.key
-                                ?: ClassificationResult.DIGEST,
+                                ?: ClassificationResult.MATTERS,
                             notifications = notifs
                         )
                     } else {
@@ -216,15 +216,13 @@ class TopicEngine(
 
         // Use highest-priority category from merged groups
         val categoryPriority = listOf(
-            ClassificationResult.URGENT,
-            ClassificationResult.ACTIONABLE,
-            ClassificationResult.DIGEST,
+            ClassificationResult.MATTERS,
             ClassificationResult.NOISE,
             ClassificationResult.UNCATEGORIZED
         )
         val category = group.map { it.category }
             .minByOrNull { categoryPriority.indexOf(it).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
-            ?: ClassificationResult.DIGEST
+            ?: ClassificationResult.MATTERS
 
         // Try detail extraction
         val primaryApp = group.maxByOrNull { it.notifications.size } ?: group.first()

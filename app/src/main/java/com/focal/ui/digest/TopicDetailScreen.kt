@@ -31,9 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.intelligence.ClassificationResult
-import com.focal.ui.theme.ActionableAmber
 import com.focal.ui.theme.DigestBlue
-import com.focal.ui.theme.UrgentRed
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -153,9 +151,7 @@ fun TopicDetailScreen(
 @Composable
 private fun CategoryBadge(category: String) {
     val color = when (category) {
-        ClassificationResult.URGENT -> UrgentRed
-        ClassificationResult.ACTIONABLE -> ActionableAmber
-        ClassificationResult.DIGEST -> DigestBlue
+        ClassificationResult.MATTERS -> DigestBlue
         else -> Color.Gray
     }
 

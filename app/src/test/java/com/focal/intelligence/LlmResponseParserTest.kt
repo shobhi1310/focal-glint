@@ -8,145 +8,125 @@ import org.junit.Test
 class LlmResponseParserTest {
 
     @Test
-    fun `parses clean JSON response`() {
-        val raw = """{"category": "urgent", "reason": "OTP message", "confidence": 0.95}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification parses matters true`() {
+        val raw = """{"matters": true, "reason": "Personal message from mom"}"""
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("urgent", result!!.category)
+        assertEquals(ClassificationResult.MATTERS, result!!.category)
         assertEquals("llm", result.classifiedBy)
-        assertEquals("OTP message", result.reason)
-        assertEquals(0.95f, result.confidence, 0.01f)
+        assertEquals("Personal message from mom", result.reason)
     }
 
     @Test
-    fun `parses JSON with surrounding text`() {
-        val raw = """Based on my analysis, here is the result:
-{"category": "noise", "reason": "Promotional content", "confidence": 0.8}
-That's my classification."""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification parses matters false`() {
+        val raw = """{"matters": false, "reason": "Promotional content"}"""
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("noise", result!!.category)
+        assertEquals(ClassificationResult.NOISE, result!!.category)
+        assertEquals("Promotional content", result.reason)
     }
 
     @Test
-    fun `parses JSON in markdown code block`() {
-        val raw = "```json\n{\"category\": \"actionable\", \"reason\": \"Bill payment due\", \"confidence\": 0.7}\n```"
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification parses JSON with surrounding text`() {
+        val raw = """Here is my analysis:
+{"matters": true, "reason": "OTP for login"}
+Done."""
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("actionable", result!!.category)
+        assertEquals(ClassificationResult.MATTERS, result!!.category)
     }
 
     @Test
-    fun `parses actionable category`() {
-        val raw = """{"category": "actionable", "reason": "Requires user action", "confidence": 0.85}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification parses JSON in markdown code block`() {
+        val raw = "```json\n{\"matters\": false, \"reason\": \"Shopping promo\"}\n```"
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("actionable", result!!.category)
-        assertEquals("Requires user action", result.reason)
+        assertEquals(ClassificationResult.NOISE, result!!.category)
     }
 
     @Test
-    fun `parses digest category`() {
-        val raw = """{"category": "digest", "reason": "Chat message to catch up on", "confidence": 0.75}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification falls back to matters true keyword`() {
+        val raw = """The answer is: "matters": true"""
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("digest", result!!.category)
-        assertEquals("Chat message to catch up on", result.reason)
+        assertEquals(ClassificationResult.MATTERS, result!!.category)
     }
 
     @Test
-    fun `informational is normalized to digest`() {
-        val raw = """{"category": "informational", "reason": "Regular message", "confidence": 0.7}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification falls back to noise keyword`() {
+        val raw = "This looks like promotional content, clearly noise."
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals("digest", result!!.category)
+        assertEquals(ClassificationResult.NOISE, result!!.category)
     }
 
     @Test
-    fun `action is normalized to actionable`() {
-        val raw = """{"category": "action", "reason": "Needs action", "confidence": 0.8}"""
-        val result = LlmResponseParser.parseClassification(raw)
-        assertNotNull(result)
-        assertEquals("actionable", result!!.category)
-    }
-
-    @Test
-    fun `info is normalized to digest`() {
-        val raw = """{"category": "info", "reason": "Info update", "confidence": 0.6}"""
-        val result = LlmResponseParser.parseClassification(raw)
-        assertNotNull(result)
-        assertEquals("digest", result!!.category)
-    }
-
-    @Test
-    fun `urg is normalized to urgent`() {
-        val raw = """{"category": "urg", "reason": "Urgent stuff", "confidence": 0.9}"""
-        val result = LlmResponseParser.parseClassification(raw)
-        assertNotNull(result)
-        assertEquals("urgent", result!!.category)
-    }
-
-    @Test
-    fun `handles uppercase category`() {
-        val raw = """{"category": "URGENT", "reason": "test", "confidence": 0.9}"""
-        val result = LlmResponseParser.parseClassification(raw)
-        assertNotNull(result)
-        assertEquals("urgent", result!!.category)
-    }
-
-    @Test
-    fun `returns null for invalid category`() {
-        val raw = """{"category": "important", "reason": "test", "confidence": 0.9}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification returns null for unparseable response`() {
+        val raw = "I don't know what to say here."
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNull(result)
     }
 
     @Test
-    fun `returns null for unparseable response`() {
-        val raw = "I think this is an urgent notification."
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification returns null for empty response`() {
+        val result = LlmResponseParser.parseMattersClassification("")
         assertNull(result)
     }
 
     @Test
-    fun `returns null for empty response`() {
-        val result = LlmResponseParser.parseClassification("")
-        assertNull(result)
-    }
-
-    @Test
-    fun `clamps confidence to valid range`() {
-        val raw = """{"category": "urgent", "reason": "test", "confidence": 1.5}"""
-        val result = LlmResponseParser.parseClassification(raw)
+    fun `parseMattersClassification defaults matters to false when missing`() {
+        val raw = """{"reason": "unclear"}"""
+        val result = LlmResponseParser.parseMattersClassification(raw)
         assertNotNull(result)
-        assertEquals(1.0f, result!!.confidence, 0.01f)
+        assertEquals(ClassificationResult.NOISE, result!!.category)
     }
 
     @Test
-    fun `defaults confidence when missing`() {
-        val raw = """{"category": "noise", "reason": "promo"}"""
-        val result = LlmResponseParser.parseClassification(raw)
-        assertNotNull(result)
-        assertEquals(0.5f, result!!.confidence, 0.01f)
-    }
-
-    @Test
-    fun `parseSummary returns first non-blank line`() {
+    fun `parseNarrative returns trimmed first line`() {
         val raw = "The family is planning a weekend trip to Manali, with Dad booking the hotel."
-        val result = LlmResponseParser.parseSummary(raw)
+        val result = LlmResponseParser.parseNarrative(raw)
         assertEquals("The family is planning a weekend trip to Manali, with Dad booking the hotel.", result)
     }
 
     @Test
-    fun `parseSummary skips Summary prefix`() {
-        val raw = "Summary:\nPlanning weekend trip to Manali."
-        val result = LlmResponseParser.parseSummary(raw)
+    fun `parseNarrative strips Summary preamble`() {
+        val raw = "Summary: Planning weekend trip to Manali."
+        val result = LlmResponseParser.parseNarrative(raw)
         assertEquals("Planning weekend trip to Manali.", result)
     }
 
     @Test
-    fun `parseSummary returns null for blank`() {
-        val result = LlmResponseParser.parseSummary("   ")
+    fun `parseNarrative strips Here's a summary preamble`() {
+        val raw = "Here's a summary: Mom wants dinner at 8."
+        val result = LlmResponseParser.parseNarrative(raw)
+        assertEquals("Mom wants dinner at 8.", result)
+    }
+
+    @Test
+    fun `parseNarrative returns null for blank`() {
+        val result = LlmResponseParser.parseNarrative("   ")
         assertNull(result)
+    }
+
+    @Test
+    fun `parseClassification still works for backward compat binary only`() {
+        val raw = """{"category": "matters", "reason": "Personal", "confidence": 0.9}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals(ClassificationResult.MATTERS, result!!.category)
+    }
+
+    @Test
+    fun `parseClassification rejects old 4-class categories`() {
+        val raw = """{"category": "urgent", "reason": "OTP", "confidence": 0.9}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNull(result)
+    }
+
+    @Test
+    fun `parseSummary still returns first non-blank line`() {
+        val raw = "The family is planning a weekend trip to Manali."
+        val result = LlmResponseParser.parseSummary(raw)
+        assertEquals("The family is planning a weekend trip to Manali.", result)
     }
 }

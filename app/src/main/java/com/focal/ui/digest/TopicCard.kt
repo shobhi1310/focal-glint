@@ -23,12 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.focal.data.db.entity.TopicEntity
 import com.focal.intelligence.ClassificationResult
-import com.focal.ui.theme.ActionableAmber
-import com.focal.ui.theme.ActionableAmberContainer
 import com.focal.ui.theme.DigestBlue
 import com.focal.ui.theme.DigestBlueContainer
-import com.focal.ui.theme.UrgentRed
-import com.focal.ui.theme.UrgentRedContainer
 import org.json.JSONArray
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -119,9 +115,7 @@ fun TopicCard(
 
 private fun categoryColors(category: String): Pair<Color, Color> {
     return when (category) {
-        ClassificationResult.URGENT -> UrgentRed to UrgentRedContainer
-        ClassificationResult.ACTIONABLE -> ActionableAmber to ActionableAmberContainer
-        ClassificationResult.DIGEST -> DigestBlue to DigestBlueContainer
+        ClassificationResult.MATTERS -> DigestBlue to DigestBlueContainer
         else -> Color.Gray to Color.Gray.copy(alpha = 0.1f)
     }
 }

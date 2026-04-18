@@ -1,7 +1,6 @@
 package com.focal.intelligence
 
 import com.focal.data.db.entity.AppProfileEntity
-import com.focal.data.db.entity.CorrectionEntity
 import com.focal.data.db.entity.NotificationEntity
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -9,50 +8,35 @@ import java.util.Locale
 
 object PromptBuilder {
 
-    fun buildClassificationPrompt(
-        notification: NotificationEntity,
-        appProfile: AppProfileEntity?,
-        recentCorrections: List<CorrectionEntity>,
-        correctionNotifications: Map<String, NotificationEntity>
-    ): String {
-        val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
-        val time = timeFormat.format(Date(notification.postedAt))
+    fun buildClassificationPrompt(notification: NotificationEntity): String {
         val message = notification.bigText ?: notification.content
+        return """Does this notification matter personally to the user, or is it generic/promotional?
 
+Notification from ${notification.appName}:
+"${notification.title}: ${message.take(200)}"
+
+Answer with JSON only: {"matters": true, "reason": "..."} or {"matters": false, "reason": "..."}"""
+    }
+
+    fun buildNarrativePrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
-        sb.appendLine("You are a notification classifier. Categorize as: urgent, actionable, digest, or noise.")
+        sb.appendLine("You are a personal assistant briefing the user about their notifications.")
+        sb.appendLine("Write ONE natural sentence summarizing what happened.")
+        sb.appendLine("Be specific — include names, amounts, times, places.")
+        sb.appendLine("Do NOT say \"Here's a summary\" or \"Summary:\" — just state what happened.")
+        sb.appendLine("Write as if telling a friend.")
         sb.appendLine()
-        sb.appendLine("- urgent: needs immediate attention (OTP, emergency, meeting right now)")
-        sb.appendLine("- actionable: requires user action but not immediately (bill due, order to rate, reply needed)")
-        sb.appendLine("- digest: context to catch up on later (chat messages, news, updates)")
-        sb.appendLine("- noise: promotional, duplicate, or irrelevant")
-        sb.appendLine()
-        sb.appendLine("App: ${notification.appName} | Sender: ${notification.title} | Time: $time")
-        sb.appendLine("Message: \"$message\"")
-
-        if (recentCorrections.isNotEmpty()) {
-            sb.appendLine()
-            sb.appendLine("User history (recent corrections):")
-            for (correction in recentCorrections.take(5)) {
-                val corrNotif = correctionNotifications[correction.notificationId]
-                if (corrNotif != null) {
-                    sb.appendLine("- ${corrNotif.appName} from ${corrNotif.title} \"${corrNotif.content.take(50)}\" → user marked ${correction.newCategory.uppercase()}")
-                }
-            }
+        sb.appendLine("Notifications:")
+        notifications.forEachIndexed { index, notif ->
+            val content = notif.bigText ?: notif.content
+            sb.appendLine("[${index + 1}] ${notif.appName} — ${notif.title}: ${content.take(150)}")
         }
-
-        if (appProfile != null) {
-            sb.appendLine()
-            sb.appendLine("App profile: ${appProfile.appName} — ${appProfile.appType} app, noise_ratio: ${String.format("%.2f", appProfile.noiseRatio)}")
-        }
-
         sb.appendLine()
-        sb.appendLine("Respond in JSON only:")
-        sb.appendLine("{\"category\": \"...\", \"reason\": \"...\", \"confidence\": 0.0-1.0}")
-
+        sb.appendLine("Write one sentence:")
         return sb.toString()
     }
 
+    // Legacy summarization prompt — retained for Task 1 transition; Task 2 rewrites Summarizer.
     fun buildSummarizationPrompt(
         appName: String,
         conversationName: String?,
@@ -73,6 +57,25 @@ object PromptBuilder {
         sb.appendLine()
         sb.appendLine("Summary:")
 
+        return sb.toString()
+    }
+
+    fun buildBriefingPrompt(storyNarratives: List<String>, noiseCount: Int): String {
+        val sb = StringBuilder()
+        sb.appendLine("Write a 2-3 line personal briefing for the user.")
+        sb.appendLine("Mention the most important things first. Be concise and specific.")
+        sb.appendLine("Do NOT use bullet points. Write natural sentences.")
+        sb.appendLine()
+        sb.appendLine("Today's stories:")
+        storyNarratives.forEachIndexed { index, narrative ->
+            sb.appendLine("- $narrative")
+        }
+        if (noiseCount > 0) {
+            sb.appendLine()
+            sb.appendLine("$noiseCount promotional/noise notifications were hidden.")
+        }
+        sb.appendLine()
+        sb.appendLine("Write the briefing:")
         return sb.toString()
     }
 }

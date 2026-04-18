@@ -23,7 +23,7 @@ import com.focal.data.db.entity.TopicEntity
         AppProfileEntity::class,
         TopicEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class FocalDatabase : RoomDatabase() {
@@ -65,6 +65,13 @@ abstract class FocalDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE notifications ADD COLUMN notification_key TEXT")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE notifications SET category = 'matters' WHERE category IN ('urgent', 'actionable', 'digest')")
+                db.execSQL("ALTER TABLE topics ADD COLUMN briefing_contribution TEXT")
             }
         }
     }
