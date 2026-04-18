@@ -45,11 +45,10 @@ fun DigestScreen(
                 )
             }
 
-            // Briefing paragraph
-            if (state.briefing != null) {
+            state.briefing?.let { briefingText ->
                 item {
                     Text(
-                        text = state.briefing!!,
+                        text = briefingText,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 4.dp)

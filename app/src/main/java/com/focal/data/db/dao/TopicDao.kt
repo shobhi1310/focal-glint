@@ -20,7 +20,7 @@ interface TopicDao {
     @Update
     suspend fun update(topic: TopicEntity)
 
-    @Query("SELECT * FROM topics WHERE updated_at > :since ORDER BY CASE category WHEN 'urgent' THEN 0 WHEN 'actionable' THEN 1 WHEN 'digest' THEN 2 WHEN 'noise' THEN 3 END, updated_at DESC")
+    @Query("SELECT * FROM topics WHERE updated_at > :since ORDER BY updated_at DESC")
     fun getTopicsSince(since: Long): Flow<List<TopicEntity>>
 
     @Query("SELECT * FROM topics WHERE category = :category AND updated_at > :since ORDER BY updated_at DESC")
