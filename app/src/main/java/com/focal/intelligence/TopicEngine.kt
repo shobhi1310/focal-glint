@@ -38,14 +38,8 @@ class TopicEngine(
             val appTopics = topGroups.mapNotNull { (packageName, notifs) ->
                 try {
                     if (notifs.size < 3) {
-                        // For small groups (1-2 notifs), use notification title as headline
-                        val headline = if (notifs.size == 1) {
-                            notifs.first().title
-                        } else {
-                            "${notifs.first().appName} \u00b7 ${notifs.size} messages"
-                        }
                         AppTopic(
-                            appName = headline,
+                            appName = notifs.first().appName,
                             packageName = packageName,
                             summary = notifs.first().content.take(100),
                             category = notifs.groupBy { it.category }
@@ -204,15 +198,14 @@ class TopicEngine(
 
         val allNotifications = group.flatMap { it.notifications }
         val allNotificationIds = allNotifications.map { it.id }
-        val sourceApps = group.map { it.packageName }.distinct()
+        val sourceAppNames = group.map { it.appName }.distinct()
+        val sourcePackages = group.map { it.packageName }.distinct()
 
         val headline = if (group.size == 1) {
             val topic = group.first()
             if (topic.notifications.size == 1) {
-                // Single notification: use the notification title (e.g., "Darahas Kopparapu")
                 topic.notifications.first().title
             } else {
-                // Multiple from same app: use app name + count
                 "${topic.appName} \u00b7 ${topic.notifications.size} messages"
             }
         } else {
@@ -240,7 +233,7 @@ class TopicEngine(
 
         // Build JSON arrays for notificationIds and sourceApps
         val notificationIdsJson = JSONArray(allNotificationIds).toString()
-        val sourceAppsJson = JSONArray(sourceApps).toString()
+        val sourceAppsJson = JSONArray(sourceAppNames).toString()
 
         return TopicEntity(
             headline = headline,
@@ -248,7 +241,7 @@ class TopicEngine(
             category = category,
             notificationIds = notificationIdsJson,
             sourceApps = sourceAppsJson,
-            channelCount = sourceApps.size,
+            channelCount = sourcePackages.size,
             detailJson = detailJson,
             actionLabel = actionLabel,
             actionPackage = primaryApp.packageName
