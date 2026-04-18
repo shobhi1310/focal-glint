@@ -1,15 +1,18 @@
 package com.focal.di
 
+import android.content.Context
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.LiteRtLmProvider
+import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.Summarizer
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -27,6 +30,12 @@ object IntelligenceModule {
     @Singleton
     fun provideInferenceProvider(): InferenceProvider {
         return LiteRtLmProvider()
+    }
+
+    @Provides
+    @Singleton
+    fun provideModelManager(@ApplicationContext context: Context): ModelManager {
+        return ModelManager(context)
     }
 
     @Provides
