@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -17,11 +18,35 @@ class ClassificationWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val notificationRepository: NotificationRepository,
     private val classifier: Classifier,
+    private val rulesEngine: RulesEngine,
     private val topicEngine: TopicEngine
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         Log.d("ClassificationWorker", "Starting batch processing")
+
+        // Re-apply rules to all recent notifications (catches rule updates)
+        val allRecent = notificationRepository.getRecentNotificationsSnapshot()
+        var reclassified = 0
+        for (notification in allRecent) {
+            try {
+                val ruleResult = rulesEngine.classify(notification)
+                if (ruleResult != null && ruleResult.category != notification.category) {
+                    notificationRepository.markClassified(
+                        notification = notification,
+                        category = ruleResult.category,
+                        classifiedBy = ruleResult.classifiedBy,
+                        ruleId = ruleResult.ruleId
+                    )
+                    reclassified++
+                }
+            } catch (e: Exception) {
+                Log.w("ClassificationWorker", "Rule reclassify failed for ${notification.id}", e)
+            }
+        }
+        if (reclassified > 0) {
+            Log.d("ClassificationWorker", "Reclassified $reclassified notifications with updated rules")
+        }
 
         val pending = notificationRepository.getPendingForClassification()
         if (pending.isNotEmpty()) {

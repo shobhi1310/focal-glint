@@ -45,54 +45,65 @@ fun DigestScreen(
                 )
             }
 
-            state.briefing?.let { briefingText ->
+            if (state.isProcessing) {
                 item {
                     Text(
-                        text = briefingText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-
-            if (state.stories.isEmpty() && state.totalNotifications == 0) {
-                item {
-                    Text(
-                        text = "No notifications yet. Make sure notification access is enabled in Settings.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(top = 32.dp)
-                    )
-                }
-            } else if (state.stories.isEmpty()) {
-                item {
-                    Text(
-                        text = "Processing notifications into stories...",
+                        text = "Refreshing your digest...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
             } else {
-                items(state.stories, key = { it.id }) { topic ->
-                    TopicCard(
-                        topic = topic,
-                        onClick = { onTopicClick(topic.id) }
-                    )
+                state.briefing?.let { briefingText ->
+                    item {
+                        Text(
+                            text = briefingText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
                 }
-            }
 
-            if (state.noiseCount > 0) {
-                item {
-                    Text(
-                        text = "${state.noiseCount} promotional notifications hidden",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                if (state.stories.isEmpty() && state.totalNotifications == 0) {
+                    item {
+                        Text(
+                            text = "No notifications yet. Make sure notification access is enabled in Settings.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(top = 32.dp)
+                        )
+                    }
+                } else if (state.stories.isEmpty()) {
+                    item {
+                        Text(
+                            text = "Processing notifications into stories...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(top = 32.dp)
+                        )
+                    }
+                } else {
+                    items(state.stories, key = { it.id }) { topic ->
+                        TopicCard(
+                            topic = topic,
+                            onClick = { onTopicClick(topic.id) }
+                        )
+                    }
+                }
+
+                if (state.noiseCount > 0) {
+                    item {
+                        Text(
+                            text = "${state.noiseCount} promotional notifications hidden",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
                 }
             }
         }

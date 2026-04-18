@@ -48,12 +48,20 @@ class FocalNotificationListener : NotificationListenerService() {
         if (NotificationExtractor.IGNORED_PACKAGES.contains(sbn.packageName)) return
         if (sbn.isOngoing) return
 
+        if (sbn.notification?.flags?.and(android.app.Notification.FLAG_GROUP_SUMMARY) != 0) return
+
         serviceScope.launch {
             val entity = extractor.extract(sbn)
             if (entity == null) {
                 Log.w("FocalListener", "Failed to extract notification from ${sbn.packageName}")
                 return@launch
             }
+
+            if (NotificationExtractor.isSystemNoise(entity.title, entity.content)) {
+                Log.d("FocalListener", "Filtered system noise: ${entity.appName} - ${entity.title}")
+                return@launch
+            }
+
             Log.d("FocalListener", "Captured: ${entity.appName} - ${entity.title}: ${entity.content}")
 
             val ruleResult = rulesEngine.classify(entity)

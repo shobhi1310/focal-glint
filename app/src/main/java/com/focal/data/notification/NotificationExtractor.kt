@@ -63,7 +63,21 @@ class NotificationExtractor(private val packageManager: PackageManager) {
         val IGNORED_PACKAGES = setOf(
             "android",
             "com.android.systemui",
-            "com.android.providers.downloads"
+            "com.android.providers.downloads",
+            "com.android.mtp"
         )
+
+        private val SYSTEM_NOISE_PATTERNS = listOf(
+            "checking for new messages",
+            "looking for new messages",
+            "syncing new emails",
+            "downloading messages",
+            "connecting to"
+        )
+
+        fun isSystemNoise(title: String, content: String): Boolean {
+            val combined = "$title $content".lowercase()
+            return SYSTEM_NOISE_PATTERNS.any { combined.contains(it) }
+        }
     }
 }

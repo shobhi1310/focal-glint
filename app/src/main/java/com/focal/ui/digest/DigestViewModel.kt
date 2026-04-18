@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
@@ -68,13 +69,19 @@ class DigestViewModel @Inject constructor(
     fun onRefresh() {
         viewModelScope.launch {
             isProcessing.value = true
+            val workManager = WorkManager.getInstance(context)
             val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
+            workManager.enqueueUniqueWork(
                 ClassificationWorker.WORK_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 workRequest
             )
-            isProcessing.value = false
+            workManager.getWorkInfoByIdFlow(workRequest.id).collect { workInfo ->
+                if (workInfo != null && workInfo.state.isFinished) {
+                    isProcessing.value = false
+                    return@collect
+                }
+            }
         }
     }
 }
