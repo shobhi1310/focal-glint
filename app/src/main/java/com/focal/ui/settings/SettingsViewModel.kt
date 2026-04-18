@@ -14,10 +14,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -42,11 +40,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
-    val uiState: StateFlow<SettingsUiState> = _uiState.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = SettingsUiState()
-    )
+    val uiState: StateFlow<SettingsUiState> = _uiState
 
     private var debounceJob: Job? = null
     private val pendingChanges = mutableMapOf<String, String?>()
@@ -126,7 +120,7 @@ class SettingsViewModel @Inject constructor(
 
         _uiState.value = _uiState.value.copy(snackbarMessage = "Changes saved · refreshing digest...")
 
-        delay(3000)
+        delay(2000)
         _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
 }
