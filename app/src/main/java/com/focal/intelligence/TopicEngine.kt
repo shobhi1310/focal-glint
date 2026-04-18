@@ -115,23 +115,24 @@ class TopicEngine(
         val packageName = notifications.first().packageName
 
         val headline: String
+        var isLlmGenerated = false
         if (notifications.size == 1) {
-            // Single notification — use title: content snippet, no LLM needed
             val notif = notifications.first()
             headline = "${notif.title}: ${notif.content.take(60)}"
+            isLlmGenerated = true
         } else if (inferenceProvider.isReady() && currentLlmCallCount < MAX_LLM_CALLS) {
-            // Multiple notifications with LLM available — generate narrative
             headline = try {
                 val prompt = PromptBuilder.buildNarrativePrompt(notifications)
                 val raw = inferenceProvider.generate(prompt, maxTokens = 128)
                 onLlmCall()
-                LlmResponseParser.parseNarrative(raw) ?: "$appName \u00b7 ${notifications.size} messages"
+                val parsed = LlmResponseParser.parseNarrative(raw)
+                isLlmGenerated = parsed != null
+                parsed ?: "$appName \u00b7 ${notifications.size} messages"
             } catch (e: Exception) {
                 Log.w(TAG, "LLM narrative failed for $appName, using template", e)
                 "$appName \u00b7 ${notifications.size} messages"
             }
         } else {
-            // Fallback template
             headline = "$appName \u00b7 ${notifications.size} messages"
         }
 
@@ -156,7 +157,7 @@ class TopicEngine(
             detailJson = detailJson,
             actionLabel = actionLabel,
             actionPackage = packageName,
-            briefingContribution = headline
+            briefingContribution = if (isLlmGenerated) headline else null
         )
     }
 }

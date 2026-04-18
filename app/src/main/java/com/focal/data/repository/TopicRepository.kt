@@ -48,8 +48,7 @@ class TopicRepository(
     }
 
     suspend fun clearAndSaveTopics(topics: List<TopicEntity>) {
-        topicDao.deleteAll()
-        topicDao.insertAll(topics)
+        topicDao.replaceAll(topics)
     }
 
     suspend fun purgeOld() {
