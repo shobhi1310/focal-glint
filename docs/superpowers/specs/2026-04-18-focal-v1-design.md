@@ -397,15 +397,25 @@ focal-glint/
 - Performance tuning: batching strategy, idle/charging scheduling
 - **Milestone:** Digest shows smart summaries, not raw notification text
 
-### Week 5: User Correction + Learning Loop
-- Recategorization bottom sheet UI
+### Week 5: v1.5 — Enhanced Classification & Topic-Based Digest (NEW)
+- 4-class classification: Urgent / Actionable / Digest / Noise (replaces 3-class)
+- Topic clustering engine with cross-app semantic deduplication
+- New Digest screen: topic-based "news shorts" feed with drill-down detail views
+- Topic Detail screen: template-based smart cards (billing, delivery, calendar) + LLM-generated details
+- All Notifications screen: traditional 4-class categorized view
+- Database migration v1→v2 (topics table, category migration)
+- See: `docs/superpowers/specs/2026-04-18-focal-v1.5-topic-digest-design.md`
+- **Milestone:** Topic-based Digest with semantic dedup working on device
+
+### Week 6: User Correction + Learning Loop
+- Recategorization bottom sheet UI (works on topics and individual notifications)
 - Correction → rule scope selection flow
 - Layer 3: LLM-based rule extraction from corrections (every 20 corrections)
 - Few-shot prompt injection from correction history
 - Apps screen with per-app configuration
 - **Milestone:** Full learning loop — correct → rule → smarter future classification
 
-### Week 6: Polish, Settings, Edge Cases
+### Week 7: Polish, Settings, Edge Cases
 - Settings screen (retention period, permissions, model status, about)
 - MIUI battery optimization handling (foreground service, user guidance)
 - 24-hour auto-purge for raw notification data
