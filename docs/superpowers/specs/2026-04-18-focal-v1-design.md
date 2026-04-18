@@ -45,7 +45,7 @@ Focal solves this by running a local LLM to semantically classify and summarize 
 │  │  │  Layer 3: Rule Extraction (periodic, background) │     │
 │  │  │                                                  │     │
 │  │  │  InferenceProvider (Strategy Interface)           │     │
-│  │  │  ├── MediaPipeProvider (v1)                      │     │
+│  │  │  ├── LiteRtLmProvider (v1)                      │     │
 │  │  │  └── MlcLlmProvider (future)                     │     │
 │  │  └─────────────────────────────────────────────────┘     │
 │  └───────────────────────────────────────────────────────────┘
@@ -63,7 +63,7 @@ Focal solves this by running a local LLM to semantically classify and summarize 
 **Key Design Decisions:**
 
 - **Room DB as the hub** — everything flows through the database. Listener writes, Engine reads/writes, UI reads. Simple, debuggable, survives process death.
-- **Strategy pattern for inference** — `InferenceProvider` interface with `MediaPipeProvider` for v1. Swap to MLC LLM later without touching business logic.
+- **Strategy pattern for inference** — `InferenceProvider` interface with `LiteRtLmProvider` for v1. Swap to MLC LLM later without touching business logic.
 - **3-layer intelligence** — Rules are fast (microseconds), LLM is slow (~3-5s). Rules absorb repeat patterns so the LLM only handles novel notifications.
 - **Batch processing** — LLM does not run on every notification in real-time. It processes in batches when the user opens the app or during device idle time via WorkManager.
 
@@ -243,7 +243,7 @@ interface InferenceProvider {
 }
 ```
 
-`MediaPipeProvider` implements this for v1. `MlcLlmProvider` can be added later without changing any business logic in `Classifier`, `Summarizer`, or `RuleExtractor`.
+`LiteRtLmProvider` implements this for v1. `MlcLlmProvider` can be added later without changing any business logic in `Classifier`, `Summarizer`, or `RuleExtractor`.
 
 ### 4.6 Performance Budget (Snapdragon 720G)
 
@@ -323,8 +323,8 @@ List of all apps sorted by notification count. Each row: app icon, name, total c
 | Database | Room |
 | Dependency Injection | Hilt |
 | Background Processing | WorkManager |
-| LLM Runtime | MediaPipe LLM Inference API |
-| LLM Model | Gemma 3 1B (int4 quantized) |
+| LLM Runtime | LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android`) |
+| LLM Model | Gemma 3 1B (1005 MB, `.litertlm` format) |
 | Build System | Gradle (Kotlin DSL) |
 | Architecture | MVVM + Repository pattern |
 
@@ -342,7 +342,7 @@ focal-glint/
 │       │   │   └── repository/           # Data access layer
 │       │   ├── intelligence/
 │       │   │   ├── InferenceProvider.kt  # Strategy interface
-│       │   │   ├── MediaPipeProvider.kt  # v1 implementation
+│       │   │   ├── LiteRtLmProvider.kt  # v1 implementation
 │       │   │   ├── RulesEngine.kt        # Layer 1
 │       │   │   ├── Classifier.kt         # Layer 2 classification
 │       │   │   ├── Summarizer.kt         # Layer 2 summarization
@@ -382,8 +382,8 @@ focal-glint/
 - **Milestone:** Rules-only classification working, visible in Digest
 
 ### Week 3: LLM Integration — Classification
-- MediaPipe SDK integration + Gemma 3 1B model download flow
-- `MediaPipeProvider` implementing `InferenceProvider`
+- LiteRT-LM SDK integration + Gemma 3 1B model download flow
+- `LiteRtLmProvider` implementing `InferenceProvider`
 - Classification prompt engineering + JSON response parsing
 - WorkManager job for batch classification of pending notifications
 - **Critical test:** Measure inference latency on Redmi Note 10 Pro
@@ -431,4 +431,4 @@ focal-glint/
 - **v3: Context-aware DND** — auto-silencing based on time, location, calendar
 - **v3: Multi-modal** — summarizing image-based notifications
 - **v4: Ambient listening** — microphone input for context-aware processing
-- **Future: MLC LLM backend** — swap MediaPipe for MLC for better GPU acceleration on newer devices
+- **Future: Gemma 4 / larger models** — upgrade to Gemma4-E2B or E4B as device RAM allows
