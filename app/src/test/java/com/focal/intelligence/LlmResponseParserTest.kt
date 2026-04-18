@@ -55,10 +55,35 @@ That's my classification."""
     }
 
     @Test
-    fun `informational is now invalid category`() {
+    fun `informational is normalized to digest`() {
         val raw = """{"category": "informational", "reason": "Regular message", "confidence": 0.7}"""
         val result = LlmResponseParser.parseClassification(raw)
-        assertNull(result)
+        assertNotNull(result)
+        assertEquals("digest", result!!.category)
+    }
+
+    @Test
+    fun `action is normalized to actionable`() {
+        val raw = """{"category": "action", "reason": "Needs action", "confidence": 0.8}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals("actionable", result!!.category)
+    }
+
+    @Test
+    fun `info is normalized to digest`() {
+        val raw = """{"category": "info", "reason": "Info update", "confidence": 0.6}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals("digest", result!!.category)
+    }
+
+    @Test
+    fun `urg is normalized to urgent`() {
+        val raw = """{"category": "urg", "reason": "Urgent stuff", "confidence": 0.9}"""
+        val result = LlmResponseParser.parseClassification(raw)
+        assertNotNull(result)
+        assertEquals("urgent", result!!.category)
     }
 
     @Test

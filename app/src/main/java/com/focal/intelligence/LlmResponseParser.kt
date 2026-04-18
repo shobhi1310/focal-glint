@@ -11,8 +11,9 @@ object LlmResponseParser {
             val jsonStr = extractJson(raw)
             if (jsonStr != null) {
                 val json = JSONObject(jsonStr)
-                val category = json.optString("category", "").lowercase().trim()
-                if (category in VALID_CATEGORIES) {
+                val rawCategory = json.optString("category", "").lowercase().trim()
+                val category = normalizeCategory(rawCategory)
+                if (category != null) {
                     val reason = if (json.has("reason")) json.getString("reason") else null
                     val confidence = json.optDouble("confidence", 0.5).toFloat().coerceIn(0f, 1f)
                     return ClassificationResult(
@@ -34,11 +35,26 @@ object LlmResponseParser {
 
     private val VALID_CATEGORIES = listOf("urgent", "actionable", "digest", "noise")
 
+    /**
+     * Normalize fuzzy LLM category responses to valid categories.
+     * Returns null if the category cannot be mapped.
+     */
+    internal fun normalizeCategory(raw: String): String? {
+        if (raw in VALID_CATEGORIES) return raw
+        return when {
+            raw == "action" || raw == "act" -> "actionable"
+            raw == "info" || raw == "informational" || raw == "information" -> "digest"
+            raw == "urg" -> "urgent"
+            else -> null
+        }
+    }
+
     private fun parseMarkdownFormat(raw: String): ClassificationResult? {
         val text = raw.lowercase()
 
-        val categoryPattern = Regex("\\*?\\*?category\\*?\\*?:?\\s*\\*?\\*?\\s*(urgent|actionable|digest|noise)")
-        val category = categoryPattern.find(text)?.groupValues?.get(1) ?: return null
+        val categoryPattern = Regex("\\*?\\*?category\\*?\\*?:?\\s*\\*?\\*?\\s*(\\w+)")
+        val rawCategory = categoryPattern.find(text)?.groupValues?.get(1) ?: return null
+        val category = normalizeCategory(rawCategory) ?: return null
 
         val reasonPattern = Regex("\\*?\\*?reason\\*?\\*?:?\\s*\\*?\\*?\\s*(.+)")
         val reason = reasonPattern.find(text)?.groupValues?.get(1)?.trim()

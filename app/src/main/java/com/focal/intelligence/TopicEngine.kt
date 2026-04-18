@@ -28,13 +28,36 @@ class TopicEngine(
             val grouped = notifications.groupBy { it.packageName }
             Log.d(TAG, "Found ${grouped.size} app groups from ${notifications.size} notifications")
 
+            // Sort by notification count descending, take top 10 to avoid OOM on low-memory devices
+            val topGroups = grouped.entries
+                .sortedByDescending { it.value.size }
+                .take(10)
+
             // Build initial app-level topics
-            val appTopics = grouped.map { (packageName, notifs) ->
-                buildAppTopic(packageName, notifs)
+            val appTopics = topGroups.mapNotNull { (packageName, notifs) ->
+                try {
+                    if (notifs.size < 3) {
+                        // Skip LLM summarization for small groups — use app name as headline
+                        AppTopic(
+                            appName = notifs.first().appName,
+                            packageName = packageName,
+                            summary = notifs.first().content.take(100),
+                            category = notifs.groupBy { it.category }
+                                .maxByOrNull { it.value.size }?.key
+                                ?: ClassificationResult.UNCATEGORIZED,
+                            notifications = notifs
+                        )
+                    } else {
+                        buildAppTopic(packageName, notifs)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to build topic for $packageName, skipping", e)
+                    null
+                }
             }
 
-            // Attempt LLM merge if ready and multiple groups
-            val mergedTopics = if (inferenceProvider.isReady() && appTopics.size > 1) {
+            // Skip LLM merge pass if too many groups to avoid OOM
+            val mergedTopics = if (inferenceProvider.isReady() && appTopics.size in 2..15) {
                 tryMergeTopics(appTopics)
             } else {
                 appTopics.map { listOf(it) }
