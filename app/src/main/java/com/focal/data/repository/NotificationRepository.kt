@@ -80,4 +80,8 @@ class NotificationRepository(
         val since = System.currentTimeMillis() - twentyFourHoursMs
         return notificationDao.getByPackage(packageName, since)
     }
+
+    suspend fun getByIds(ids: List<String>): List<NotificationEntity> {
+        return notificationDao.getByIds(ids)
+    }
 }

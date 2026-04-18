@@ -18,18 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.focal.ui.theme.InformationalBlue
-import com.focal.ui.theme.InformationalBlueContainer
-import com.focal.ui.theme.NoiseSurface
-import com.focal.ui.theme.UrgentRed
-import com.focal.ui.theme.UrgentRedContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DigestScreen(
+    onTopicClick: (String) -> Unit = {},
     viewModel: DigestViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val needAttention = state.urgentCount + state.actionableCount
 
     PullToRefreshBox(
         isRefreshing = state.isProcessing,
@@ -49,63 +47,48 @@ fun DigestScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Last 24h · ${state.totalCount} notifications · ${state.urgentCount} need attention",
+                text = buildString {
+                    append("Last 24h")
+                    append(" \u00B7 ${state.topics.size} topics")
+                    if (needAttention > 0) {
+                        append(" \u00B7 $needAttention need attention")
+                    }
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (state.urgent.isNotEmpty()) {
-                CategorySection(
-                    label = "URGENT",
-                    count = state.urgent.size,
-                    color = UrgentRed,
-                    containerColor = UrgentRedContainer,
-                    notifications = state.urgent,
-                    initiallyExpanded = true
-                )
-            }
-
-            if (state.actionable.isNotEmpty()) {
-                CategorySection(
-                    label = "ACTIONABLE",
-                    count = state.actionable.size,
-                    color = InformationalBlue,
-                    containerColor = InformationalBlueContainer,
-                    notifications = state.actionable,
-                    initiallyExpanded = true
-                )
-            }
-
-            if (state.digest.isNotEmpty()) {
-                CategorySection(
-                    label = "DIGEST",
-                    count = state.digest.size,
-                    color = InformationalBlue,
-                    containerColor = InformationalBlueContainer,
-                    notifications = state.digest,
-                    initiallyExpanded = true
-                )
-            }
-
-            if (state.noise.isNotEmpty()) {
-                CategorySection(
-                    label = "NOISE",
-                    count = state.noise.size,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    containerColor = NoiseSurface,
-                    notifications = state.noise,
-                    initiallyExpanded = false
-                )
-            }
-
-            if (state.totalCount == 0) {
+            if (state.topics.isEmpty() && state.totalNotifications == 0) {
                 Text(
                     text = "No notifications yet. Make sure notification access is enabled in Settings.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.padding(top = 32.dp)
+                )
+            } else if (state.topics.isEmpty()) {
+                Text(
+                    text = "Processing notifications into topics...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 32.dp)
+                )
+            } else {
+                state.topics.forEach { topic ->
+                    TopicCard(
+                        topic = topic,
+                        onClick = { onTopicClick(topic.id) }
+                    )
+                }
+            }
+
+            if (state.noiseCount > 0) {
+                Text(
+                    text = "${state.noiseCount} noise notifications hidden",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

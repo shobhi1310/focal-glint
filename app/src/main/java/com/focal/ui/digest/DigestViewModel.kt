@@ -6,8 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.focal.data.db.entity.NotificationEntity
+import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.TopicRepository
 import com.focal.intelligence.ClassificationResult
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,44 +22,45 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DigestUiState(
-    val urgent: List<NotificationEntity> = emptyList(),
-    val actionable: List<NotificationEntity> = emptyList(),
-    val digest: List<NotificationEntity> = emptyList(),
-    val noise: List<NotificationEntity> = emptyList(),
-    val totalCount: Int = 0,
+    val topics: List<TopicEntity> = emptyList(),
     val urgentCount: Int = 0,
+    val actionableCount: Int = 0,
+    val totalNotifications: Int = 0,
+    val noiseCount: Int = 0,
     val isProcessing: Boolean = false
 )
 
 @HiltViewModel
 class DigestViewModel @Inject constructor(
+    private val topicRepository: TopicRepository,
     private val notificationRepository: NotificationRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val isProcessing = MutableStateFlow(false)
 
-    private val categoriesFlow = combine(
-        notificationRepository.getByCategory(ClassificationResult.URGENT),
-        notificationRepository.getByCategory(ClassificationResult.ACTIONABLE),
-        notificationRepository.getByCategory(ClassificationResult.DIGEST),
-        notificationRepository.getByCategory(ClassificationResult.NOISE),
-    ) { urgent, actionable, digest, noise ->
-        listOf(urgent, actionable, digest, noise)
-    }
-
+    @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<DigestUiState> = combine(
-        categoriesFlow,
+        topicRepository.getRecentTopics(),
+        notificationRepository.countByCategory(ClassificationResult.URGENT),
+        notificationRepository.countByCategory(ClassificationResult.ACTIONABLE),
         notificationRepository.totalCount(),
+        notificationRepository.countByCategory(ClassificationResult.NOISE),
         isProcessing
-    ) { categories, total, processing ->
+    ) { values ->
+        val topics = values[0] as List<TopicEntity>
+        val urgentCount = values[1] as Int
+        val actionableCount = values[2] as Int
+        val totalNotifications = values[3] as Int
+        val noiseCount = values[4] as Int
+        val processing = values[5] as Boolean
+
         DigestUiState(
-            urgent = categories[0],
-            actionable = categories[1],
-            digest = categories[2],
-            noise = categories[3],
-            totalCount = total,
-            urgentCount = categories[0].size,
+            topics = topics.filter { it.category != ClassificationResult.NOISE },
+            urgentCount = urgentCount,
+            actionableCount = actionableCount,
+            totalNotifications = totalNotifications,
+            noiseCount = noiseCount,
             isProcessing = processing
         )
     }.stateIn(
