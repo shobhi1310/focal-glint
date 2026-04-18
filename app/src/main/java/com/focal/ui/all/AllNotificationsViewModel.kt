@@ -25,6 +25,10 @@ class AllNotificationsViewModel @Inject constructor(
     notificationRepository: NotificationRepository
 ) : ViewModel() {
 
+    companion object {
+        private const val MAX_PER_CATEGORY = 20
+    }
+
     private val categoriesFlow = combine(
         notificationRepository.getByCategory(ClassificationResult.URGENT),
         notificationRepository.getByCategory(ClassificationResult.ACTIONABLE),
@@ -39,10 +43,10 @@ class AllNotificationsViewModel @Inject constructor(
         notificationRepository.totalCount()
     ) { categories, total ->
         AllNotificationsUiState(
-            urgent = categories[0],
-            actionable = categories[1],
-            digest = categories[2],
-            noise = categories[3],
+            urgent = categories[0].take(MAX_PER_CATEGORY),
+            actionable = categories[1].take(MAX_PER_CATEGORY),
+            digest = categories[2].take(MAX_PER_CATEGORY),
+            noise = categories[3].take(MAX_PER_CATEGORY),
             totalCount = total
         )
     }.stateIn(
