@@ -32,6 +32,13 @@ object DefaultRules {
         keywordUrgent("emergency"),
         keywordUrgent("call me"),
         keywordUrgent("immediately"),
+
+        keywordActionable("bill"),
+        keywordActionable("due"),
+        keywordActionable("payment"),
+        keywordActionable("pay now"),
+        keywordActionable("expire"),
+        keywordActionable("renew"),
     )
 
     private fun appNoise(packageName: String, category: String = "noise") = RuleEntity(
@@ -55,6 +62,14 @@ object DefaultRules {
         pattern = keyword,
         category = "urgent",
         confidence = 0.8f,
+        source = "system_default"
+    )
+
+    private fun keywordActionable(keyword: String) = RuleEntity(
+        type = "keyword_match",
+        pattern = keyword,
+        category = "actionable",
+        confidence = 0.75f,
         source = "system_default"
     )
 }

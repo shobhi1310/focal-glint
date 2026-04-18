@@ -9,7 +9,18 @@ class RulesEngine(private val ruleRepository: RuleRepository) {
     suspend fun classify(notification: NotificationEntity): ClassificationResult? {
         val rules = ruleRepository.getAllRulesOrdered()
 
-        for (rule in rules) {
+        // Check rules in priority order: keyword_match -> sender_match -> app_match
+        // This ensures content-based actionable detection fires before broad app rules
+        val orderedRules = rules.sortedBy { rule ->
+            when (rule.type) {
+                "keyword_match" -> 0
+                "sender_match" -> 1
+                "app_match" -> 2
+                else -> 3
+            }
+        }
+
+        for (rule in orderedRules) {
             if (matches(rule, notification)) {
                 ruleRepository.incrementHitCount(rule)
                 return ClassificationResult(

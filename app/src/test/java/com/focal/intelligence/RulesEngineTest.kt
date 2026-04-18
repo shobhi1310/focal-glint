@@ -115,4 +115,16 @@ class RulesEngineTest {
         val result = engine.classify(notification(packageName = "com.unknown.app"))
         assertNull(result)
     }
+
+    @Test
+    fun `keyword_match takes priority over app_match`() = runTest {
+        coEvery { ruleRepository.getAllRulesOrdered() } returns listOf(
+            RuleEntity(id = "r-app", type = "app_match", app = "com.whatsapp", category = "digest", source = "system_default"),
+            RuleEntity(id = "r-keyword", type = "keyword_match", pattern = "bill", category = "actionable", source = "system_default")
+        )
+        val result = engine.classify(notification(packageName = "com.whatsapp", content = "Your bill is due"))
+        assertNotNull(result)
+        assertEquals("actionable", result!!.category)
+        assertEquals("r-keyword", result.ruleId)
+    }
 }
