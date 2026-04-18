@@ -21,6 +21,7 @@ import androidx.navigation.navArgument
 import com.focal.ui.all.AllNotificationsScreen
 import com.focal.ui.digest.DigestScreen
 import com.focal.ui.digest.TopicDetailScreen
+import com.focal.ui.settings.SettingsScreen
 
 val bottomNavItems = listOf(Screen.Digest, Screen.All, Screen.Settings)
 
@@ -70,7 +71,7 @@ fun FocalNavigation() {
                 AllNotificationsScreen()
             }
             composable(Screen.Settings.route) {
-                Text("Settings \u2014 coming soon")
+                SettingsScreen()
             }
             composable(
                 route = Screen.TopicDetail.route,
