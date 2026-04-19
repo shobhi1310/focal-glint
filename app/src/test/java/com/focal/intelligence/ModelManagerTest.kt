@@ -20,6 +20,7 @@ class ModelManagerTest {
         tempDir = Files.createTempDirectory("focal_model_test").toFile()
         val context = mockk<Context>(relaxed = true)
         every { context.filesDir } returns tempDir
+        every { context.getExternalFilesDir("models") } returns File(tempDir, "external_models")
         modelManager = ModelManager(context)
     }
 
