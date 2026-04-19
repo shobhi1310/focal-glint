@@ -99,7 +99,7 @@ fun SetupScreen(
                                     Text(
                                         text = buildString {
                                             append(variant.sizeLabel)
-                                            if (state.activeModel == variant) append(" · on device")
+                                            if (variant in state.modelsOnDevice) append(" · on device")
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)

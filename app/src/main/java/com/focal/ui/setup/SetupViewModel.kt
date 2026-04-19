@@ -20,6 +20,7 @@ data class SetupUiState(
     val notificationAccessGranted: Boolean = false,
     val selectedModel: ModelVariant = ModelVariant.GEMMA3_1B,
     val activeModel: ModelVariant? = null,
+    val modelsOnDevice: Set<ModelVariant> = emptySet(),
     val downloadProgress: Int? = null,
     val engineRunning: Boolean = false,
     val errorMessage: String? = null,
@@ -43,13 +44,15 @@ class SetupViewModel @Inject constructor(
     }
 
     fun refresh() {
-        val active = modelManager.activeVariant()
+        val selected = _uiState.value.selectedModel
+        val selectedOnDevice = modelManager.isModelAvailable(selected)
+        val onDevice = ModelVariant.entries.filter { modelManager.isModelAvailable(it) }.toSet()
         _uiState.value = _uiState.value.copy(
             notificationAccessGranted = NotificationManagerCompat
                 .getEnabledListenerPackages(context)
                 .contains(context.packageName),
-            activeModel = active,
-            selectedModel = active ?: _uiState.value.selectedModel,
+            activeModel = if (selectedOnDevice) selected else null,
+            modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
             embeddingModelAvailable = modelManager.isEmbeddingModelAvailable
         )
@@ -64,20 +67,15 @@ class SetupViewModel @Inject constructor(
     }
 
     fun onModelSelected(variant: ModelVariant) {
-        if (variant == _uiState.value.activeModel) {
-            _uiState.value = _uiState.value.copy(selectedModel = variant)
-            return
-        }
-        viewModelScope.launch {
+        val alreadyOnDevice = modelManager.isModelAvailable(variant)
+        if (inferenceProvider.isReady()) {
             inferenceProvider.close()
-            _uiState.value.activeModel?.let { modelManager.deleteModel(it) }
-            _uiState.value = _uiState.value.copy(
-                selectedModel = variant,
-                activeModel = null,
-                engineRunning = false,
-                downloadProgress = null
-            )
         }
+        _uiState.value = _uiState.value.copy(
+            selectedModel = variant,
+            activeModel = if (alreadyOnDevice) variant else null,
+            engineRunning = false
+        )
     }
 
     fun onDownload() {
