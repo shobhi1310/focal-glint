@@ -24,9 +24,10 @@ class LiteRtLmProvider @Inject constructor(
 
     override suspend fun initialize(modelPath: String, useGpu: Boolean) {
         withContext(Dispatchers.IO) {
+            val backend: Backend = if (useGpu) Backend.GPU() else Backend.CPU()
             val config = EngineConfig(
                 modelPath = modelPath,
-                backend = if (useGpu) Backend.GPU() else Backend.CPU,
+                backend = backend,
                 cacheDir = context.cacheDir.absolutePath,
                 maxNumTokens = 8192
             )
@@ -54,8 +55,8 @@ class LiteRtLmProvider @Inject constructor(
                 val conversationConfig = ConversationConfig(
                     samplerConfig = SamplerConfig(
                         topK = 10,
-                        topP = 0.95f,
-                        temperature = 0.3f,
+                        topP = 0.95,
+                        temperature = 0.3,
                     )
                 )
                 eng.createConversation(conversationConfig).use { conversation ->
