@@ -137,6 +137,10 @@ class NotificationRepository(
         notificationDao.resetAllProcessedFlags()
     }
 
+    suspend fun resetUncategorizedForReclassification() {
+        notificationDao.resetUncategorizedForReclassification()
+    }
+
     suspend fun invalidateEmbedding(id: String) {
         notificationDao.invalidateEmbedding(id)
     }

@@ -61,6 +61,9 @@ interface NotificationDao {
     @Query("UPDATE notifications SET processed_for_topics = 0")
     suspend fun resetAllProcessedFlags()
 
+    @Query("UPDATE notifications SET processed_at = NULL WHERE classified_by = 'pending' AND processed_at IS NOT NULL")
+    suspend fun resetUncategorizedForReclassification()
+
     @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL WHERE id = :id")
     suspend fun invalidateEmbedding(id: String)
 }

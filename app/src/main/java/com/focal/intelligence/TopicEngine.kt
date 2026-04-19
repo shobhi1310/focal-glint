@@ -28,6 +28,7 @@ class TopicEngine(
             if (fullRebuild) {
                 Log.d(TAG, "Full rebuild requested")
                 notificationRepository.resetAllProcessedFlags()
+                notificationRepository.resetUncategorizedForReclassification()
                 topicRepository.clearAndSaveTopics(emptyList())
             }
 
