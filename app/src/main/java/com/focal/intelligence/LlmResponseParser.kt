@@ -78,33 +78,54 @@ object LlmResponseParser {
         return cleaned.lines().firstOrNull { it.isNotBlank() }?.trim()
     }
 
-    data class TopicContent(val title: String, val summary: String)
+    data class TopicContent(
+        val title: String,
+        val summary: String,
+        val actions: List<SuggestedAction> = emptyList()
+    )
 
     fun parseTopicContent(raw: String): TopicContent? {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
 
-        // Try to find TITLE: and SUMMARY: markers
         val titleMatch = Regex("(?:TITLE:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
         val summaryMatch = Regex("(?:SUMMARY:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
 
+        val title: String
+        val summary: String
+
         if (titleMatch != null && summaryMatch != null) {
-            return TopicContent(
-                title = titleMatch.groupValues[1].trim().take(60),
-                summary = summaryMatch.groupValues[1].trim().take(300)
-            )
+            title = titleMatch.groupValues[1].trim().take(60)
+            summary = summaryMatch.groupValues[1].trim().take(300)
+        } else {
+            val lines = trimmed.lines().filter { it.isNotBlank() }
+            if (lines.isEmpty()) return null
+            title = lines.first().removePrefix("TITLE:").trim().take(60)
+            summary = if (lines.size > 1) {
+                lines.drop(1).first().removePrefix("SUMMARY:").trim().take(300)
+            } else title
         }
 
-        // Fallback: first line is title, rest is summary
-        val lines = trimmed.lines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return null
-        val title = lines.first().removePrefix("TITLE:").trim().take(60)
-        val summary = if (lines.size > 1) {
-            lines.drop(1).joinToString(" ").removePrefix("SUMMARY:").trim().take(300)
-        } else {
-            title
-        }
-        return TopicContent(title = title, summary = summary)
+        // Parse ACTIONS section
+        val actionsStart = trimmed.indexOf("ACTIONS:", ignoreCase = true)
+        val actions = if (actionsStart >= 0) {
+            val actionsBlock = trimmed.substring(actionsStart + "ACTIONS:".length)
+            actionsBlock.lines()
+                .map { it.trim() }
+                .filter { it.startsWith("- ") }
+                .take(3)
+                .mapNotNull { line ->
+                    val parts = line.removePrefix("- ").split("|").map { it.trim() }
+                    if (parts.size >= 3) {
+                        val type = parts[1].lowercase().let {
+                            if (it in SuggestedAction.VALID_TYPES) it else "open_app"
+                        }
+                        SuggestedAction(label = parts[0], type = type, app = parts[2])
+                    } else null
+                }
+        } else emptyList()
+
+        return TopicContent(title = title, summary = summary, actions = actions)
     }
 
     private val VALID_CATEGORIES = listOf("matters", "noise")
