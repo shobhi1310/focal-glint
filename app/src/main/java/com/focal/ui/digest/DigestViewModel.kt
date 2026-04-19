@@ -45,17 +45,16 @@ class DigestViewModel @Inject constructor(
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<DigestUiState> = combine(
         topicRepository.getStoryTopics(),
-        topicRepository.getBriefing(),
         notificationRepository.countByCategory(ClassificationResult.MATTERS),
         notificationRepository.countByCategory(ClassificationResult.NOISE),
         notificationRepository.totalCount(),
         isProcessing
     ) { values ->
         val stories = values[0] as List<TopicEntity>
-        val mattersCount = values[2] as Int
-        val noiseCount = values[3] as Int
-        val totalNotifications = values[4] as Int
-        val processing = values[5] as Boolean
+        val mattersCount = values[1] as Int
+        val noiseCount = values[2] as Int
+        val totalNotifications = values[3] as Int
+        val processing = values[4] as Boolean
 
         DigestUiState(
             greeting = buildGreeting(),

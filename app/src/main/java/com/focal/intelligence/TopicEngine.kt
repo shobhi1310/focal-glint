@@ -130,7 +130,8 @@ class TopicEngine(
     }
 
     private suspend fun createNewTopic(notif: NotificationEntity) {
-        val headline = "${notif.title}: ${notif.content.take(60)}"
+        val headline = notif.title.take(40)
+        val summary = (notif.bigText ?: notif.content).take(300)
         val sourceApps = JSONArray(listOf(notif.appName)).toString()
         val notificationIds = JSONArray(listOf(notif.id)).toString()
 
@@ -139,7 +140,7 @@ class TopicEngine(
 
         val topic = TopicEntity(
             headline = headline,
-            summary = (notif.bigText ?: notif.content).take(500),
+            summary = summary,
             category = ClassificationResult.MATTERS,
             notificationIds = notificationIds,
             sourceApps = sourceApps,
@@ -175,84 +176,52 @@ class TopicEngine(
         if (dirtyTopics.isEmpty()) return
 
         var llmCallCount = 0
-        val allNarratives = mutableListOf<String>()
-        val noiseCount = notificationRepository.getRecentNotificationsSnapshot()
-            .count { !it.isSummary && it.category == ClassificationResult.NOISE }
 
         for (topic in dirtyTopics) {
             val memberIds = parseJsonArray(topic.notificationIds)
             val members = notificationRepository.getByIds(memberIds)
 
-            val headline: String
+            var headline: String
+            var summary: String
             var isLlmGenerated = false
             val llmSkipped = members.size > 1 && (!inferenceProvider.isReady() || llmCallCount >= MAX_LLM_CALLS)
 
             if (members.size == 1) {
                 val m = members.first()
-                headline = "${m.title}: ${m.content.take(60)}"
+                headline = m.title.take(40)
+                summary = (m.bigText ?: m.content).take(300)
                 isLlmGenerated = true
             } else if (inferenceProvider.isReady() && llmCallCount < MAX_LLM_CALLS) {
                 headline = try {
-                    val prompt = PromptBuilder.buildNarrativePrompt(members)
-                    val raw = inferenceProvider.generate(prompt, maxTokens = 128)
+                    val prompt = PromptBuilder.buildTopicPrompt(members)
+                    val raw = inferenceProvider.generate(prompt, maxTokens = 150)
                     llmCallCount++
-                    val parsed = LlmResponseParser.parseNarrative(raw)
-                    isLlmGenerated = parsed != null
-                    parsed ?: "${members.first().appName} · ${members.size} messages"
+                    val parsed = LlmResponseParser.parseTopicContent(raw)
+                    if (parsed != null) {
+                        isLlmGenerated = true
+                        summary = parsed.summary
+                        parsed.title
+                    } else {
+                        summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
+                        "${members.first().appName} · ${members.size} messages"
+                    }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Narrative generation failed for topic ${topic.id}", e)
+                    Log.w(TAG, "Topic generation failed for topic ${topic.id}", e)
+                    summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
                     "${members.first().appName} · ${members.size} messages"
                 }
             } else {
                 headline = "${members.first().appName} · ${members.size} messages"
+                summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
             }
 
             topicRepository.updateTopicHeadline(
                 topicId = topic.id,
                 headline = headline,
-                summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(500),
-                briefingContribution = if (isLlmGenerated) headline else null
+                summary = summary,
+                briefingContribution = null
             )
             if (!llmSkipped) topicRepository.markClean(topic.id)
-
-            if (isLlmGenerated) allNarratives.add(headline)
-        }
-
-        // Also collect narratives from clean (non-dirty) topics for briefing completeness
-        allTopicsInWindow.filter { !it.needsNarrativeRegen }.forEach {
-            it.briefingContribution?.let { bc -> allNarratives.add(bc) }
-        }
-
-        // Generate briefing
-        if (inferenceProvider.isReady() && allNarratives.isNotEmpty() && llmCallCount < MAX_LLM_CALLS) {
-            try {
-                val briefingPrompt = PromptBuilder.buildBriefingPrompt(allNarratives, noiseCount)
-                val briefingRaw = inferenceProvider.generate(briefingPrompt, maxTokens = 256)
-                val briefingText = briefingRaw.trim().ifBlank { null }
-
-                if (briefingText != null) {
-                    val existingBriefing = topicRepository.getBriefingInWindow(dayStart, dayEnd)
-                    if (existingBriefing != null) {
-                        topicRepository.updateTopicHeadline(
-                            topicId = existingBriefing.id,
-                            headline = "BRIEFING",
-                            summary = briefingText.take(500),
-                            briefingContribution = null
-                        )
-                    } else {
-                        topicRepository.saveTopic(TopicEntity(
-                            headline = "BRIEFING",
-                            summary = briefingText.take(500),
-                            category = ClassificationResult.MATTERS,
-                            notificationIds = "[]",
-                            sourceApps = "[]"
-                        ))
-                    }
-                    Log.d(TAG, "Generated daily briefing")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to generate briefing", e)
-            }
         }
     }
 

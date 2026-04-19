@@ -35,7 +35,7 @@ class Summarizer(
 
         for ((group, notifs) in grouped) {
             if (notifs.size < 2) continue
-            val prompt = PromptBuilder.buildSummarizationPrompt(
+            val prompt = buildSummarizationPrompt(
                 appName = profile.appName,
                 conversationName = group,
                 notifications = notifs.take(20)
@@ -105,11 +105,31 @@ class Summarizer(
         )
     }
 
+    // Legacy prompt — kept here since Summarizer is unused; will be removed with Summarizer.
+    private fun buildSummarizationPrompt(
+        appName: String,
+        conversationName: String?,
+        notifications: List<NotificationEntity>
+    ): String {
+        val label = if (conversationName != null) "$appName — $conversationName" else appName
+        val sb = StringBuilder()
+        sb.appendLine("Summarize these notifications from \"$label\" in one sentence.")
+        sb.appendLine("Focus on decisions, action items, and things the user needs to know.")
+        sb.appendLine()
+        notifications.forEachIndexed { index, notif ->
+            val content = notif.bigText ?: notif.content
+            sb.appendLine("[${index + 1}] ${notif.title}: \"${content.take(100)}\"")
+        }
+        sb.appendLine()
+        sb.appendLine("Summary:")
+        return sb.toString()
+    }
+
     private suspend fun summarizeGeneric(
         profile: AppProfileEntity,
         notifications: List<NotificationEntity>
     ): NotificationEntity? {
-        val prompt = PromptBuilder.buildSummarizationPrompt(
+        val prompt = buildSummarizationPrompt(
             appName = profile.appName,
             conversationName = null,
             notifications = notifications.take(20)

@@ -78,6 +78,35 @@ object LlmResponseParser {
         return cleaned.lines().firstOrNull { it.isNotBlank() }?.trim()
     }
 
+    data class TopicContent(val title: String, val summary: String)
+
+    fun parseTopicContent(raw: String): TopicContent? {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return null
+
+        // Try to find TITLE: and SUMMARY: markers
+        val titleMatch = Regex("(?:TITLE:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
+        val summaryMatch = Regex("(?:SUMMARY:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
+
+        if (titleMatch != null && summaryMatch != null) {
+            return TopicContent(
+                title = titleMatch.groupValues[1].trim().take(60),
+                summary = summaryMatch.groupValues[1].trim().take(300)
+            )
+        }
+
+        // Fallback: first line is title, rest is summary
+        val lines = trimmed.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return null
+        val title = lines.first().removePrefix("TITLE:").trim().take(60)
+        val summary = if (lines.size > 1) {
+            lines.drop(1).joinToString(" ").removePrefix("SUMMARY:").trim().take(300)
+        } else {
+            title
+        }
+        return TopicContent(title = title, summary = summary)
+    }
+
     private val VALID_CATEGORIES = listOf("matters", "noise")
 
     /**

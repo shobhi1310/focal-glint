@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -152,24 +150,9 @@ fun TopicDetailScreen(
             }
         }
 
-        // 6. Action button
-        if (topic.actionPackage != null) {
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                val appLabel = topic.actionLabel ?: topic.actionPackage.substringAfterLast(".")
-                    .replaceFirstChar { it.uppercase() }
-                Button(
-                    onClick = { /* Intent to open app would go here */ },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(text = "Open in $appLabel")
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        // Bottom spacing
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -183,7 +166,7 @@ private fun QuietSummaryCard(summary: String) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "\u2728 QUIET SUMMARY",
+                text = "SUMMARY",
                 style = MaterialTheme.typography.labelSmall.copy(
                     letterSpacing = 2.sp,
                     fontWeight = FontWeight.Medium

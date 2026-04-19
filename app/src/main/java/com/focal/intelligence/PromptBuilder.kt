@@ -9,13 +9,19 @@ object PromptBuilder {
         return "App: ${notification.appName}\nTitle: ${notification.title}\nContent: ${message.take(200)}"
     }
 
-    fun buildNarrativePrompt(notifications: List<NotificationEntity>): String {
+    fun buildTopicPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
-        sb.appendLine("You are a personal assistant briefing the user about their notifications.")
-        sb.appendLine("Write ONE natural sentence summarizing what happened.")
-        sb.appendLine("Be specific — include names, amounts, times, places.")
-        sb.appendLine("Do NOT say \"Here's a summary\" or \"Summary:\" — just state what happened.")
-        sb.appendLine("Write as if telling a friend.")
+        sb.appendLine("You are generating a topic card for a notification digest app.")
+        sb.appendLine("Given these notifications, produce:")
+        sb.appendLine("1. TITLE: A short, action-invoking headline (3-5 words max). Focus on what matters to the user.")
+        sb.appendLine("2. SUMMARY: One sentence explaining what happened. Be specific — names, amounts, times.")
+        sb.appendLine()
+        sb.appendLine("Examples:")
+        sb.appendLine("TITLE: Mom wants Sunday lunch")
+        sb.appendLine("SUMMARY: Two missed calls and a WhatsApp asking if you're bringing Maya.")
+        sb.appendLine()
+        sb.appendLine("TITLE: ₹44K ICICI card charge")
+        sb.appendLine("SUMMARY: Rs 44,000 spent on your ICICI card at Amazon on Apr 18.")
         sb.appendLine()
         sb.appendLine("Notifications:")
         notifications.forEachIndexed { index, notif ->
@@ -23,50 +29,7 @@ object PromptBuilder {
             sb.appendLine("[${index + 1}] ${notif.appName} — ${notif.title}: ${content.take(150)}")
         }
         sb.appendLine()
-        sb.appendLine("Write one sentence:")
-        return sb.toString()
-    }
-
-    // Legacy summarization prompt — retained for Task 1 transition; Task 2 rewrites Summarizer.
-    fun buildSummarizationPrompt(
-        appName: String,
-        conversationName: String?,
-        notifications: List<NotificationEntity>
-    ): String {
-        val label = if (conversationName != null) "$appName — $conversationName" else appName
-
-        val sb = StringBuilder()
-        sb.appendLine("Summarize these notifications from \"$label\" in one sentence.")
-        sb.appendLine("Focus on decisions, action items, and things the user needs to know.")
-        sb.appendLine()
-
-        notifications.forEachIndexed { index, notif ->
-            val content = notif.bigText ?: notif.content
-            sb.appendLine("[${index + 1}] ${notif.title}: \"${content.take(100)}\"")
-        }
-
-        sb.appendLine()
-        sb.appendLine("Summary:")
-
-        return sb.toString()
-    }
-
-    fun buildBriefingPrompt(storyNarratives: List<String>, noiseCount: Int): String {
-        val sb = StringBuilder()
-        sb.appendLine("Write a 2-3 line personal briefing for the user.")
-        sb.appendLine("Mention the most important things first. Be concise and specific.")
-        sb.appendLine("Do NOT use bullet points. Write natural sentences.")
-        sb.appendLine()
-        sb.appendLine("Today's stories:")
-        storyNarratives.forEach { narrative ->
-            sb.appendLine("- $narrative")
-        }
-        if (noiseCount > 0) {
-            sb.appendLine()
-            sb.appendLine("$noiseCount promotional/noise notifications were hidden.")
-        }
-        sb.appendLine()
-        sb.appendLine("Write the briefing:")
+        sb.appendLine("TITLE:")
         return sb.toString()
     }
 }
