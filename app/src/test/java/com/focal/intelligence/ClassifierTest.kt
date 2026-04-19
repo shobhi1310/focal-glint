@@ -7,6 +7,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 
@@ -67,6 +69,27 @@ class ClassifierTest {
         val result = classifier.classify(notification(content = "50% off today!"))
         assertEquals(ClassificationResult.NOISE, result.category)
         assertEquals("llm", result.classifiedBy)
+    }
+
+    @Test
+    fun `classify uses raw system prompt without thinking prefix`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        var capturedSystemInstruction: String? = null
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            capturedSystemInstruction = firstArg()
+            val tools = thirdArg<List<ToolSet>>()
+            tools.filterIsInstance<ClassifyNotificationTool>().first()
+                .classifyNotification("matters", "OTP from bank")
+            emptyFlow()
+        }
+
+        val result = classifier.classify(notification(content = "Your OTP is 123456"))
+
+        assertEquals(ClassificationResult.MATTERS, result.category)
+        assertEquals("llm", result.classifiedBy)
+        assertEquals("OTP from bank", result.reason)
+        assertNotNull(capturedSystemInstruction)
+        assertFalse(capturedSystemInstruction!!.contains("<|think|>"))
     }
 
     @Test

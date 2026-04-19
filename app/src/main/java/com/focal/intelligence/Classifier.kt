@@ -6,9 +6,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 
 private const val TAG = "Classifier"
-private val CLASSIFICATION_SYSTEM = ThinkingMode.withThinkPrefix(
+private const val CLASSIFICATION_SYSTEM =
     "You are a notification classifier. Classify each notification as 'matters' (personally relevant to the user) or 'noise' (generic, promotional, or irrelevant). Call classifyNotification exactly once. No prose."
-)
 
 class Classifier(
     private val inferenceProvider: InferenceProvider
