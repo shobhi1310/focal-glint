@@ -5,6 +5,8 @@ import com.focal.data.db.entity.AppProfileEntity
 import com.focal.data.db.entity.RuleEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.InferenceProvider
+import com.focal.intelligence.ModelManager
 import androidx.work.WorkManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -32,6 +34,8 @@ class SettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var ruleRepository: RuleRepository
     private lateinit var notificationRepository: NotificationRepository
+    private lateinit var inferenceProvider: InferenceProvider
+    private lateinit var modelManager: ModelManager
     private lateinit var context: Context
 
     @Before
@@ -39,6 +43,8 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         ruleRepository = mockk(relaxed = true)
         notificationRepository = mockk(relaxed = true)
+        inferenceProvider = mockk(relaxed = true)
+        modelManager = mockk(relaxed = true)
         context = mockk(relaxed = true)
 
         mockkStatic(WorkManager::class)
@@ -53,7 +59,7 @@ class SettingsViewModelTest {
     }
 
     private fun createViewModel(): SettingsViewModel {
-        return SettingsViewModel(ruleRepository, notificationRepository, context)
+        return SettingsViewModel(ruleRepository, notificationRepository, inferenceProvider, modelManager, context)
     }
 
     private fun setupProfiles(vararg apps: Pair<String, Int>) {
