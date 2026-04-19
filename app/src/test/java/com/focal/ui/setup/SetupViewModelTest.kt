@@ -31,9 +31,14 @@ class SetupViewModelTest {
         context = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
         inferenceProvider = mockk(relaxed = true)
+        workManager = mockk(relaxed = true)
         mockkStatic(NotificationManagerCompat::class)
+        mockkStatic(WorkManager::class)
         every { context.packageName } returns "com.focal"
         every { NotificationManagerCompat.getEnabledListenerPackages(context) } returns emptySet()
+        every { WorkManager.getInstance(context) } returns workManager
+        // cancelAndWait: emit empty list so the flow collector exits immediately
+        every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList<WorkInfo>())
         every { modelManager.activeVariant() } returns null
         every { modelManager.getSelectedVariant() } returns null
         every { modelManager.saveSelectedVariant(any()) } just Runs

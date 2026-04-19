@@ -8,7 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Optional
 
-class GeckoEmbeddingProvider : EmbeddingProvider {
+class GeckoEmbeddingProvider(
+    private val taskType: EmbedData.TaskType = EmbedData.TaskType.CLUSTERING
+) : EmbeddingProvider {
 
     @Volatile private var model: GeckoEmbeddingModel? = null
 
@@ -26,7 +28,7 @@ class GeckoEmbeddingProvider : EmbeddingProvider {
     override suspend fun embed(text: String): FloatArray {
         val m = model ?: throw IllegalStateException("Embedding model not initialized")
         return withContext(Dispatchers.IO) {
-            val embedData = EmbedData.create(text, EmbedData.TaskType.CLUSTERING)
+            val embedData = EmbedData.create(text, taskType)
             val request = EmbeddingRequest.create(listOf(embedData))
             val future = m.getEmbeddings(request)
             val result = future.get()

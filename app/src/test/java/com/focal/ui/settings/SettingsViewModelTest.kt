@@ -9,6 +9,7 @@ import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -56,6 +57,7 @@ class SettingsViewModelTest {
         mockkStatic(WorkManager::class)
         val workManager = mockk<WorkManager>(relaxed = true)
         every { WorkManager.getInstance(any()) } returns workManager
+        every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList<WorkInfo>())
     }
 
     @After
