@@ -156,27 +156,8 @@ fun SetupScreen(
             }
 
             item {
-                val modelAvailable = state.activeModel == state.selectedModel
-                val isDownloading = state.downloadProgress != null
-
                 StepCard(
                     number = 4,
-                    title = "Start Engine",
-                    description = "Load the AI model into memory for classification",
-                    isComplete = state.engineRunning
-                ) {
-                    Button(
-                        onClick = if (state.engineRunning) viewModel::onStopEngine else viewModel::onStartEngine,
-                        enabled = modelAvailable && !isDownloading
-                    ) {
-                        Text(if (state.engineRunning) "Stop" else "Start")
-                    }
-                }
-            }
-
-            item {
-                StepCard(
-                    number = 5,
                     title = "Backend",
                     description = "Choose GPU (faster) or CPU (more compatible) for model inference",
                     isComplete = true
@@ -203,6 +184,25 @@ fun SetupScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
+                    }
+                }
+            }
+
+            item {
+                val modelAvailable = state.activeModel == state.selectedModel
+                val isDownloading = state.downloadProgress != null
+
+                StepCard(
+                    number = 5,
+                    title = "Start Engine",
+                    description = "Load the AI model into memory for classification",
+                    isComplete = state.engineRunning
+                ) {
+                    Button(
+                        onClick = if (state.engineRunning) viewModel::onStopEngine else viewModel::onStartEngine,
+                        enabled = modelAvailable && !isDownloading
+                    ) {
+                        Text(if (state.engineRunning) "Stop" else "Start")
                     }
                 }
             }
