@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.theme.FocalAccent
 import com.focal.ui.theme.ThemeMode
@@ -240,21 +241,12 @@ private fun TuneAppRow(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Circular icon with first letter
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = app.appName.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        // App icon (real icon from PackageManager, letter fallback)
+        AppIcon(
+            packageName = app.packageName,
+            appName = app.appName,
+            size = 36.dp
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 

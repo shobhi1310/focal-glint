@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.NotificationEntity
+import com.focal.ui.components.AppIcon
 import com.focal.ui.components.formatRelativeTime
 
 @Composable
@@ -29,20 +30,11 @@ fun NotificationCard(notification: NotificationEntity, modifier: Modifier = Modi
         modifier = modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = notification.appName.take(1).uppercase(),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
+        AppIcon(
+            packageName = notification.packageName,
+            appName = notification.appName,
+            size = 36.dp
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

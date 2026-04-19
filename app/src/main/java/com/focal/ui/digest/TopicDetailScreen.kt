@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.data.db.entity.NotificationEntity
+import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.components.formatRelativeTime
 import com.focal.ui.components.getAppCategory
@@ -207,21 +208,12 @@ private fun SourceNotificationRow(notification: NotificationEntity) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Circular app icon with first letter
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = notification.appName.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        // App icon (real icon from PackageManager, letter fallback)
+        AppIcon(
+            packageName = notification.packageName,
+            appName = notification.appName,
+            size = 36.dp
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.TopicEntity
+import com.focal.ui.components.AppIcon
 import com.focal.ui.components.formatRelativeTime
 import com.focal.ui.components.getAppCategory
 import com.focal.ui.theme.FocalAccent
@@ -106,7 +107,16 @@ fun TopicCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
-                    sourceApps.take(4).forEach { app ->
+                    // Primary app icon (real icon from PackageManager)
+                    if (topic.actionPackage != null) {
+                        AppIcon(
+                            packageName = topic.actionPackage,
+                            appName = sourceApps.firstOrNull() ?: "",
+                            size = 28.dp
+                        )
+                    }
+                    // Additional source apps (letter fallback since we don't have their package names)
+                    sourceApps.drop(1).take(3).forEach { app ->
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
