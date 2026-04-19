@@ -55,6 +55,14 @@ fun SettingsScreen(
             }
 
             item {
+                BackendToggleRow(
+                    useGpu = state.useGpu,
+                    restarting = state.engineRestarting,
+                    onSelect = { viewModel.setBackendPreference(it) }
+                )
+            }
+
+            item {
                 SetupNavRow(onClick = onNavigateToSetup)
             }
 
@@ -129,6 +137,46 @@ private fun SetupNavRow(onClick: () -> Unit) {
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BackendToggleRow(
+    useGpu: Boolean,
+    restarting: Boolean,
+    onSelect: (Boolean) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Inference Backend",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = if (restarting) "Restarting engine…" else "GPU is faster on supported devices",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                listOf("GPU", "CPU").forEachIndexed { index, label ->
+                    SegmentedButton(
+                        selected = if (index == 0) useGpu else !useGpu,
+                        onClick = { if (!restarting) onSelect(index == 0) },
+                        enabled = !restarting,
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = 2)
+                    ) {
+                        Text(label)
+                    }
+                }
+            }
         }
     }
 }

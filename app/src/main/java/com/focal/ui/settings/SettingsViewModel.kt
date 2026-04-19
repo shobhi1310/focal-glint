@@ -8,6 +8,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.InferenceProvider
+import com.focal.intelligence.ModelManager
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,13 +31,17 @@ data class AppOverride(
 
 data class SettingsUiState(
     val apps: List<AppOverride> = emptyList(),
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val useGpu: Boolean = true,
+    val engineRestarting: Boolean = false
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val notificationRepository: NotificationRepository,
+    private val inferenceProvider: InferenceProvider,
+    private val modelManager: ModelManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -46,6 +52,7 @@ class SettingsViewModel @Inject constructor(
     private val pendingChanges = mutableMapOf<String, String?>()
 
     init {
+        _uiState.value = _uiState.value.copy(useGpu = modelManager.getBackendPreference())
         loadApps()
     }
 
@@ -92,6 +99,27 @@ class SettingsViewModel @Inject constructor(
         debounceJob = viewModelScope.launch {
             delay(3000)
             persistChanges()
+        }
+    }
+
+    fun setBackendPreference(useGpu: Boolean) {
+        if (_uiState.value.engineRestarting) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(engineRestarting = true, useGpu = useGpu)
+            modelManager.saveBackendPreference(useGpu)
+            if (modelManager.isModelAvailable) {
+                try {
+                    inferenceProvider.restart(modelManager.modelPath, useGpu)
+                } catch (e: Exception) {
+                    val fallback = !useGpu
+                    modelManager.saveBackendPreference(fallback)
+                    _uiState.value = _uiState.value.copy(
+                        useGpu = fallback,
+                        snackbarMessage = "Backend switch failed, reverted."
+                    )
+                }
+            }
+            _uiState.value = _uiState.value.copy(engineRestarting = false)
         }
     }
 
