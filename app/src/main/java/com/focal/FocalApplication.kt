@@ -16,6 +16,7 @@ import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.TopicClusteringPolicy
 import com.focal.intelligence.TopicEngine
+import com.focal.ui.theme.ThemePreference
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ class FocalApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        ThemePreference.initialize(this)
         seedDefaultRules()
         migrateTopicClusteringIfNeeded()
         initializeLlmIfModelExists()

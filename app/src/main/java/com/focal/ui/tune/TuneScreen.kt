@@ -19,16 +19,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,7 +43,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.theme.FocalAccent
+import com.focal.ui.theme.ThemeMode
+import com.focal.ui.theme.ThemePreference
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TuneScreen(
     onNavigateToDevSettings: () -> Unit = {},
@@ -67,6 +76,42 @@ fun TuneScreen(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
+
+            // Theme toggle
+            item {
+                SectionHeader(title = "APPEARANCE")
+            }
+            item {
+                val themeMode by ThemePreference.themeMode.collectAsState()
+                val context = LocalContext.current
+                val options = listOf("System", "Light", "Dark")
+                val selectedIndex = when (themeMode) {
+                    ThemeMode.SYSTEM -> 0
+                    ThemeMode.LIGHT -> 1
+                    ThemeMode.DARK -> 2
+                }
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = index == selectedIndex,
+                            onClick = {
+                                val mode = when (index) {
+                                    0 -> ThemeMode.SYSTEM
+                                    1 -> ThemeMode.LIGHT
+                                    else -> ThemeMode.DARK
+                                }
+                                ThemePreference.setThemeMode(context, mode)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                        ) {
+                            Text(label)
+                        }
+                    }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
 
             // Explanation cards row
             item {

@@ -12,3 +12,8 @@ val DarkSurface = Color(0xFF16213E)
 val DarkOnBackground = Color(0xFFE0E0E0)
 val DarkOnSurface = Color(0xFFB0B0B0)
 val FocalAccent = Color(0xFFC8956C)
+
+val LightBackground = Color(0xFFF5F0E8)
+val LightSurface = Color(0xFFECE7DD)
+val LightOnBackground = Color(0xFF2A2A2A)
+val LightOnSurface = Color(0xFF555555)
