@@ -54,9 +54,9 @@ class LiteRtLmProvider @Inject constructor(
             withContext(Dispatchers.IO) {
                 val conversationConfig = ConversationConfig(
                     samplerConfig = SamplerConfig(
-                        topK = 10,
+                        topK = 64,
                         topP = 0.95,
-                        temperature = 0.3,
+                        temperature = 1.0,
                     )
                 )
                 eng.createConversation(conversationConfig).use { conversation ->
