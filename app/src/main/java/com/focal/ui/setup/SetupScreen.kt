@@ -175,10 +175,43 @@ fun SetupScreen(
             }
 
             item {
+                StepCard(
+                    number = 5,
+                    title = "Backend",
+                    description = "Choose GPU (faster) or CPU (more compatible) for model inference",
+                    isComplete = true
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.onToggleBackend(true) },
+                            enabled = !state.backendSwitching && !state.useGpu
+                        ) {
+                            Text(if (state.useGpu) "GPU ✓" else "GPU")
+                        }
+                        Button(
+                            onClick = { viewModel.onToggleBackend(false) },
+                            enabled = !state.backendSwitching && state.useGpu
+                        ) {
+                            Text(if (!state.useGpu) "CPU ✓" else "CPU")
+                        }
+                    }
+                    if (state.backendSwitching) {
+                        Text(
+                            text = "Switching backend...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            item {
                 val isDownloading = state.embeddingDownloadProgress != null
 
                 StepCard(
-                    number = 5,
+                    number = 6,
                     title = "Embedding Model",
                     description = "Download the Gecko embedding model for smart notification grouping (~30 MB)",
                     isComplete = state.embeddingModelAvailable
