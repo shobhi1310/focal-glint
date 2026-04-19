@@ -28,7 +28,7 @@ enum class ModelVariant(
         url = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
         displayName = "Gemma 4 E2B",
         sizeLabel = "2.58 GB",
-        maxContextTokens = 32768
+        maxContextTokens = 8192
     )
 }
 
@@ -87,6 +87,27 @@ class ModelManager(private val context: Context) {
 
     fun activeVariant(): ModelVariant? =
         ModelVariant.entries.firstOrNull { isModelAvailable(it) }
+
+    fun getSelectedVariant(): ModelVariant? {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        val raw = prefs.getString("selected_model_variant", null) ?: return null
+        return ModelVariant.entries.firstOrNull { it.name == raw }
+    }
+
+    fun saveSelectedVariant(variant: ModelVariant) {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("selected_model_variant", variant.name).apply()
+    }
+
+    fun isEngineEnabled(): Boolean {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("llm_engine_enabled", false)
+    }
+
+    fun setEngineEnabled(enabled: Boolean) {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("llm_engine_enabled", enabled).apply()
+    }
 
     fun deleteModel(variant: ModelVariant) {
         modelFileFor(variant).delete()

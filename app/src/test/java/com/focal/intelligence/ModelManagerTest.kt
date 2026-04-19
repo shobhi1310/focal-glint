@@ -1,8 +1,12 @@
 package com.focal.intelligence
 
 import android.content.Context
+import android.content.SharedPreferences
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
+import io.mockk.verify
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -14,13 +18,24 @@ import java.nio.file.Files
 class ModelManagerTest {
     private lateinit var tempDir: File
     private lateinit var modelManager: ModelManager
+    private lateinit var prefs: SharedPreferences
+    private lateinit var editor: SharedPreferences.Editor
 
     @Before
     fun setup() {
         tempDir = Files.createTempDirectory("focal_model_test").toFile()
         val context = mockk<Context>(relaxed = true)
+        prefs = mockk(relaxed = true)
+        editor = mockk(relaxed = true)
         every { context.filesDir } returns tempDir
         every { context.getExternalFilesDir("models") } returns File(tempDir, "external_models")
+        every { context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE) } returns prefs
+        every { prefs.edit() } returns editor
+        every { editor.putString(any(), any()) } returns editor
+        every { editor.putBoolean(any(), any()) } returns editor
+        every { editor.apply() } just runs
+        every { prefs.getString(any(), any()) } answers { secondArg<String?>() }
+        every { prefs.getBoolean(any(), any()) } answers { secondArg<Boolean>() }
         modelManager = ModelManager(context)
     }
 
@@ -37,6 +52,11 @@ class ModelManagerTest {
     @Test
     fun `modelFileFor GEMMA4_E2B returns correct filename`() {
         assertEquals("gemma-4-E2B-it.litertlm", modelManager.modelFileFor(ModelVariant.GEMMA4_E2B).name)
+    }
+
+    @Test
+    fun `GEMMA4_E2B uses 8192 max context tokens`() {
+        assertEquals(8192, ModelVariant.GEMMA4_E2B.maxContextTokens)
     }
 
     @Test
@@ -85,5 +105,17 @@ class ModelManagerTest {
     @Test
     fun `deleteModel does not throw when file absent`() {
         modelManager.deleteModel(ModelVariant.GEMMA3_1B)
+    }
+
+    @Test
+    fun `setEngineEnabled persists boolean flag`() {
+        modelManager.setEngineEnabled(true)
+        verify { editor.putBoolean("llm_engine_enabled", true) }
+    }
+
+    @Test
+    fun `isEngineEnabled reads persisted boolean flag`() {
+        every { prefs.getBoolean("llm_engine_enabled", false) } returns true
+        assertTrue(modelManager.isEngineEnabled())
     }
 }

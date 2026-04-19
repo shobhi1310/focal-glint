@@ -11,6 +11,7 @@ import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 
 @HiltWorker
 class ClassificationWorker @AssistedInject constructor(
@@ -55,12 +56,18 @@ class ClassificationWorker @AssistedInject constructor(
             for (notification in pending) {
                 try {
                     val result = classifier.classify(notification)
-                    notificationRepository.markClassified(
-                        notification = notification,
-                        category = result.category,
-                        classifiedBy = result.classifiedBy
-                    )
-                    classified++
+                    if (result.classifiedBy == "pending") {
+                        Log.d("ClassificationWorker", "LLM not ready, will retry ${notification.id}")
+                    } else {
+                        notificationRepository.markClassified(
+                            notification = notification,
+                            category = result.category,
+                            classifiedBy = result.classifiedBy
+                        )
+                        classified++
+                    }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("ClassificationWorker", "Failed to classify ${notification.id}", e)
                 }
@@ -71,6 +78,8 @@ class ClassificationWorker @AssistedInject constructor(
         try {
             topicEngine.generateTopics()
             Log.d("ClassificationWorker", "Topic generation complete")
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("ClassificationWorker", "Topic generation failed", e)
         }

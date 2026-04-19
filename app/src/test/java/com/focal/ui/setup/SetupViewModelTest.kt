@@ -31,6 +31,12 @@ class SetupViewModelTest {
         every { context.packageName } returns "com.focal"
         every { NotificationManagerCompat.getEnabledListenerPackages(context) } returns emptySet()
         every { modelManager.activeVariant() } returns null
+        every { modelManager.getSelectedVariant() } returns null
+        every { modelManager.saveSelectedVariant(any()) } just Runs
+        every { modelManager.isEngineEnabled() } returns false
+        every { modelManager.setEngineEnabled(any()) } just Runs
+        every { modelManager.isModelAvailable(any()) } returns false
+        every { modelManager.isEmbeddingModelAvailable } returns false
         every { inferenceProvider.isReady() } returns false
     }
 
@@ -67,6 +73,15 @@ class SetupViewModelTest {
     }
 
     @Test
+    fun `init restores persisted selected model even when not active`() = runTest {
+        every { modelManager.getSelectedVariant() } returns ModelVariant.GEMMA4_E2B
+        val vm = createViewModel()
+        advanceUntilIdle()
+        assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.selectedModel)
+        assertNull(vm.uiState.value.activeModel)
+    }
+
+    @Test
     fun `init detects engine running`() = runTest {
         every { inferenceProvider.isReady() } returns true
         val vm = createViewModel()
@@ -77,25 +92,28 @@ class SetupViewModelTest {
     @Test
     fun `onModelSelected same as active only updates selectedModel without side effects`() = runTest {
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
+        every { modelManager.isModelAvailable(ModelVariant.GEMMA3_1B) } returns true
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onModelSelected(ModelVariant.GEMMA3_1B)
         advanceUntilIdle()
         verify(exactly = 0) { inferenceProvider.close() }
-        verify(exactly = 0) { modelManager.deleteModel(any()) }
+        verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA3_1B) }
         assertEquals(ModelVariant.GEMMA3_1B, vm.uiState.value.selectedModel)
     }
 
     @Test
-    fun `onModelSelected different stops engine deletes old and clears active`() = runTest {
+    fun `onModelSelected different stops engine persists selection and clears active`() = runTest {
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
+        every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns false
         every { inferenceProvider.isReady() } returns true
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onModelSelected(ModelVariant.GEMMA4_E2B)
         advanceUntilIdle()
         verify { inferenceProvider.close() }
-        verify { modelManager.deleteModel(ModelVariant.GEMMA3_1B) }
+        verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA4_E2B) }
+        verify { modelManager.setEngineEnabled(false) }
         assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.selectedModel)
         assertNull(vm.uiState.value.activeModel)
         assertFalse(vm.uiState.value.engineRunning)
@@ -138,6 +156,7 @@ class SetupViewModelTest {
         advanceUntilIdle()
         verify { inferenceProvider.close() }
         verify { modelManager.deleteModel(ModelVariant.GEMMA3_1B) }
+        verify { modelManager.setEngineEnabled(false) }
         coVerify { modelManager.downloadModel(ModelVariant.GEMMA3_1B, any()) }
     }
 
@@ -150,6 +169,7 @@ class SetupViewModelTest {
         vm.onStartEngine()
         advanceUntilIdle()
         assertTrue(vm.uiState.value.engineRunning)
+        verify { modelManager.setEngineEnabled(true) }
         coVerify { inferenceProvider.initialize("/path/model.litertlm") }
     }
 
@@ -160,6 +180,7 @@ class SetupViewModelTest {
         advanceUntilIdle()
         vm.onStopEngine()
         verify { inferenceProvider.close() }
+        verify { modelManager.setEngineEnabled(false) }
         assertFalse(vm.uiState.value.engineRunning)
     }
 }

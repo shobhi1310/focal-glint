@@ -43,8 +43,8 @@ interface NotificationDao {
     @Query("DELETE FROM notifications WHERE posted_at < :before")
     suspend fun deleteOlderThan(before: Long)
 
-    @Query("SELECT * FROM notifications WHERE notification_key = :key LIMIT 1")
-    suspend fun getByNotificationKey(key: String): NotificationEntity?
+    @Query("SELECT * FROM notifications WHERE notification_key = :key ORDER BY captured_at DESC, posted_at DESC LIMIT 1")
+    suspend fun getLatestByNotificationKey(key: String): NotificationEntity?
 
     @Query("SELECT * FROM notifications WHERE embedding IS NULL AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
     suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity>

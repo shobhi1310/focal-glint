@@ -132,6 +132,38 @@ class TopicEngineTest {
     }
 
     @Test
+    fun `creates new topic when score is below stricter threshold`() = runTest {
+        val existingVec = makeVec(1f, 0f, 0f)
+        val newVec = makeVec(0.92f, 0.39191836f, 0f)
+
+        val existingNotif = notification(id = "n1", embedding = VectorMath.toBytes(existingVec))
+        val newNotif = notification(id = "n2", title = "Market update", content = "Watchlist move",
+            appName = "WhatsApp", packageName = "com.whatsapp",
+            embedding = VectorMath.toBytes(newVec))
+
+        val existingTopic = TopicEntity(
+            id = "t1",
+            headline = "Mom: Are you coming?",
+            summary = "test",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1")).toString(),
+            sourceApps = JSONArray(listOf("WhatsApp")).toString()
+        )
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(newNotif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(existingTopic)
+        coEvery { notificationRepo.getByIds(listOf("n1")) } returns listOf(existingNotif)
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify(exactly = 0) { topicRepo.updateTopicMembers(eq("t1"), any(), any(), any()) }
+        coVerify { topicRepo.saveTopic(any()) }
+    }
+
+    @Test
     fun `skips notifications with null embedding`() = runTest {
         val notif = notification(id = "n1", embedding = null)
 

@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
@@ -34,7 +35,10 @@ data class SettingsUiState(
     val apps: List<AppOverride> = emptyList(),
     val snackbarMessage: String? = null,
     val useGpu: Boolean = true,
-    val engineRestarting: Boolean = false
+    val engineRestarting: Boolean = false,
+    val isEmbeddingModelAvailable: Boolean = false,
+    val isEmbeddingReady: Boolean = false,
+    val isEmbeddingInitializing: Boolean = false
 )
 
 @HiltViewModel
@@ -42,8 +46,9 @@ class SettingsViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val notificationRepository: NotificationRepository,
     private val inferenceProvider: InferenceProvider,
+    private val embeddingProvider: EmbeddingProvider,
     private val modelManager: ModelManager,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -53,7 +58,11 @@ class SettingsViewModel @Inject constructor(
     private val pendingChanges = mutableMapOf<String, String?>()
 
     init {
-        _uiState.value = _uiState.value.copy(useGpu = modelManager.getBackendPreference())
+        _uiState.value = _uiState.value.copy(
+            useGpu = modelManager.getBackendPreference(),
+            isEmbeddingModelAvailable = modelManager.isEmbeddingModelAvailable,
+            isEmbeddingReady = embeddingProvider.isReady()
+        )
         loadApps()
     }
 
@@ -108,10 +117,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(engineRestarting = true, useGpu = useGpu)
             modelManager.saveBackendPreference(useGpu)
-            if (modelManager.isModelAvailable) {
+            if (modelManager.isEngineEnabled() && modelManager.isModelAvailable) {
                 try {
+                    val workManager = WorkManager.getInstance(context)
+                    workManager.cancelUniqueWork(ClassificationWorker.WORK_NAME)
+                    workManager.getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
+                        .first { infos -> infos.isEmpty() || infos.all { it.state.isFinished } }
                     val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
                     inferenceProvider.restart(modelManager.modelPath, useGpu, variant.maxContextTokens)
+                    reinitializeEmbeddings(useGpu)
                 } catch (e: Exception) {
                     val fallback = !useGpu
                     modelManager.saveBackendPreference(fallback)
@@ -120,8 +134,52 @@ class SettingsViewModel @Inject constructor(
                         snackbarMessage = "Backend switch failed, reverted."
                     )
                 }
+            } else {
+                reinitializeEmbeddings(useGpu)
             }
             _uiState.value = _uiState.value.copy(engineRestarting = false)
+        }
+    }
+
+    private suspend fun reinitializeEmbeddings(useGpu: Boolean) {
+        if (!modelManager.isEmbeddingModelAvailable) return
+        if (embeddingProvider.isReady()) {
+            embeddingProvider.close()
+        }
+        embeddingProvider.initialize(
+            modelManager.geckoModelFile.absolutePath,
+            modelManager.geckoTokenizerFile.absolutePath,
+            useGpu
+        )
+    }
+
+    fun refreshEmbeddingState() {
+        _uiState.value = _uiState.value.copy(
+            isEmbeddingModelAvailable = modelManager.isEmbeddingModelAvailable,
+            isEmbeddingReady = embeddingProvider.isReady()
+        )
+    }
+
+    fun initializeEmbedding() {
+        if (_uiState.value.isEmbeddingInitializing || !_uiState.value.isEmbeddingModelAvailable) return
+        // Re-read actual state — startup may have finished since ViewModel was created
+        if (embeddingProvider.isReady()) {
+            _uiState.value = _uiState.value.copy(isEmbeddingReady = true)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isEmbeddingInitializing = true)
+            try {
+                reinitializeEmbeddings(modelManager.getBackendPreference())
+                _uiState.value = _uiState.value.copy(
+                    isEmbeddingReady = true,
+                    snackbarMessage = "Embedding engine started."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(snackbarMessage = "Failed to start embedding engine.")
+            } finally {
+                _uiState.value = _uiState.value.copy(isEmbeddingInitializing = false)
+            }
         }
     }
 
@@ -144,7 +202,7 @@ class SettingsViewModel @Inject constructor(
         val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             ClassificationWorker.WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             workRequest
         )
 

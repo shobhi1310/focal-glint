@@ -49,33 +49,34 @@ class NotificationRepository(
 
     suspend fun upsertNotification(notification: NotificationEntity) {
         val existing = if (notification.notificationKey != null) {
-            notificationDao.getByNotificationKey(notification.notificationKey)
+            notificationDao.getLatestByNotificationKey(notification.notificationKey)
         } else null
 
         if (existing != null) {
-            // Update existing -- keep the ID, update content and timestamp
-            notificationDao.update(existing.copy(
-                title = notification.title,
-                content = notification.content,
-                bigText = notification.bigText,
-                postedAt = notification.postedAt,
-                extrasJson = notification.extrasJson,
-                // Don't overwrite category if already classified
-                category = if (existing.classifiedBy != "pending") existing.category else notification.category,
-                classifiedBy = if (existing.classifiedBy != "pending") existing.classifiedBy else notification.classifiedBy,
-                processedAt = existing.processedAt
-            ))
-            if (existing.title != notification.title || existing.content != notification.content || existing.bigText != notification.bigText) {
-                notificationDao.invalidateEmbedding(existing.id)
+            if (existing.hasSameVisibleContent(notification)) {
+                return
             }
+            insertNewNotification(notification)
         } else {
-            notificationDao.insert(notification)
-            appProfileDao.insertIfNew(AppProfileEntity(
-                packageName = notification.packageName,
-                appName = notification.appName
-            ))
-            appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
+            insertNewNotification(notification)
         }
+    }
+
+    private suspend fun insertNewNotification(notification: NotificationEntity) {
+        notificationDao.insert(notification)
+        appProfileDao.insertIfNew(AppProfileEntity(
+            packageName = notification.packageName,
+            appName = notification.appName
+        ))
+        appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
+    }
+
+    private fun NotificationEntity.hasSameVisibleContent(other: NotificationEntity): Boolean {
+        return title == other.title &&
+            content == other.content &&
+            bigText == other.bigText &&
+            conversation == other.conversation &&
+            extrasJson == other.extrasJson
     }
 
     suspend fun markClassified(notification: NotificationEntity, category: String, classifiedBy: String, ruleId: String? = null) {

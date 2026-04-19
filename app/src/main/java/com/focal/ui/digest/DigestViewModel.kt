@@ -35,7 +35,7 @@ data class DigestUiState(
 class DigestViewModel @Inject constructor(
     private val topicRepository: TopicRepository,
     private val notificationRepository: NotificationRepository,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val isProcessing = MutableStateFlow(false)
@@ -75,15 +75,16 @@ class DigestViewModel @Inject constructor(
             val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
             workManager.enqueueUniqueWork(
                 ClassificationWorker.WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,
                 workRequest
             )
-            workManager.getWorkInfoByIdFlow(workRequest.id).collect { workInfo ->
-                if (workInfo != null && workInfo.state.isFinished) {
-                    isProcessing.value = false
-                    return@collect
+            workManager.getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
+                .collect { workInfos ->
+                    if (workInfos.isEmpty() || workInfos.all { it.state.isFinished }) {
+                        isProcessing.value = false
+                        return@collect
+                    }
                 }
-            }
         }
     }
 }

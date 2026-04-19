@@ -16,7 +16,6 @@ class TopicEngine(
     companion object {
         private const val TAG = "TopicEngine"
         private const val MAX_LLM_CALLS = 8
-        private const val ASSIGN_THRESHOLD = 0.60f
 
         @Volatile
         var pendingFullRebuild = false
@@ -119,7 +118,7 @@ class TopicEngine(
             }
         }
 
-        if (bestScore >= ASSIGN_THRESHOLD && bestTopicId != null) {
+        if (bestScore >= TopicClusteringPolicy.ASSIGN_THRESHOLD && bestTopicId != null) {
             appendToTopic(bestTopicId, notif)
             topicRepository.markDirty(bestTopicId)
             Log.d(TAG, "Assigned ${notif.appName}/${notif.title} to topic $bestTopicId (score=$bestScore)")
@@ -185,6 +184,7 @@ class TopicEngine(
 
             val headline: String
             var isLlmGenerated = false
+            val llmSkipped = members.size > 1 && (!inferenceProvider.isReady() || llmCallCount >= MAX_LLM_CALLS)
 
             if (members.size == 1) {
                 val m = members.first()
@@ -212,7 +212,7 @@ class TopicEngine(
                 summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(500),
                 briefingContribution = if (isLlmGenerated) headline else null
             )
-            topicRepository.markClean(topic.id)
+            if (!llmSkipped) topicRepository.markClean(topic.id)
 
             if (isLlmGenerated) allNarratives.add(headline)
         }

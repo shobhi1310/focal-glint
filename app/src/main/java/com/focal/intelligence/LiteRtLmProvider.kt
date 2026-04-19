@@ -24,7 +24,7 @@ import javax.inject.Inject
 private val THINKING_CHANNELS = listOf(ThinkingMode.thoughtChannel)
 
 class LiteRtLmProvider @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : InferenceProvider {
 
     private var engine: Engine? = null

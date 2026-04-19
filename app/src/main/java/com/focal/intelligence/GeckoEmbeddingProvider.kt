@@ -10,7 +10,7 @@ import java.util.Optional
 
 class GeckoEmbeddingProvider : EmbeddingProvider {
 
-    private var model: GeckoEmbeddingModel? = null
+    @Volatile private var model: GeckoEmbeddingModel? = null
 
     override suspend fun initialize(modelPath: String, tokenizerPath: String, useGpu: Boolean) {
         withContext(Dispatchers.IO) {

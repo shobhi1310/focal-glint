@@ -31,7 +31,7 @@ data class SetupUiState(
 
 @HiltViewModel
 class SetupViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val modelManager: ModelManager,
     private val inferenceProvider: InferenceProvider
 ) : ViewModel() {
@@ -44,14 +44,15 @@ class SetupViewModel @Inject constructor(
     }
 
     fun refresh() {
-        val selected = _uiState.value.selectedModel
-        val selectedOnDevice = modelManager.isModelAvailable(selected)
+        val activeModel = modelManager.activeVariant()
+        val selected = modelManager.getSelectedVariant() ?: activeModel ?: _uiState.value.selectedModel
         val onDevice = ModelVariant.entries.filter { modelManager.isModelAvailable(it) }.toSet()
         _uiState.value = _uiState.value.copy(
             notificationAccessGranted = NotificationManagerCompat
                 .getEnabledListenerPackages(context)
                 .contains(context.packageName),
-            activeModel = if (selectedOnDevice) selected else null,
+            selectedModel = selected,
+            activeModel = activeModel,
             modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
             embeddingModelAvailable = modelManager.isEmbeddingModelAvailable
@@ -68,8 +69,10 @@ class SetupViewModel @Inject constructor(
 
     fun onModelSelected(variant: ModelVariant) {
         val alreadyOnDevice = modelManager.isModelAvailable(variant)
+        modelManager.saveSelectedVariant(variant)
         if (inferenceProvider.isReady()) {
             inferenceProvider.close()
+            modelManager.setEngineEnabled(false)
         }
         _uiState.value = _uiState.value.copy(
             selectedModel = variant,
@@ -87,6 +90,7 @@ class SetupViewModel @Inject constructor(
         val variant = _uiState.value.selectedModel
         viewModelScope.launch {
             inferenceProvider.close()
+            modelManager.setEngineEnabled(false)
             modelManager.deleteModel(variant)
             _uiState.value = _uiState.value.copy(activeModel = null, engineRunning = false)
             startDownload(variant)
@@ -116,6 +120,7 @@ class SetupViewModel @Inject constructor(
                     modelManager.modelFileFor(variant).absolutePath,
                     maxContextTokens = variant.maxContextTokens
                 )
+                modelManager.setEngineEnabled(true)
                 _uiState.value = _uiState.value.copy(engineRunning = true, errorMessage = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessage = "Failed to start engine: ${e.message}")
@@ -125,6 +130,7 @@ class SetupViewModel @Inject constructor(
 
     fun onStopEngine() {
         inferenceProvider.close()
+        modelManager.setEngineEnabled(false)
         _uiState.value = _uiState.value.copy(engineRunning = false)
     }
 

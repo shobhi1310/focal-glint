@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,10 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshEmbeddingState()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -59,6 +65,15 @@ fun SettingsScreen(
                     useGpu = state.useGpu,
                     restarting = state.engineRestarting,
                     onSelect = { viewModel.setBackendPreference(it) }
+                )
+            }
+
+            item {
+                EmbeddingEngineRow(
+                    isModelAvailable = state.isEmbeddingModelAvailable,
+                    isReady = state.isEmbeddingReady,
+                    isInitializing = state.isEmbeddingInitializing,
+                    onInitialize = { viewModel.initializeEmbedding() }
                 )
             }
 
@@ -175,6 +190,49 @@ private fun BackendToggleRow(
                     ) {
                         Text(label)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmbeddingEngineRow(
+    isModelAvailable: Boolean,
+    isReady: Boolean,
+    isInitializing: Boolean,
+    onInitialize: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Embedding Engine",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = when {
+                        !isModelAvailable -> "Model not downloaded"
+                        isInitializing -> "Starting…"
+                        isReady -> "Active"
+                        else -> "Not started"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            if (isModelAvailable && !isInitializing) {
+                Button(onClick = onInitialize) {
+                    Text(if (isReady) "Restart" else "Start")
                 }
             }
         }
