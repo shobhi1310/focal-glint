@@ -3,7 +3,6 @@ package com.focal.intelligence
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * On-device embedding provider using the Gecko embedding model via AI Edge RAG SDK.
@@ -19,21 +18,29 @@ class GeckoEmbeddingProvider : EmbeddingProvider {
 
     override suspend fun initialize(modelPath: String, tokenizerPath: String, useGpu: Boolean) {
         withContext(Dispatchers.IO) {
-            try {
-                val clazz = Class.forName(GECKO_CLASS)
-                val ctor = clazz.getConstructor(
-                    String::class.java,
-                    java.util.Optional::class.java,
-                    Boolean::class.javaPrimitiveType
-                )
-                embedder = ctor.newInstance(modelPath, java.util.Optional.of(tokenizerPath), useGpu)
-                embedMethod = clazz.getMethod("embed", String::class.java)
-                Log.d(TAG, "Gecko embedding model initialized (gpu=$useGpu)")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load Gecko embedding model via reflection", e)
-                embedder = null
-                embedMethod = null
+            for (className in GECKO_CLASS_CANDIDATES) {
+                try {
+                    val clazz = Class.forName(className)
+                    val ctor = clazz.getConstructor(
+                        String::class.java,
+                        java.util.Optional::class.java,
+                        Boolean::class.javaPrimitiveType
+                    )
+                    embedder = ctor.newInstance(
+                        modelPath,
+                        java.util.Optional.of(tokenizerPath),
+                        useGpu
+                    )
+                    embedMethod = clazz.getMethod("embed", String::class.java)
+                    Log.d(TAG, "Gecko embedding model initialized via $className (gpu=$useGpu)")
+                    return@withContext
+                } catch (e: ClassNotFoundException) {
+                    Log.d(TAG, "Class not found: $className, trying next candidate")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to instantiate $className", e)
+                }
             }
+            Log.e(TAG, "No Gecko embedding model class found in any candidate path")
         }
     }
 
@@ -58,7 +65,11 @@ class GeckoEmbeddingProvider : EmbeddingProvider {
 
     companion object {
         private const val TAG = "GeckoEmbedding"
-        private const val GECKO_CLASS =
-            "com.google.ai.edge.localagents.rag.memory.GeckoEmbeddingModel"
+        private val GECKO_CLASS_CANDIDATES = listOf(
+            "com.google.ai.edge.localagents.rag.memory.embedding.GeckoEmbeddingModel",
+            "com.google.ai.edge.localagents.rag.memory.GeckoEmbeddingModel",
+            "com.google.ai.edge.localagents.rag.embedding.GeckoEmbeddingModel",
+            "com.google.ai.edge.localagents.rag.GeckoEmbeddingModel"
+        )
     }
 }
