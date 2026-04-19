@@ -9,155 +9,262 @@ import org.json.JSONArray
 
 class TopicEngine(
     private val inferenceProvider: InferenceProvider,
+    private val embeddingProvider: EmbeddingProvider,
     private val notificationRepository: NotificationRepository,
     private val topicRepository: TopicRepository
 ) {
     companion object {
         private const val TAG = "TopicEngine"
         private const val MAX_LLM_CALLS = 8
+        private const val ASSIGN_THRESHOLD = 0.60f
+
+        @Volatile
+        var pendingFullRebuild = false
     }
 
-    suspend fun generateTopics() {
+    suspend fun generateTopics(fullRebuild: Boolean = pendingFullRebuild.also { pendingFullRebuild = false }) {
         try {
-            val allNotifications = notificationRepository.getRecentNotificationsSnapshot()
+            val (dayStart, dayEnd) = DayWindow.getWindow()
 
-            val mattersNotifications = allNotifications
-                .filter {
-                    !it.isSummary &&
-                        it.category == ClassificationResult.MATTERS
+            if (fullRebuild) {
+                Log.d(TAG, "Full rebuild requested")
+                notificationRepository.resetAllProcessedFlags()
+                topicRepository.clearAndSaveTopics(emptyList())
+            }
+
+            // Phase 1: Embed unembedded notifications
+            if (embeddingProvider.isReady()) {
+                val unembedded = notificationRepository.getUnembedded(dayStart, dayEnd)
+                if (unembedded.isNotEmpty()) {
+                    Log.d(TAG, "Embedding ${unembedded.size} notifications")
+                    for (notif in unembedded) {
+                        try {
+                            val text = buildEmbeddingText(notif)
+                            if (text.isBlank()) continue
+                            val vec = embeddingProvider.embed(text)
+                            notificationRepository.setEmbedding(notif.id, VectorMath.toBytes(vec))
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to embed ${notif.id}", e)
+                        }
+                    }
                 }
+            }
 
-            if (mattersNotifications.isEmpty()) {
-                Log.d(TAG, "No recent MATTERS notifications, skipping topic generation")
+            // Phase 2: Assign unprocessed notifications to topics
+            val unprocessed = notificationRepository.getUnprocessedMatters(dayStart, dayEnd)
+            if (unprocessed.isEmpty()) {
+                Log.d(TAG, "No unprocessed notifications")
                 return
             }
 
-            val noiseCount = allNotifications.count {
-                !it.isSummary && it.category == ClassificationResult.NOISE
-            }
+            Log.d(TAG, "Assigning ${unprocessed.size} notifications to topics")
+            val processedIds = mutableListOf<String>()
 
-            Log.d(TAG, "Processing ${mattersNotifications.size} MATTERS notifications, $noiseCount noise hidden")
-
-            // Group by app (packageName)
-            val appGroups = mattersNotifications.groupBy { it.packageName }
-
-            // Sort by notification count descending, take top 10 to avoid OOM on low-memory devices
-            val topAppGroups = appGroups.entries
-                .sortedByDescending { it.value.size }
-                .take(10)
-
-            var llmCallCount = 0
-            val storyTopics = mutableListOf<TopicEntity>()
-            val allNarratives = mutableListOf<String>()
-
-            for ((packageName, appNotifications) in topAppGroups) {
-                // Sub-group by conversation/sender
-                val senderGroups = appNotifications.groupBy { notif ->
-                    notif.conversation ?: notif.title
-                }
-
-                for ((_, senderNotifications) in senderGroups) {
-                    try {
-                        val topic = buildStoryTopic(
-                            senderNotifications,
-                            llmCallCount
-                        ) { llmCallCount++ }
-
-                        storyTopics.add(topic)
-                        topic.briefingContribution?.let { allNarratives.add(it) }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to build topic for sender group in $packageName, skipping", e)
-                    }
-                }
-            }
-
-            // Generate daily briefing
-            val allTopics = mutableListOf<TopicEntity>()
-            allTopics.addAll(storyTopics)
-
-            if (inferenceProvider.isReady() && allNarratives.isNotEmpty() && llmCallCount < MAX_LLM_CALLS) {
+            for (notif in unprocessed) {
                 try {
-                    val briefingPrompt = PromptBuilder.buildBriefingPrompt(allNarratives, noiseCount)
-                    val briefingRaw = inferenceProvider.generate(briefingPrompt, maxTokens = 256)
-                    val briefingText = briefingRaw.trim().ifBlank { null }
-
-                    if (briefingText != null) {
-                        val briefingTopic = TopicEntity(
-                            headline = "BRIEFING",
-                            summary = briefingText.take(500),
-                            category = ClassificationResult.MATTERS,
-                            notificationIds = "[]",
-                            sourceApps = "[]"
-                        )
-                        allTopics.add(briefingTopic)
-                        Log.d(TAG, "Generated daily briefing")
+                    val vec = notif.embedding?.let { VectorMath.toFloats(it) }
+                    if (vec == null) {
+                        processedIds.add(notif.id)
+                        continue
                     }
+                    assignOrCreateTopic(notif, vec, dayStart, dayEnd)
+                    processedIds.add(notif.id)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to generate briefing, skipping", e)
+                    Log.w(TAG, "Failed to assign ${notif.id}", e)
                 }
             }
 
-            if (allTopics.isNotEmpty()) {
-                topicRepository.clearAndSaveTopics(allTopics)
-                Log.d(TAG, "Saved ${allTopics.size} topics (${storyTopics.size} stories)")
+            if (processedIds.isNotEmpty()) {
+                notificationRepository.markProcessedForTopics(processedIds)
             }
+
+            // Phase 3: Regenerate narratives for dirty topics
+            regenerateNarratives(dayStart, dayEnd)
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to generate topics", e)
         }
     }
 
-    private suspend fun buildStoryTopic(
-        notifications: List<NotificationEntity>,
-        currentLlmCallCount: Int,
-        onLlmCall: () -> Unit
-    ): TopicEntity {
-        val appName = notifications.first().appName
-        val packageName = notifications.first().packageName
+    private suspend fun assignOrCreateTopic(
+        notif: NotificationEntity,
+        vec: FloatArray,
+        dayStart: Long,
+        dayEnd: Long
+    ) {
+        val activeTopics = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
 
-        val headline: String
-        var isLlmGenerated = false
-        if (notifications.size == 1) {
-            val notif = notifications.first()
-            headline = "${notif.title}: ${notif.content.take(60)}"
-            isLlmGenerated = true
-        } else if (inferenceProvider.isReady() && currentLlmCallCount < MAX_LLM_CALLS) {
-            headline = try {
-                val prompt = PromptBuilder.buildNarrativePrompt(notifications)
-                val raw = inferenceProvider.generate(prompt, maxTokens = 128)
-                onLlmCall()
-                val parsed = LlmResponseParser.parseNarrative(raw)
-                isLlmGenerated = parsed != null
-                parsed ?: "$appName \u00b7 ${notifications.size} messages"
-            } catch (e: Exception) {
-                Log.w(TAG, "LLM narrative failed for $appName, using template", e)
-                "$appName \u00b7 ${notifications.size} messages"
-            }
-        } else {
-            headline = "$appName \u00b7 ${notifications.size} messages"
+        if (activeTopics.isEmpty()) {
+            createNewTopic(notif)
+            return
         }
 
-        // Detail extraction
-        val appType = DetailTemplates.detectAppType(appName, packageName)
-        val (detailJson, actionLabel) = DetailTemplates.tryExtractDetail(notifications, appType)
+        var bestTopicId: String? = null
+        var bestScore = Float.NEGATIVE_INFINITY
 
-        // Build notification IDs and source apps
-        val notificationIds = notifications.map { it.id }
-        val notificationIdsJson = JSONArray(notificationIds).toString()
-        val sourceAppsJson = JSONArray(listOf(appName)).toString()
+        for (topic in activeTopics) {
+            val memberIds = parseJsonArray(topic.notificationIds)
+            val members = notificationRepository.getByIds(memberIds)
 
-        return TopicEntity(
+            var topicBest = Float.NEGATIVE_INFINITY
+            for (m in members) {
+                val mv = m.embedding?.let { VectorMath.toFloats(it) } ?: continue
+                val s = VectorMath.dot(vec, mv)
+                if (s > topicBest) topicBest = s
+            }
+
+            if (topicBest > bestScore) {
+                bestScore = topicBest
+                bestTopicId = topic.id
+            }
+        }
+
+        if (bestScore >= ASSIGN_THRESHOLD && bestTopicId != null) {
+            appendToTopic(bestTopicId, notif)
+            topicRepository.markDirty(bestTopicId)
+            Log.d(TAG, "Assigned ${notif.appName}/${notif.title} to topic $bestTopicId (score=$bestScore)")
+        } else {
+            createNewTopic(notif)
+            Log.d(TAG, "Created new topic for ${notif.appName}/${notif.title} (bestScore=$bestScore)")
+        }
+    }
+
+    private suspend fun createNewTopic(notif: NotificationEntity) {
+        val headline = "${notif.title}: ${notif.content.take(60)}"
+        val sourceApps = JSONArray(listOf(notif.appName)).toString()
+        val notificationIds = JSONArray(listOf(notif.id)).toString()
+
+        val appType = DetailTemplates.detectAppType(notif.appName, notif.packageName)
+        val (detailJson, actionLabel) = DetailTemplates.tryExtractDetail(listOf(notif), appType)
+
+        val topic = TopicEntity(
             headline = headline,
-            summary = notifications.joinToString(". ") {
-                (it.bigText ?: it.content).take(100)
-            }.take(500),
+            summary = (notif.bigText ?: notif.content).take(500),
             category = ClassificationResult.MATTERS,
-            notificationIds = notificationIdsJson,
-            sourceApps = sourceAppsJson,
+            notificationIds = notificationIds,
+            sourceApps = sourceApps,
             channelCount = 1,
             detailJson = detailJson,
             actionLabel = actionLabel,
-            actionPackage = packageName,
-            briefingContribution = if (isLlmGenerated) headline else null
+            actionPackage = notif.packageName,
+            needsNarrativeRegen = true
         )
+        topicRepository.saveTopic(topic)
+    }
+
+    private suspend fun appendToTopic(topicId: String, notif: NotificationEntity) {
+        val topic = topicRepository.getById(topicId) ?: return
+        val existingIds = parseJsonArray(topic.notificationIds).toMutableList()
+        existingIds.add(notif.id)
+
+        val existingApps = parseJsonArray(topic.sourceApps).toMutableSet()
+        existingApps.add(notif.appName)
+
+        topicRepository.updateTopicMembers(
+            topicId = topicId,
+            notificationIds = JSONArray(existingIds).toString(),
+            sourceApps = JSONArray(existingApps.toList()).toString(),
+            channelCount = existingApps.size
+        )
+    }
+
+    private suspend fun regenerateNarratives(dayStart: Long, dayEnd: Long) {
+        val allTopicsInWindow = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
+        val dirtyTopics = allTopicsInWindow.filter { it.needsNarrativeRegen }
+
+        if (dirtyTopics.isEmpty()) return
+
+        var llmCallCount = 0
+        val allNarratives = mutableListOf<String>()
+        val noiseCount = notificationRepository.getRecentNotificationsSnapshot()
+            .count { !it.isSummary && it.category == ClassificationResult.NOISE }
+
+        for (topic in dirtyTopics) {
+            val memberIds = parseJsonArray(topic.notificationIds)
+            val members = notificationRepository.getByIds(memberIds)
+
+            val headline: String
+            var isLlmGenerated = false
+
+            if (members.size == 1) {
+                val m = members.first()
+                headline = "${m.title}: ${m.content.take(60)}"
+                isLlmGenerated = true
+            } else if (inferenceProvider.isReady() && llmCallCount < MAX_LLM_CALLS) {
+                headline = try {
+                    val prompt = PromptBuilder.buildNarrativePrompt(members)
+                    val raw = inferenceProvider.generate(prompt, maxTokens = 128)
+                    llmCallCount++
+                    val parsed = LlmResponseParser.parseNarrative(raw)
+                    isLlmGenerated = parsed != null
+                    parsed ?: "${members.first().appName} · ${members.size} messages"
+                } catch (e: Exception) {
+                    Log.w(TAG, "Narrative generation failed for topic ${topic.id}", e)
+                    "${members.first().appName} · ${members.size} messages"
+                }
+            } else {
+                headline = "${members.first().appName} · ${members.size} messages"
+            }
+
+            topicRepository.updateTopicHeadline(
+                topicId = topic.id,
+                headline = headline,
+                summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(500),
+                briefingContribution = if (isLlmGenerated) headline else null
+            )
+            topicRepository.markClean(topic.id)
+
+            if (isLlmGenerated) allNarratives.add(headline)
+        }
+
+        // Also collect narratives from clean (non-dirty) topics for briefing completeness
+        allTopicsInWindow.filter { !it.needsNarrativeRegen }.forEach {
+            it.briefingContribution?.let { bc -> allNarratives.add(bc) }
+        }
+
+        // Generate briefing
+        if (inferenceProvider.isReady() && allNarratives.isNotEmpty() && llmCallCount < MAX_LLM_CALLS) {
+            try {
+                val briefingPrompt = PromptBuilder.buildBriefingPrompt(allNarratives, noiseCount)
+                val briefingRaw = inferenceProvider.generate(briefingPrompt, maxTokens = 256)
+                val briefingText = briefingRaw.trim().ifBlank { null }
+
+                if (briefingText != null) {
+                    val existingBriefing = topicRepository.getBriefingInWindow(dayStart, dayEnd)
+                    if (existingBriefing != null) {
+                        topicRepository.updateTopicHeadline(
+                            topicId = existingBriefing.id,
+                            headline = "BRIEFING",
+                            summary = briefingText.take(500),
+                            briefingContribution = null
+                        )
+                    } else {
+                        topicRepository.saveTopic(TopicEntity(
+                            headline = "BRIEFING",
+                            summary = briefingText.take(500),
+                            category = ClassificationResult.MATTERS,
+                            notificationIds = "[]",
+                            sourceApps = "[]"
+                        ))
+                    }
+                    Log.d(TAG, "Generated daily briefing")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to generate briefing", e)
+            }
+        }
+    }
+
+    private fun buildEmbeddingText(notif: NotificationEntity): String {
+        val content = notif.bigText ?: notif.content
+        if (notif.title.isBlank() && content.isBlank()) return ""
+        return "${notif.appName} — ${notif.title}: ${content.take(300)}"
+    }
+
+    private fun parseJsonArray(json: String): List<String> {
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (_: Exception) { emptyList() }
     }
 }
