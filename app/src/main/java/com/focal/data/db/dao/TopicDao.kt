@@ -64,4 +64,7 @@ interface TopicDao {
 
     @Query("UPDATE topics SET needs_narrative_regen = 0 WHERE id = :id")
     suspend fun markClean(id: String)
+
+    @Query("UPDATE topics SET suggested_actions = :actionsJson, updated_at = :timestamp WHERE id = :topicId")
+    suspend fun updateActions(topicId: String, actionsJson: String, timestamp: Long)
 }

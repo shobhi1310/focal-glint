@@ -95,4 +95,8 @@ class TopicRepository(
     suspend fun markClean(topicId: String) {
         topicDao.markClean(topicId)
     }
+
+    suspend fun updateTopicActions(topicId: String, actionsJson: String) {
+        topicDao.updateActions(topicId, actionsJson, System.currentTimeMillis())
+    }
 }

@@ -191,6 +191,7 @@ class TopicEngine(
             var headline: String
             var summary: String
             var isLlmGenerated = false
+            var actions: List<SuggestedAction> = emptyList()
             val llmSkipped = members.size > 1 && (!inferenceProvider.isReady() || llmCallCount >= MAX_LLM_CALLS)
 
             if (members.size == 1) {
@@ -198,15 +199,22 @@ class TopicEngine(
                 headline = m.title.take(40)
                 summary = (m.bigText ?: m.content).take(300)
                 isLlmGenerated = true
+                actions = listOf(SuggestedAction(
+                    label = "Open in ${m.appName}",
+                    type = "open_app",
+                    app = m.appName,
+                    packageName = m.packageName
+                ))
             } else if (inferenceProvider.isReady() && llmCallCount < MAX_LLM_CALLS) {
                 headline = try {
                     val prompt = PromptBuilder.buildTopicPrompt(members)
-                    val raw = inferenceProvider.generate(prompt, maxTokens = 150)
+                    val raw = inferenceProvider.generate(prompt, maxTokens = 200)
                     llmCallCount++
                     val parsed = LlmResponseParser.parseTopicContent(raw)
                     if (parsed != null) {
                         isLlmGenerated = true
                         summary = parsed.summary
+                        actions = resolveActionPackages(parsed.actions, members)
                         parsed.title
                     } else {
                         summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
@@ -228,6 +236,9 @@ class TopicEngine(
                 summary = summary,
                 briefingContribution = null
             )
+            if (actions.isNotEmpty()) {
+                topicRepository.updateTopicActions(topic.id, SuggestedAction.listToJson(actions))
+            }
             if (!llmSkipped) topicRepository.markClean(topic.id)
         }
     }
@@ -236,6 +247,25 @@ class TopicEngine(
         val content = notif.bigText ?: notif.content
         if (notif.title.isBlank() && content.isBlank()) return ""
         return "${notif.appName} — ${notif.title}: ${content.take(300)}"
+    }
+
+    private fun resolveActionPackages(
+        actions: List<SuggestedAction>,
+        members: List<NotificationEntity>
+    ): List<SuggestedAction> {
+        val knownApps = mapOf(
+            "phone" to "com.android.phone",
+            "messages" to "com.google.android.apps.messaging",
+            "chrome" to "com.android.chrome"
+        )
+        return actions.map { action ->
+            val packageName = members.firstOrNull {
+                it.appName.equals(action.app, ignoreCase = true)
+            }?.packageName
+                ?: knownApps[action.app.lowercase()]
+                ?: ""
+            action.copy(packageName = packageName)
+        }
     }
 
     private fun parseJsonArray(json: String): List<String> {
