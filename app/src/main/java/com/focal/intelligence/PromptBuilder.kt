@@ -6,12 +6,7 @@ object PromptBuilder {
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {
         val message = notification.bigText ?: notification.content
-        return """Does this notification matter personally to the user, or is it generic/promotional?
-
-Notification from ${notification.appName}:
-"${notification.title}: ${message.take(200)}"
-
-Answer with JSON only: {"matters": true, "reason": "..."} or {"matters": false, "reason": "..."}"""
+        return "App: ${notification.appName}\nTitle: ${notification.title}\nContent: ${message.take(200)}"
     }
 
     fun buildNarrativePrompt(notifications: List<NotificationEntity>): String {

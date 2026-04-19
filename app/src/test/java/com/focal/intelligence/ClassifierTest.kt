@@ -1,8 +1,10 @@
 package com.focal.intelligence
 
 import com.focal.data.db.entity.NotificationEntity
+import com.google.ai.edge.litertlm.ToolSet
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -40,32 +42,37 @@ class ClassifierTest {
     }
 
     @Test
-    fun `returns matters when LLM says matters is true`() = runTest {
+    fun `returns matters when tool classifies as matters`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns
-            """{"matters": true, "reason": "OTP from bank"}"""
-
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            val tools = thirdArg<List<ToolSet>>()
+            tools.filterIsInstance<ClassifyNotificationTool>().first()
+                .classifyNotification("matters", "OTP from bank")
+            emptyFlow()
+        }
         val result = classifier.classify(notification(content = "Your OTP is 123456"))
         assertEquals(ClassificationResult.MATTERS, result.category)
         assertEquals("llm", result.classifiedBy)
     }
 
     @Test
-    fun `returns noise when LLM says matters is false`() = runTest {
+    fun `returns noise when tool classifies as noise`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns
-            """{"matters": false, "reason": "Promotional"}"""
-
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            val tools = thirdArg<List<ToolSet>>()
+            tools.filterIsInstance<ClassifyNotificationTool>().first()
+                .classifyNotification("noise", "Promotional offer")
+            emptyFlow()
+        }
         val result = classifier.classify(notification(content = "50% off today!"))
         assertEquals(ClassificationResult.NOISE, result.category)
         assertEquals("llm", result.classifiedBy)
     }
 
     @Test
-    fun `returns uncategorized when LLM response unparseable`() = runTest {
+    fun `returns uncategorized when tool not called`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns "I don't know"
-
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } returns emptyFlow()
         val result = classifier.classify(notification())
         assertEquals(ClassificationResult.UNCATEGORIZED, result.category)
         assertEquals("llm", result.classifiedBy)
@@ -74,8 +81,7 @@ class ClassifierTest {
     @Test
     fun `returns uncategorized when LLM throws exception`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } throws RuntimeException("OOM")
-
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } throws RuntimeException("OOM")
         val result = classifier.classify(notification())
         assertEquals(ClassificationResult.UNCATEGORIZED, result.category)
         assertEquals("pending", result.classifiedBy)
@@ -84,9 +90,12 @@ class ClassifierTest {
     @Test
     fun `classifyBatch processes all notifications`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns
-            """{"matters": false, "reason": "promo"}"""
-
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            val tools = thirdArg<List<ToolSet>>()
+            tools.filterIsInstance<ClassifyNotificationTool>().first()
+                .classifyNotification("noise", "promo")
+            emptyFlow()
+        }
         val notifications = listOf(notification(), notification(), notification())
         val results = classifier.classifyBatch(notifications)
         assertEquals(3, results.size)

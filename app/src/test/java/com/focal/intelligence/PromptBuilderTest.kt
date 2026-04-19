@@ -46,13 +46,6 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `classification prompt requests JSON with matters field`() {
-        val prompt = PromptBuilder.buildClassificationPrompt(notification())
-        assertTrue(prompt.contains("JSON"))
-        assertTrue(prompt.contains("\"matters\""))
-    }
-
-    @Test
     fun `narrative prompt includes all notification contents`() {
         val notifications = listOf(
             notification(title = "Mom", content = "Let's go to Manali"),
