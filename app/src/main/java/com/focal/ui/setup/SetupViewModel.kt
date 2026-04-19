@@ -22,7 +22,10 @@ data class SetupUiState(
     val activeModel: ModelVariant? = null,
     val downloadProgress: Int? = null,
     val engineRunning: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val embeddingModelAvailable: Boolean = false,
+    val embeddingDownloadProgress: Int? = null,
+    val embeddingErrorMessage: String? = null
 )
 
 @HiltViewModel
@@ -47,7 +50,8 @@ class SetupViewModel @Inject constructor(
                 .contains(context.packageName),
             activeModel = active,
             selectedModel = active ?: _uiState.value.selectedModel,
-            engineRunning = inferenceProvider.isReady()
+            engineRunning = inferenceProvider.isReady(),
+            embeddingModelAvailable = modelManager.isEmbeddingModelAvailable
         )
     }
 
@@ -124,5 +128,25 @@ class SetupViewModel @Inject constructor(
     fun onStopEngine() {
         inferenceProvider.close()
         _uiState.value = _uiState.value.copy(engineRunning = false)
+    }
+
+    fun onDownloadEmbeddingModel() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(embeddingDownloadProgress = 0, embeddingErrorMessage = null)
+            try {
+                modelManager.downloadEmbeddingModel { progress ->
+                    _uiState.value = _uiState.value.copy(embeddingDownloadProgress = progress)
+                }
+                _uiState.value = _uiState.value.copy(
+                    embeddingDownloadProgress = null,
+                    embeddingModelAvailable = true
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    embeddingDownloadProgress = null,
+                    embeddingErrorMessage = "Download failed: ${e.message}"
+                )
+            }
+        }
     }
 }

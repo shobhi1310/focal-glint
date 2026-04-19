@@ -173,6 +173,40 @@ fun SetupScreen(
                     }
                 }
             }
+
+            item {
+                val isDownloading = state.embeddingDownloadProgress != null
+
+                StepCard(
+                    number = 5,
+                    title = "Embedding Model",
+                    description = "Download the Gecko embedding model for smart notification grouping (~30 MB)",
+                    isComplete = state.embeddingModelAvailable
+                ) {
+                    Column {
+                        Button(
+                            onClick = viewModel::onDownloadEmbeddingModel,
+                            enabled = !state.embeddingModelAvailable && !isDownloading
+                        ) {
+                            Text(
+                                text = when {
+                                    isDownloading -> "Downloading ${state.embeddingDownloadProgress}%"
+                                    state.embeddingModelAvailable -> "Downloaded ✓"
+                                    else -> "Download"
+                                }
+                            )
+                        }
+                        state.embeddingErrorMessage?.let { error ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

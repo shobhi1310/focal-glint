@@ -145,10 +145,73 @@ class ModelManager(private val context: Context) {
         }
     }
 
+    suspend fun downloadEmbeddingModel(onProgress: (Int) -> Unit) {
+        ensureEmbeddingModelDir()
+
+        val dm = context.getSystemService(DownloadManager::class.java)
+
+        // Download model file
+        val modelRequest = DownloadManager.Request(Uri.parse(GECKO_MODEL_URL))
+            .setDestinationUri(Uri.fromFile(geckoModelFile))
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setTitle("Downloading Gecko embedding model...")
+            .setAllowedNetworkTypes(
+                DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
+            )
+        val modelDownloadId = dm.enqueue(modelRequest)
+
+        withContext(Dispatchers.IO) {
+            while (true) {
+                delay(1000)
+                val cursor = dm.query(DownloadManager.Query().setFilterById(modelDownloadId))
+                if (!cursor.moveToFirst()) { cursor.close(); continue }
+                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                cursor.close()
+                when (status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> { onProgress(90); break }
+                    DownloadManager.STATUS_FAILED -> throw IOException("Embedding model download failed")
+                    else -> {
+                        val percent = if (total > 0) ((downloaded * 80) / total).toInt() else 0
+                        onProgress(percent)
+                    }
+                }
+            }
+        }
+
+        // Download tokenizer
+        val tokenizerRequest = DownloadManager.Request(Uri.parse(GECKO_TOKENIZER_URL))
+            .setDestinationUri(Uri.fromFile(geckoTokenizerFile))
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setTitle("Downloading tokenizer...")
+            .setAllowedNetworkTypes(
+                DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
+            )
+        val tokenizerDownloadId = dm.enqueue(tokenizerRequest)
+
+        withContext(Dispatchers.IO) {
+            while (true) {
+                delay(500)
+                val cursor = dm.query(DownloadManager.Query().setFilterById(tokenizerDownloadId))
+                if (!cursor.moveToFirst()) { cursor.close(); continue }
+                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                cursor.close()
+                when (status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> { onProgress(100); return@withContext }
+                    DownloadManager.STATUS_FAILED -> throw IOException("Tokenizer download failed")
+                    else -> onProgress(95)
+                }
+            }
+        }
+    }
+
     companion object {
         const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
         const val MIN_MODEL_SIZE = 100_000_000L
         const val GECKO_MODEL_FILENAME = "Gecko_256_f32.tflite"
         const val GECKO_TOKENIZER_FILENAME = "sentencepiece.model"
+        const val GECKO_MODEL_URL = "https://storage.googleapis.com/mediapipe-assets/Gecko_256_f32.tflite"
+        const val GECKO_TOKENIZER_URL = "https://storage.googleapis.com/mediapipe-assets/sentencepiece.model"
     }
 }
