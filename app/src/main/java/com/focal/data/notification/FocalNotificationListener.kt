@@ -1,5 +1,6 @@
 package com.focal.data.notification
 
+import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -25,9 +26,12 @@ class FocalNotificationListener : NotificationListenerService() {
     private lateinit var extractor: NotificationExtractor
     private lateinit var repository: NotificationRepository
     private lateinit var rulesEngine: RulesEngine
+    private lateinit var wakeLock: PowerManager.WakeLock
 
     override fun onCreate() {
         super.onCreate()
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "focal:NotificationListener").apply { acquire() }
         extractor = NotificationExtractor(packageManager)
 
         val db = Room.databaseBuilder(
@@ -97,6 +101,7 @@ class FocalNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (wakeLock.isHeld) wakeLock.release()
         serviceScope.cancel()
     }
 }
