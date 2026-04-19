@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
@@ -12,6 +13,7 @@ import com.focal.intelligence.TopicEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 
 @HiltWorker
 class ClassificationWorker @AssistedInject constructor(
@@ -41,6 +43,8 @@ class ClassificationWorker @AssistedInject constructor(
                     )
                     reclassified++
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("ClassificationWorker", "Rule reclassify failed for ${notification.id}", e)
             }
@@ -89,5 +93,11 @@ class ClassificationWorker @AssistedInject constructor(
 
     companion object {
         const val WORK_NAME = "focal_classification"
+
+        suspend fun cancelAndWait(workManager: WorkManager) {
+            workManager.cancelUniqueWork(WORK_NAME)
+            workManager.getWorkInfosForUniqueWorkFlow(WORK_NAME)
+                .first { infos -> infos.isEmpty() || infos.all { it.state.isFinished } }
+        }
     }
 }

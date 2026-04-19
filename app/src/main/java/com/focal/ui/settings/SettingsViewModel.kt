@@ -119,10 +119,7 @@ class SettingsViewModel @Inject constructor(
             modelManager.saveBackendPreference(useGpu)
             if (modelManager.isEngineEnabled() && modelManager.isModelAvailable) {
                 try {
-                    val workManager = WorkManager.getInstance(context)
-                    workManager.cancelUniqueWork(ClassificationWorker.WORK_NAME)
-                    workManager.getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
-                        .first { infos -> infos.isEmpty() || infos.all { it.state.isFinished } }
+                    ClassificationWorker.cancelAndWait(WorkManager.getInstance(context))
                     val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
                     inferenceProvider.restart(modelManager.modelPath, useGpu, variant.maxContextTokens)
                     reinitializeEmbeddings(useGpu)

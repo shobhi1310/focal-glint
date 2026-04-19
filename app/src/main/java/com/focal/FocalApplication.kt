@@ -155,11 +155,11 @@ class FocalApplication : Application(), Configuration.Provider {
         val storedVersion = prefs.getInt("topic_clustering_config_version", 0)
         if (!TopicClusteringPolicy.needsFullRebuild(storedVersion)) return
 
-        TopicEngine.pendingFullRebuild = true
+        TopicEngine.pendingFullRebuild.set(true)
         val request = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
         WorkManager.getInstance(this).enqueueUniqueWork(
             ClassificationWorker.WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             request
         )
         prefs.edit()

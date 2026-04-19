@@ -90,7 +90,7 @@ class DigestViewModel @Inject constructor(
     fun onRefresh() {
         viewModelScope.launch {
             isProcessing.value = true
-            TopicEngine.pendingFullRebuild = true
+            TopicEngine.pendingFullRebuild.set(true)
             val workManager = WorkManager.getInstance(context)
             val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
             workManager.enqueueUniqueWork(

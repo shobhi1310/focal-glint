@@ -23,8 +23,6 @@ data class SetupUiState(
     val modelsOnDevice: Set<ModelVariant> = emptySet(),
     val downloadProgress: Int? = null,
     val engineRunning: Boolean = false,
-    val useGpu: Boolean = true,
-    val backendSwitching: Boolean = false,
     val errorMessage: String? = null,
     val embeddingModelAvailable: Boolean = false,
     val embeddingDownloadProgress: Int? = null,
@@ -57,7 +55,6 @@ class SetupViewModel @Inject constructor(
             activeModel = activeModel,
             modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
-            useGpu = modelManager.getBackendPreference(),
             embeddingModelAvailable = modelManager.isEmbeddingModelAvailable
         )
     }
@@ -135,32 +132,6 @@ class SetupViewModel @Inject constructor(
         inferenceProvider.close()
         modelManager.setEngineEnabled(false)
         _uiState.value = _uiState.value.copy(engineRunning = false)
-    }
-
-    fun onToggleBackend(useGpu: Boolean) {
-        if (_uiState.value.backendSwitching) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(backendSwitching = true, useGpu = useGpu)
-            modelManager.saveBackendPreference(useGpu)
-            if (inferenceProvider.isReady()) {
-                try {
-                    val variant = _uiState.value.selectedModel
-                    inferenceProvider.restart(
-                        modelManager.modelFileFor(variant).absolutePath,
-                        useGpu,
-                        variant.maxContextTokens
-                    )
-                } catch (e: Exception) {
-                    val fallback = !useGpu
-                    modelManager.saveBackendPreference(fallback)
-                    _uiState.value = _uiState.value.copy(
-                        useGpu = fallback,
-                        errorMessage = "Backend switch failed: ${e.message}"
-                    )
-                }
-            }
-            _uiState.value = _uiState.value.copy(backendSwitching = false)
-        }
     }
 
     fun onDownloadEmbeddingModel() {

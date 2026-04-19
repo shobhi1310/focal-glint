@@ -1,6 +1,8 @@
 package com.focal.intelligence
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
@@ -17,11 +19,10 @@ class TopicEngine(
         private const val TAG = "TopicEngine"
         private const val MAX_LLM_CALLS = 8
 
-        @Volatile
-        var pendingFullRebuild = false
+        val pendingFullRebuild = AtomicBoolean(false)
     }
 
-    suspend fun generateTopics(fullRebuild: Boolean = pendingFullRebuild.also { pendingFullRebuild = false }) {
+    suspend fun generateTopics(fullRebuild: Boolean = pendingFullRebuild.getAndSet(false)) {
         try {
             val (dayStart, dayEnd) = DayWindow.getWindow()
 
@@ -43,6 +44,8 @@ class TopicEngine(
                             if (text.isBlank()) continue
                             val vec = embeddingProvider.embed(text)
                             notificationRepository.setEmbedding(notif.id, VectorMath.toBytes(vec))
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed to embed ${notif.id}", e)
                         }
@@ -69,6 +72,8 @@ class TopicEngine(
                     }
                     assignOrCreateTopic(notif, vec, dayStart, dayEnd)
                     processedIds.add(notif.id)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to assign ${notif.id}", e)
                 }
@@ -81,6 +86,8 @@ class TopicEngine(
             // Phase 3: Regenerate narratives for dirty topics
             regenerateNarratives(dayStart, dayEnd)
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Failed to generate topics", e)
         }

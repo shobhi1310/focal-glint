@@ -2,12 +2,15 @@ package com.focal.ui.setup
 
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.*
@@ -20,6 +23,7 @@ class SetupViewModelTest {
     private lateinit var context: Context
     private lateinit var modelManager: ModelManager
     private lateinit var inferenceProvider: InferenceProvider
+    private lateinit var workManager: WorkManager
 
     @Before
     fun setup() {
@@ -36,14 +40,21 @@ class SetupViewModelTest {
         every { modelManager.isEngineEnabled() } returns false
         every { modelManager.setEngineEnabled(any()) } just Runs
         every { modelManager.isModelAvailable(any()) } returns false
+        every { modelManager.getBackendPreference() } returns true
         every { modelManager.isEmbeddingModelAvailable } returns false
         every { inferenceProvider.isReady() } returns false
+
+        mockkStatic(WorkManager::class)
+        workManager = mockk(relaxed = true)
+        every { WorkManager.getInstance(any()) } returns workManager
+        every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList<WorkInfo>())
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(NotificationManagerCompat::class)
+        unmockkStatic(WorkManager::class)
     }
 
     private fun createViewModel() = SetupViewModel(context, modelManager, inferenceProvider)
@@ -161,8 +172,9 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `onStartEngine sets engineRunning true`() = runTest {
+    fun `onStartEngine uses selected backend and sets engineRunning true`() = runTest {
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
+        every { modelManager.getBackendPreference() } returns false
         every { modelManager.modelFileFor(any()) } returns mockk { every { absolutePath } returns "/path/model.litertlm" }
         val vm = createViewModel()
         advanceUntilIdle()
@@ -170,7 +182,13 @@ class SetupViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.engineRunning)
         verify { modelManager.setEngineEnabled(true) }
-        coVerify { inferenceProvider.initialize("/path/model.litertlm") }
+        coVerify {
+            inferenceProvider.initialize(
+                "/path/model.litertlm",
+                false,
+                ModelVariant.GEMMA3_1B.maxContextTokens
+            )
+        }
     }
 
     @Test
@@ -179,6 +197,7 @@ class SetupViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onStopEngine()
+        advanceUntilIdle()
         verify { inferenceProvider.close() }
         verify { modelManager.setEngineEnabled(false) }
         assertFalse(vm.uiState.value.engineRunning)

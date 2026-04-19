@@ -200,9 +200,13 @@ fun SetupScreen(
                 ) {
                     Button(
                         onClick = if (state.engineRunning) viewModel::onStopEngine else viewModel::onStartEngine,
-                        enabled = modelAvailable && !isDownloading
+                        enabled = modelAvailable && !isDownloading && !state.engineStopping
                     ) {
-                        Text(if (state.engineRunning) "Stop" else "Start")
+                        Text(when {
+                            state.engineStopping -> "Stopping…"
+                            state.engineRunning -> "Stop"
+                            else -> "Start"
+                        })
                     }
                 }
             }
