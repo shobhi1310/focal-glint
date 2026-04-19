@@ -1,75 +1,47 @@
 package com.focal.intelligence
 
 import android.util.Log
+import com.google.ai.edge.localagents.rag.models.EmbedData
+import com.google.ai.edge.localagents.rag.models.EmbeddingRequest
+import com.google.ai.edge.localagents.rag.models.GeckoEmbeddingModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Optional
 
-/**
- * On-device embedding provider using the Gecko embedding model via AI Edge RAG SDK.
- *
- * Uses reflection to load the GeckoEmbeddingModel class so that compilation succeeds
- * even when the exact class path shifts between SDK releases. If the class is not found
- * at runtime the provider remains in a non-ready state.
- */
 class GeckoEmbeddingProvider : EmbeddingProvider {
 
-    private var embedder: Any? = null
-    private var embedMethod: java.lang.reflect.Method? = null
+    private var model: GeckoEmbeddingModel? = null
 
     override suspend fun initialize(modelPath: String, tokenizerPath: String, useGpu: Boolean) {
         withContext(Dispatchers.IO) {
-            for (className in GECKO_CLASS_CANDIDATES) {
-                try {
-                    val clazz = Class.forName(className)
-                    val ctor = clazz.getConstructor(
-                        String::class.java,
-                        java.util.Optional::class.java,
-                        Boolean::class.javaPrimitiveType
-                    )
-                    embedder = ctor.newInstance(
-                        modelPath,
-                        java.util.Optional.of(tokenizerPath),
-                        useGpu
-                    )
-                    embedMethod = clazz.getMethod("embed", String::class.java)
-                    Log.d(TAG, "Gecko embedding model initialized via $className (gpu=$useGpu)")
-                    return@withContext
-                } catch (e: ClassNotFoundException) {
-                    Log.d(TAG, "Class not found: $className, trying next candidate")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to instantiate $className", e)
-                }
-            }
-            Log.e(TAG, "No Gecko embedding model class found in any candidate path")
+            model = GeckoEmbeddingModel(
+                modelPath,
+                Optional.of(tokenizerPath),
+                useGpu
+            )
+            Log.d(TAG, "Gecko embedding model initialized (gpu=$useGpu)")
         }
     }
 
     override suspend fun embed(text: String): FloatArray {
-        val model = embedder
-            ?: throw IllegalStateException("Embedding model not initialized")
-        val method = embedMethod
-            ?: throw IllegalStateException("Embed method not resolved")
+        val m = model ?: throw IllegalStateException("Embedding model not initialized")
         return withContext(Dispatchers.IO) {
-            @Suppress("UNCHECKED_CAST")
-            val result = method.invoke(model, text) as FloatArray
-            VectorMath.l2Normalize(result)
+            val embedData = EmbedData.create(text, EmbedData.TaskType.RETRIEVAL_DOCUMENT)
+            val request = EmbeddingRequest.create(listOf(embedData))
+            val future = m.getEmbeddings(request)
+            val result = future.get()
+            val floats = FloatArray(result.size) { result[it] }
+            VectorMath.l2Normalize(floats)
         }
     }
 
-    override fun isReady(): Boolean = embedder != null && embedMethod != null
+    override fun isReady(): Boolean = model != null
 
     override fun close() {
-        embedder = null
-        embedMethod = null
+        model = null
     }
 
     companion object {
         private const val TAG = "GeckoEmbedding"
-        private val GECKO_CLASS_CANDIDATES = listOf(
-            "com.google.ai.edge.localagents.rag.memory.embedding.GeckoEmbeddingModel",
-            "com.google.ai.edge.localagents.rag.memory.GeckoEmbeddingModel",
-            "com.google.ai.edge.localagents.rag.embedding.GeckoEmbeddingModel",
-            "com.google.ai.edge.localagents.rag.GeckoEmbeddingModel"
-        )
     }
 }
