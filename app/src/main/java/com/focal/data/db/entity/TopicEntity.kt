@@ -43,5 +43,8 @@ data class TopicEntity(
     val briefingContribution: String? = null,
 
     @ColumnInfo(name = "needs_narrative_regen")
-    val needsNarrativeRegen: Boolean = true
+    val needsNarrativeRegen: Boolean = true,
+
+    @ColumnInfo(name = "suggested_actions")
+    val suggestedActions: String? = null
 )
