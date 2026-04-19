@@ -7,6 +7,7 @@ import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.TopicRepository
+import com.focal.intelligence.SuggestedAction
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ import javax.inject.Inject
 data class TopicDetailUiState(
     val topic: TopicEntity? = null,
     val notifications: List<NotificationEntity> = emptyList(),
+    val actions: List<SuggestedAction> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -48,9 +50,11 @@ class TopicDetailViewModel @Inject constructor(
                     } else {
                         emptyList()
                     }
+                    val actions = SuggestedAction.listFromJson(topic.suggestedActions)
                     _uiState.value = TopicDetailUiState(
                         topic = topic,
                         notifications = notifications,
+                        actions = actions,
                         isLoading = false
                     )
                 } else {

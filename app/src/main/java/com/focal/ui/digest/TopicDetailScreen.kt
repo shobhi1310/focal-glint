@@ -1,5 +1,6 @@
 package com.focal.ui.digest
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.data.db.entity.NotificationEntity
+import com.focal.intelligence.ActionIntentResolver
+import com.focal.intelligence.SuggestedAction
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.components.formatRelativeTime
@@ -132,7 +136,17 @@ fun TopicDetailScreen(
             QuietSummaryCard(summary = topic.summary)
         }
 
-        // 5. Sources section
+        // 5. Suggested Next Steps
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            SuggestedNextStepsSection(
+                actions = state.actions,
+                notifications = state.notifications
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // 6. Sources section
         if (notifications.isNotEmpty()) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -228,5 +242,57 @@ private fun SourceNotificationRow(notification: NotificationEntity) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
         )
+    }
+}
+
+@Composable
+private fun SuggestedNextStepsSection(
+    actions: List<SuggestedAction>,
+    notifications: List<NotificationEntity>
+) {
+    if (actions.isEmpty()) return
+    val context = LocalContext.current
+
+    SectionHeader(title = "SUGGESTED NEXT STEPS")
+    Spacer(modifier = Modifier.height(8.dp))
+
+    actions.forEachIndexed { index, action ->
+        val isPrimary = index == 0
+        Surface(
+            color = if (isPrimary) MaterialTheme.colorScheme.onBackground
+                    else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(14.dp),
+            border = if (!isPrimary) BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)) else null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clickable {
+                    val intent = ActionIntentResolver.resolve(context, action, notifications)
+                    if (intent != null) {
+                        try { context.startActivity(intent) } catch (_: Exception) {}
+                    }
+                }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = action.label,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (isPrimary) MaterialTheme.colorScheme.background
+                            else MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "\u2192 ${action.app.uppercase()}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isPrimary) MaterialTheme.colorScheme.background.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
     }
 }
