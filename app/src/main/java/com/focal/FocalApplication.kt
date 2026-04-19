@@ -62,27 +62,24 @@ class FocalApplication : Application(), Configuration.Provider {
         val modelManager = ModelManager(this)
         modelManager.ensureModelDir()
 
-        if (!modelManager.isModelAvailable) {
-            Log.d(TAG, "Model not found at ${modelManager.modelPath}. LLM unavailable.")
-            Log.d(
-                TAG,
-                "To enable LLM, push model via: adb push ${ModelManager.MODEL_FILENAME}" +
-                    " /data/data/com.focal/files/models/"
-            )
-            return
-        }
-
-        val useGpu = modelManager.getBackendPreference()
-        val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
-        applicationScope.launch {
-            try {
-                inferenceProvider.initialize(modelManager.modelPath, useGpu, variant.maxContextTokens)
-                Log.d(TAG, "LLM engine initialized successfully (gpu=$useGpu, context=${variant.maxContextTokens})")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize LLM engine", e)
+        // Initialize LLM
+        val variant = modelManager.activeVariant()
+        if (variant != null) {
+            val useGpu = modelManager.getBackendPreference()
+            val modelPath = modelManager.modelFileFor(variant).absolutePath
+            applicationScope.launch {
+                try {
+                    inferenceProvider.initialize(modelPath, useGpu, variant.maxContextTokens)
+                    Log.d(TAG, "LLM engine initialized: ${variant.displayName} (gpu=$useGpu, context=${variant.maxContextTokens})")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize LLM engine", e)
+                }
             }
+        } else {
+            Log.d(TAG, "No LLM model found. Push a model to ${modelManager.modelDir}")
         }
 
+        // Initialize embedding model (independent of LLM)
         if (modelManager.isEmbeddingModelAvailable) {
             applicationScope.launch {
                 try {
