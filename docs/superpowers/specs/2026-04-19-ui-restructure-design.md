@@ -98,7 +98,26 @@ Each app row:
 ### Debounce behavior
 Keep the existing 3-second debounce save + ClassificationWorker enqueue.
 
-## 6. Shared Components
+## 6. Developer Settings
+
+The current Settings/Setup screens contain technical controls (model download, embedding model download, GPU/CPU backend toggle, engine start/stop). These are not user-facing features — they're development tools.
+
+Move all of these into a **Developer Settings** screen, accessible from a small "Developer" link at the bottom of the Tune screen (or via a hidden gesture like long-press on the Tune header). This keeps the Tune screen clean and focused on app classification.
+
+### Developer Settings contains:
+- Notification access toggle (Step 1 from current Setup)
+- Model selection + download (Gemma 3 1B / Gemma 4 E2B)
+- Embedding model download (Gecko)
+- GPU/CPU backend toggle
+- Engine start/stop
+- All existing SetupScreen/SetupViewModel functionality
+
+### Navigation
+- Add `Screen.DevSettings` route
+- Add a "Developer Settings" text button at the bottom of TuneScreen
+- DevSettingsScreen reuses the existing SetupScreen composable (just re-routed)
+
+## 7. Shared Components
 
 ### Relative time formatter
 Create a utility: `fun formatRelativeTime(timestampMs: Long): String` that returns "2m", "34 min ago", "3h ago", "yesterday".
@@ -129,6 +148,10 @@ Reusable `SectionHeader(title: String, count: Int?)` that renders uppercase spac
 | `CategorySection.kt` | Restyle section headers and notification rows |
 | `SettingsScreen.kt` | Major rewrite → TuneScreen — explanation cards, compact pills, app icons |
 | `SettingsViewModel.kt` | Add "Set by you" / "system default" label logic |
+| `Screen.kt` | Add DevSettings route |
+| `FocalNavigation.kt` | Add DevSettings composable route, link from Tune |
+| `TuneScreen.kt` | New — or rename from SettingsScreen, add "Developer Settings" link at bottom |
+| `DevSettingsScreen.kt` | New — wraps existing SetupScreen, accessible from Tune |
 | `RelativeTime.kt` | New — relative time formatter utility |
 | `AppCategory.kt` | New — package name to display category mapping |
 | `SectionHeader.kt` | New — reusable uppercase spaced section header |
