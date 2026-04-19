@@ -23,69 +23,60 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.NotificationEntity
 
 @Composable
 fun CategorySection(
     label: String,
     count: Int,
-    color: Color,
-    containerColor: Color,
     notifications: List<NotificationEntity>,
     initiallyExpanded: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
 
-    Surface(
-        color = containerColor,
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-            ) {
-                Text(
-                    text = "$label ($count)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = color
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = color
-                )
-            }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                text = "$label · $count",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    letterSpacing = 2.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+        }
 
-            AnimatedVisibility(visible = expanded) {
-                Column {
+        AnimatedVisibility(visible = expanded) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                     notifications.forEachIndexed { index, notification ->
                         NotificationCard(notification = notification)
                         if (index < notifications.lastIndex) {
                             HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                             )
                         }
                     }
                 }
-            }
-
-            if (!expanded && notifications.isNotEmpty()) {
-                Text(
-                    text = notifications.joinToString(" · ") { it.appName }
-                        .take(80) + if (notifications.size > 5) "..." else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
             }
         }
     }

@@ -15,9 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.digest.CategorySection
-import com.focal.ui.theme.DigestBlue
-import com.focal.ui.theme.DigestBlueContainer
-import com.focal.ui.theme.NoiseSurface
 
 @Composable
 fun AllNotificationsScreen(
@@ -40,9 +37,9 @@ fun AllNotificationsScreen(
         }
         item {
             Text(
-                text = "Last 24h \u00B7 ${state.totalCount} notifications",
+                text = "Last 24h · ${state.totalCount} notifications",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
 
@@ -51,10 +48,8 @@ fun AllNotificationsScreen(
         if (state.matters.isNotEmpty()) {
             item {
                 CategorySection(
-                    label = "MATTERS",
+                    label = "MATTERS TO YOU",
                     count = state.matters.size,
-                    color = DigestBlue,
-                    containerColor = DigestBlueContainer,
                     notifications = state.matters,
                     initiallyExpanded = true
                 )
@@ -66,8 +61,6 @@ fun AllNotificationsScreen(
                 CategorySection(
                     label = "NOISE",
                     count = state.noise.size,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    containerColor = NoiseSurface,
                     notifications = state.noise,
                     initiallyExpanded = false
                 )
@@ -79,8 +72,6 @@ fun AllNotificationsScreen(
                 CategorySection(
                     label = "UNCLASSIFIED",
                     count = state.uncategorized.size,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     notifications = state.uncategorized,
                     initiallyExpanded = true
                 )
