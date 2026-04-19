@@ -65,10 +65,11 @@ class FocalApplication : Application(), Configuration.Provider {
             return
         }
 
+        val useGpu = modelManager.getBackendPreference()
         applicationScope.launch {
             try {
-                inferenceProvider.initialize(modelManager.modelPath)
-                Log.d(TAG, "LLM engine initialized successfully")
+                inferenceProvider.initialize(modelManager.modelPath, useGpu)
+                Log.d(TAG, "LLM engine initialized successfully (gpu=$useGpu)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize LLM engine", e)
             }

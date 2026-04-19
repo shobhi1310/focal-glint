@@ -31,7 +31,12 @@ enum class ModelVariant(
 
 class ModelManager(private val context: Context) {
 
+    // Primary dir for new downloads — same as Companion app
     val modelDir: File
+        get() = context.getExternalFilesDir("models") ?: File(context.filesDir, "models")
+
+    // Legacy internal path used before external storage migration
+    private val legacyModelDir: File
         get() = File(context.filesDir, "models")
 
     // Legacy single-model API — kept for FocalApplication.initializeLlmIfModelExists()
@@ -48,8 +53,12 @@ class ModelManager(private val context: Context) {
         if (!modelDir.exists()) modelDir.mkdirs()
     }
 
-    // Variant-aware API
-    fun modelFileFor(variant: ModelVariant): File = File(modelDir, variant.fileName)
+    // Variant-aware API — checks legacy internal path first for backward compat
+    fun modelFileFor(variant: ModelVariant): File {
+        val legacyFile = File(legacyModelDir, variant.fileName)
+        if (legacyFile.exists() && legacyFile.length() > MIN_MODEL_SIZE) return legacyFile
+        return File(modelDir, variant.fileName)
+    }
 
     fun isModelAvailable(variant: ModelVariant): Boolean {
         val file = modelFileFor(variant)
@@ -61,6 +70,16 @@ class ModelManager(private val context: Context) {
 
     fun deleteModel(variant: ModelVariant) {
         modelFileFor(variant).delete()
+    }
+
+    fun getBackendPreference(): Boolean {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("backend_preference", "gpu") == "gpu"
+    }
+
+    fun saveBackendPreference(useGpu: Boolean) {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("backend_preference", if (useGpu) "gpu" else "cpu").apply()
     }
 
     suspend fun downloadModel(variant: ModelVariant, onProgress: (Int) -> Unit) {
