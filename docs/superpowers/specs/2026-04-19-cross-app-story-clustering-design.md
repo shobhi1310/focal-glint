@@ -1,256 +1,322 @@
-# Cross-App Story Clustering
+# Cross-App Story Clustering — Embedding-Based
 
-**Goal:** Merge notifications from multiple apps into unified stories using LLM-based semantic grouping, with incremental processing and a fixed daily window.
+**Goal:** Merge notifications from multiple apps into unified stories using on-device embedding similarity, reserving the LLM exclusively for narrative generation, summarization, and future action extraction.
 
-**Core insight:** Stories are about people and events, not apps. "Mom called twice — wants to confirm Sunday lunch" should pull from Phone + WhatsApp as one story, not two separate app-level cards.
+**Core insight:** Stories are about people and events, not apps. Grouping is a *matching* problem best solved by embeddings; narrative generation is a *creative* problem best solved by an LLM. Use each tool for what it is good at.
 
 ---
 
 ## 1. Architecture
 
-Three-phase pipeline replacing the current app+sender grouping in TopicEngine:
+Two on-device models running in complementary roles:
 
-1. **Dedup** (code-level) — Remove exact duplicate content before the LLM sees it. Truecaller re-showing the same SMS text, or multiple notification updates for the same event, are filtered by content similarity (>90% match within the same time window).
+- **EmbeddingGemma** (via AI Edge RAG SDK, ~200MB RAM, 768-dim output) — produces L2-normalized embedding vectors for notification text. Handles fuzzy name matching and cross-app semantic correlation implicitly. One embedding call per new notification.
 
-2. **LLM Grouping** (one call) — Feed all unprocessed notifications + existing topic summaries to Gemma 4 E2B. The model returns semantic group assignments. It handles fuzzy name matching ("Subhankar Bhadra" = "Subhankar B."), cross-app correlation (ICICI SMS + Truecaller alert), and conceptual links (Amazon order email + delivery SMS).
+- **Gemma 4 E2B** (via LiteRT-LM, ~2.6GB model, 32K context) — generates narrative headlines, daily briefing, and future action suggestions. Only called for topics whose membership changed.
 
-3. **Narrative Generation** (per new/changed group) — For each group that gained new notifications, regenerate the one-sentence headline via LLM. Then regenerate the daily briefing from all headlines.
+Memory budget on 6GB device: ~2.8GB for both models. The models are used at different pipeline stages and do not need to hold active inference sessions simultaneously.
 
-Processing is **incremental** — only new/unprocessed notifications are sent as full content. Existing topics are sent as one-line summaries for context. This keeps token usage low (existing stories are ~20 tokens each vs ~100 tokens per full notification).
+Pipeline:
 
-**Pull-to-refresh = full rebuild** — Resets all processed flags, deletes all topics, re-groups everything from scratch.
+1. **Embed** — For each unprocessed notification, produce a 768-dim L2-normalized vector via EmbeddingGemma. Persist to Room.
+2. **Assign** — Cosine similarity (dot product on normalized vectors) nearest-member matching. Compare the new vector against every member of every active topic. Pick the topic with the highest score; if below threshold, create a new topic.
+3. **Regenerate narratives** — For each topic marked dirty by step 2, regenerate its headline via Gemma 4 E2B. Generate the daily briefing from all current headlines.
+
+Processing is **incremental** — embeddings persist, so each worker run only embeds new notifications and only asks the LLM about topics whose membership changed.
+
+**Pull-to-refresh = full rebuild** — Reset processed flags, delete all topics (keep notifications and their embeddings), re-assign all notifications from scratch, regenerate all narratives.
 
 ## 2. Daily Window
 
-**Fixed 2 AM to 2 AM window** (not a rolling 24-hour sliding window).
+**Fixed 2 AM to 2 AM window.**
 
-- A scheduled WorkManager periodic job fires at 2 AM daily
-- It purges all topics and resets processed flags
-- Notifications outside the current day window are purged
-- When the user opens the app after 2 AM, the digest is clean — new day, fresh topics
+- Scheduled WorkManager periodic job fires at 2 AM daily
+- Purges topics from the previous day
+- Deletes notifications outside the new day window (including their embeddings)
+- Resets `processedForTopics` flags on any surviving notifications
 
-This ensures the digest reflects "today" as a coherent unit, not a constantly shifting window where morning notifications silently disappear in the afternoon.
+## 3. Assignment Algorithm
 
-## 3. Incremental Processing Flow
+Centroid-free nearest-member cosine similarity over all members of all active topics. No vector database, no ANN index — at our scale (few hundred vectors/day, max ~30 topics × ~10 members each) brute force is sub-millisecond in Kotlin.
 
-### Automatic Worker (triggered 30s after each notification)
-
-1. Determine current day window boundaries (last 2 AM to next 2 AM)
-2. Get unprocessed notifications: `processedForTopics = false` AND within current day window
-3. If no unprocessed notifications, skip
-4. Get existing topics (headline + source notification IDs)
-5. **Dedup pass:** For each unprocessed notification, check if its content is >90% similar to any other notification (processed or unprocessed) in the current window. If so, mark it processed and skip it — it's a duplicate.
-6. **LLM grouping call** (one call):
-   ```
-   You are grouping notifications into stories. Each story is about one event or person.
-
-   Existing stories:
-   [S1] "Mom called twice — wants to confirm Sunday lunch" (Phone, WhatsApp)
-   [S2] "₹44K charged on ICICI card at Amazon" (Messages, Truecaller)
-
-   New notifications:
-   [N1] WhatsApp — Mom: "are you bringing Maya?"
-   [N2] Gmail — Amazon: "Your order for iPhone case has shipped"
-   [N3] Splitwise — Rahul added expense "Dinner ₹1200"
-
-   For each new notification, either assign it to an existing story or group new notifications into new stories.
-   Return JSON only: {"assign": {"N1": "S1", "N2": "S2"}, "new_stories": [["N3"]]}
-   ```
-7. Parse response — assign notifications to existing stories or create new groups
-8. For stories that gained new notifications: regenerate headline via `buildNarrativePrompt` with ALL notifications in that story (processed + new)
-9. For new story groups: generate headline from scratch
-10. Mark all processed notifications as `processedForTopics = true`
-11. Regenerate daily briefing from all current topic headlines
-12. Save topics
-
-### Pull-to-Refresh (full rebuild)
-
-1. Set `processedForTopics = false` on ALL notifications in current day window
-2. Delete all topics
-3. Run the full pipeline — all notifications are "new," no existing stories
-4. This is the user's "nuclear option" to fix bad groupings
-
-### 2 AM Scheduled Job
-
-1. Delete all topics
-2. Delete (or ignore) notifications outside the new day window
-3. `processedForTopics` flags are effectively reset since old notifications are purged
-4. Uses WorkManager `PeriodicWorkRequest` with flex window around 2 AM
-
-## 4. Database Changes
-
-### NotificationEntity — add processed flag
-
-Add column:
 ```kotlin
+suspend fun assignOrCreateTopic(
+    notif: NotificationEntity,
+    vec: FloatArray  // L2-normalized
+): String {
+    val activeTopics = topicRepo.getActiveTopicsInWindow(dayStart, dayEnd)
+    if (activeTopics.isEmpty()) return createTopic(notif, vec)
+
+    var bestTopicId: String? = null
+    var bestScore = Float.NEGATIVE_INFINITY
+
+    for (topic in activeTopics) {
+        val memberIds = JSONArray(topic.notificationIds).asStringList()
+        val members = notifRepo.getByIds(memberIds)
+        var topicBest = Float.NEGATIVE_INFINITY
+        for (m in members) {
+            val mv = m.embedding?.toFloats() ?: continue
+            val s = VectorMath.dot(vec, mv)
+            if (s > topicBest) topicBest = s
+        }
+        if (topicBest > bestScore) {
+            bestScore = topicBest
+            bestTopicId = topic.id
+        }
+    }
+
+    return if (bestScore >= ASSIGN_THRESHOLD && bestTopicId != null) {
+        appendToTopic(bestTopicId, notif.id)
+        markTopicDirty(bestTopicId)
+        bestTopicId
+    } else {
+        createTopic(notif, vec)
+    }
+}
+
+private const val ASSIGN_THRESHOLD = 0.60f
+```
+
+### Why nearest-member, not centroid
+
+Centroids average out to a blurry concept when a topic holds diverse but related content (Mom's missed call + Mom's message about Sunday lunch + Mom asking about Maya). A new "Mom WhatsApp about recipe" may match one member strongly but fall below the centroid threshold. Nearest-member correctly handles topic diversity.
+
+At our scale, nearest-member over all members is ~200µs per assignment. A centroid adds state to maintain and breaks on diverse topics for no measurable speedup. We do not use centroids.
+
+### Threshold tuning
+
+Start at `0.60`. Log every assignment's score during development for a few days. Tune in `0.02` increments based on false-merge vs false-split patterns. Later, expose as a "Story sensitivity" slider in Settings.
+
+## 4. Embedding Model Integration
+
+Uses Google's AI Edge RAG SDK to load EmbeddingGemma:
+
+```gradle
+implementation("com.google.ai.edge.localagents:localagents-rag:0.1.0")
+```
+
+EmbeddingGemma is instruction-tuned. We use a **single consistent prompt template** for all notification embeddings so vectors are comparable:
+
+```
+task: sentence similarity | text: {appName} — {title}: {content}
+```
+
+Inputs over 2K tokens are truncated by the model. Notification text is always much shorter than this limit.
+
+**Blank-content guard:** If both `title` and `content` are empty, skip embedding (embedding empty strings produces degenerate vectors that falsely match everything).
+
+**Stale-embedding guard:** When `upsertNotification` updates an existing row's content (same `notificationKey`, new text), invalidate the embedding (`embedding = null`, `embeddedAt = null`) so the next worker run re-embeds.
+
+### EmbeddingProvider interface
+
+```kotlin
+interface EmbeddingProvider {
+    suspend fun initialize(modelPath: String, useGpu: Boolean = true)
+    suspend fun embed(text: String): FloatArray  // returns L2-normalized 768-dim vector
+    fun isReady(): Boolean
+    fun close()
+}
+```
+
+## 5. Database Changes
+
+### NotificationEntity
+
+Add three columns (migration v4→v5):
+
+```kotlin
+@ColumnInfo(name = "embedding")
+val embedding: ByteArray? = null,  // 768 L2-normalized floats → 3072 bytes
+
+@ColumnInfo(name = "embedded_at")
+val embeddedAt: Long? = null,
+
 @ColumnInfo(name = "processed_for_topics")
 val processedForTopics: Boolean = false
 ```
 
-Migration v4→v5:
-```sql
-ALTER TABLE notifications ADD COLUMN processed_for_topics INTEGER NOT NULL DEFAULT 0
-```
-
-### NotificationDao — new queries
+Room requires custom `equals`/`hashCode` for entities containing `ByteArray` — Kotlin data classes use reference equality for arrays by default. Implement explicitly:
 
 ```kotlin
-@Query("SELECT * FROM notifications WHERE processed_for_topics = 0 AND posted_at > :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+override fun equals(other: Any?): Boolean { ... }
+override fun hashCode(): Int { ... }
+```
+
+### TopicEntity
+
+Add dirty-tracking flag:
+
+```kotlin
+@ColumnInfo(name = "needs_narrative_regen")
+val needsNarrativeRegen: Boolean = true
+```
+
+No centroid column.
+
+### Migration v4→v5
+
+```sql
+ALTER TABLE notifications ADD COLUMN embedding BLOB;
+ALTER TABLE notifications ADD COLUMN embedded_at INTEGER;
+ALTER TABLE notifications ADD COLUMN processed_for_topics INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE topics ADD COLUMN needs_narrative_regen INTEGER NOT NULL DEFAULT 1;
+```
+
+### New DAO queries
+
+```kotlin
+// NotificationDao
+@Query("SELECT * FROM notifications WHERE processed_for_topics = 0 AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
 suspend fun getUnprocessedMatters(since: Long, until: Long): List<NotificationEntity>
+
+@Query("SELECT * FROM notifications WHERE embedding IS NULL AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity>
+
+@Query("UPDATE notifications SET embedding = :embedding, embedded_at = :timestamp WHERE id = :id")
+suspend fun setEmbedding(id: String, embedding: ByteArray, timestamp: Long)
 
 @Query("UPDATE notifications SET processed_for_topics = 1 WHERE id IN (:ids)")
 suspend fun markProcessedForTopics(ids: List<String>)
 
-@Query("UPDATE notifications SET processed_for_topics = 0 WHERE posted_at > :since AND posted_at < :until")
-suspend fun resetProcessedFlags(since: Long, until: Long)
+@Query("UPDATE notifications SET processed_for_topics = 0")
+suspend fun resetAllProcessedFlags()
+
+@Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL WHERE id = :id")
+suspend fun invalidateEmbedding(id: String)
+
+@Query("DELETE FROM notifications WHERE posted_at < :before")
+suspend fun deleteOlderThan(before: Long)
+
+// TopicDao
+@Query("SELECT * FROM topics WHERE updated_at >= :since AND updated_at < :until AND headline != 'BRIEFING'")
+suspend fun getActiveTopicsInWindow(since: Long, until: Long): List<TopicEntity>
+
+@Query("UPDATE topics SET needs_narrative_regen = 1, updated_at = :timestamp WHERE id = :id")
+suspend fun markDirty(id: String, timestamp: Long)
+
+@Query("UPDATE topics SET needs_narrative_regen = 0 WHERE id = :id")
+suspend fun markClean(id: String)
 ```
 
-### TopicEntity — add source tracking
-
-The existing `notificationIds` JSON array already tracks which notifications belong to a topic. No schema change needed — just ensure the TopicEngine updates it when merging new notifications into existing stories.
-
-## 5. Dedup Logic
-
-Content similarity check using normalized Levenshtein or simpler approach:
+## 6. Vector Math Helpers
 
 ```kotlin
-fun isDuplicate(a: NotificationEntity, b: NotificationEntity): Boolean {
-    if (a.id == b.id) return false
-    val contentA = (a.bigText ?: a.content).lowercase().trim()
-    val contentB = (b.bigText ?: b.content).lowercase().trim()
-    if (contentA.isBlank() || contentB.isBlank()) return false
-    // Exact or near-exact match (one contains the other)
-    return contentA == contentB ||
-        contentA.contains(contentB) ||
-        contentB.contains(contentA)
-}
-```
+object VectorMath {
+    fun FloatArray.toBytes(): ByteArray =
+        ByteBuffer.allocate(size * 4).order(ByteOrder.LITTLE_ENDIAN).also { bb ->
+            forEach(bb::putFloat)
+        }.array()
 
-This catches: Truecaller re-showing SMS text, notification updates (same key, slightly different content), cross-app forwarding of identical content.
-
-Not a fuzzy similarity score — that's what the LLM grouping handles.
-
-## 6. LLM Grouping Prompt
-
-### Format
-
-```
-You are grouping notifications into stories. Each story is about one person, event, or topic.
-Group notifications that are about the same thing — even if from different apps.
-"Subhankar Bhadra" and "Subhankar B." are the same person.
-A bank SMS and a caller ID alert about the same transaction are one story.
-
-{existing_stories_section}
-
-New notifications:
-[N1] {appName} — {title}: {content.take(150)}
-[N2] {appName} — {title}: {content.take(150)}
-...
-
-For each new notification, assign to an existing story or create new stories.
-Return JSON only: {"assign": {"N1": "S1"}, "new_stories": [["N2", "N3"], ["N4"]]}
-```
-
-### When no existing stories (full rebuild)
-
-```
-You are grouping notifications into stories. Each story is about one person, event, or topic.
-Group notifications that are about the same thing — even if from different apps.
-
-Notifications:
-[1] {appName} — {title}: {content.take(150)}
-[2] {appName} — {title}: {content.take(150)}
-...
-
-Group them by event/person. Return JSON only: [[1, 3], [2, 5, 7], [4], [6]]
-```
-
-### Parsing
-
-Parse the JSON response. On failure, fall back to the current behavior (group by app + sender). The LLM grouping is an enhancement — if it fails, the old logic still works.
-
-## 7. Day Window Boundaries
-
-```kotlin
-fun getDayWindow(): Pair<Long, Long> {
-    val cal = Calendar.getInstance()
-    // If before 2 AM, the window started at 2 AM yesterday
-    if (cal.get(Calendar.HOUR_OF_DAY) < 2) {
-        cal.add(Calendar.DAY_OF_YEAR, -1)
+    fun ByteArray.toFloats(): FloatArray {
+        val bb = ByteBuffer.wrap(this).order(ByteOrder.LITTLE_ENDIAN)
+        return FloatArray(size / 4) { bb.float }
     }
-    cal.set(Calendar.HOUR_OF_DAY, 2)
-    cal.set(Calendar.MINUTE, 0)
-    cal.set(Calendar.SECOND, 0)
-    cal.set(Calendar.MILLISECOND, 0)
-    val start = cal.timeInMillis
-    val end = start + 24 * 60 * 60 * 1000L
-    return start to end
+
+    fun l2Normalize(v: FloatArray): FloatArray {
+        var ss = 0f
+        for (x in v) ss += x * x
+        val inv = 1f / sqrt(ss).coerceAtLeast(1e-8f)
+        return FloatArray(v.size) { v[it] * inv }
+    }
+
+    /** Assumes both inputs L2-normalized → dot product equals cosine similarity. */
+    fun dot(a: FloatArray, b: FloatArray): Float {
+        require(a.size == b.size)
+        var s = 0f
+        for (i in a.indices) s += a[i] * b[i]
+        return s
+    }
 }
 ```
+
+## 7. TopicEngine Pipeline
+
+### Automatic worker (incremental, triggered by ClassificationWorker)
+
+1. Compute day window `(start, end)` — 2 AM today to 2 AM tomorrow (or yesterday's window if before 2 AM).
+2. `getUnembedded(start, end)` — embed each, persist vector + timestamp.
+3. `getUnprocessedMatters(start, end)` — for each, run `assignOrCreateTopic(notif, vec)`.
+4. `markProcessedForTopics(processed_ids)`.
+5. Load topics with `needs_narrative_regen = 1` in the current window. For each, fetch all member notifications and regenerate headline via `PromptBuilder.buildNarrativePrompt(members)` + Gemma 4 E2B. `markClean(topicId)`.
+6. If any topic was regenerated: regenerate daily briefing from all active topic headlines, upsert BRIEFING topic.
+
+### Full rebuild (pull-to-refresh)
+
+1. `resetAllProcessedFlags()`
+2. Delete all topics (keep notifications and embeddings)
+3. Run the incremental pipeline — all matters notifications are now unprocessed
+4. All embeddings already exist, so no re-embedding happens
+5. All topics will be created fresh and will all be dirty → all get narratives
+
+### 2 AM daily reset job
+
+1. Compute new day window `(start, end)`
+2. Delete all topics
+3. `deleteOlderThan(start)` — removes notifications outside the new window, cascading their embeddings
+4. `resetAllProcessedFlags()` — clears remaining flags (should be no-op after delete, defensive)
 
 ## 8. Files to Change
 
 | File | Change |
 |------|--------|
-| `TopicEngine.kt` | Major rewrite — incremental grouping pipeline with LLM merge |
-| `PromptBuilder.kt` | Add `buildGroupingPrompt` (incremental) and `buildFullGroupingPrompt` (rebuild) |
-| `LlmResponseParser.kt` | Add `parseGroupingResponse` and `parseFullGroupingResponse` |
-| `NotificationEntity.kt` | Add `processedForTopics` column |
-| `NotificationDao.kt` | Add unprocessed query, mark processed, reset flags |
-| `NotificationRepository.kt` | Add corresponding methods |
-| `FocalDatabase.kt` | Add MIGRATION_4_5 (or next version) |
-| `DatabaseModule.kt` | Register new migration |
-| `ClassificationWorker.kt` | Use day window boundaries instead of 24h rolling |
-| `DailyResetWorker.kt` | New — scheduled 2 AM job to purge and reset |
-| `FocalApplication.kt` | Schedule the daily reset worker on startup |
+| `EmbeddingProvider.kt` | New — interface |
+| `EmbeddingGemmaProvider.kt` | New — implementation using AI Edge RAG SDK |
+| `VectorMath.kt` | New — dot, l2Normalize, byte conversion helpers |
+| `ModelManager.kt` | Add EmbeddingGemma variant entry (fileName, url, sizeLabel), keep existing Gemma variants |
+| `TopicEngine.kt` | Major rewrite — embed → assign → regenerate pipeline |
+| `NotificationEntity.kt` | Add embedding, embeddedAt, processedForTopics columns; custom equals/hashCode |
+| `NotificationDao.kt` | Add unembedded/unprocessed/setEmbedding/markProcessed/resetAllProcessedFlags/invalidateEmbedding queries |
+| `NotificationRepository.kt` | Corresponding methods |
+| `TopicEntity.kt` | Add needsNarrativeRegen column |
+| `TopicDao.kt` | Add getActiveTopicsInWindow/markDirty/markClean |
+| `TopicRepository.kt` | Corresponding methods |
+| `FocalDatabase.kt` | Version 5, MIGRATION_4_5 |
+| `DatabaseModule.kt` | Register MIGRATION_4_5 |
+| `IntelligenceModule.kt` | Provide EmbeddingProvider singleton |
+| `FocalApplication.kt` | Initialize EmbeddingGemma on startup, schedule DailyResetWorker |
+| `DailyResetWorker.kt` | New — PeriodicWorkRequest at 2 AM |
+| `ClassificationWorker.kt` | Use day window instead of 24h rolling |
+| `NotificationRepository.kt` (upsert) | On content update, invalidate embedding |
+| `build.gradle.kts` | Add `com.google.ai.edge.localagents:localagents-rag:0.1.0` |
 
 ## 9. Testing Strategy
 
-### Unit Tests (no device needed)
+### Unit tests
 
-1. **Dedup logic** — verify `isDuplicate` catches exact matches, substring matches, and correctly allows different content through
-2. **Day window boundaries** — verify `getDayWindow()` returns correct boundaries at various times (1 AM = yesterday's window, 3 AM = today's window, 11 PM = today's window)
-3. **Grouping prompt construction** — verify incremental prompt includes existing stories + new notifications in correct format. Verify full rebuild prompt includes all notifications.
-4. **Grouping response parsing** — verify JSON parsing for: valid assignment response, valid full-rebuild response, malformed JSON (falls back gracefully), empty assignments, all-new stories, all-assigned
-5. **Incremental flow** — mock LLM. Send N1-N3, verify 3 topics created and notifications marked processed. Send N4, verify only N4 in the prompt with existing topics as context. Verify N4 merges into correct existing topic.
-6. **Full rebuild flow** — mock LLM. Create topics from N1-N3. Trigger full rebuild. Verify all processed flags reset, all notifications re-sent, new topics generated.
-7. **Processed flag management** — verify markProcessedForTopics only marks specified IDs, resetProcessedFlags only affects current day window
+1. **VectorMath** — toBytes/toFloats round-trip preserves values; l2Normalize produces unit-length vector; dot on orthogonal vectors is 0; dot on identical vectors is 1.
+2. **Day window** — `getDayWindow()` at 1 AM returns yesterday's window; at 3 AM returns today's window; at 11 PM returns today's window.
+3. **assignOrCreateTopic**
+   - Empty topic list → creates new topic
+   - Score above threshold → appends to best topic, marks dirty
+   - Score below threshold → creates new topic
+   - Notification with null embedding → creates new topic without crashing
+4. **TopicEngine incremental flow** (mocked embedder + LLM)
+   - N1–N3 arrive → 3 embeddings produced, topics created, narratives generated, all marked processed
+   - N4 arrives (high similarity to topic 1) → N4 embedded, assigned to topic 1, only topic 1 marked dirty, only topic 1's narrative regenerated
+5. **TopicEngine full rebuild** — all flags reset, all topics deleted, all notifications re-assigned, all topics dirty
+6. **Embedding invalidation on update** — upsert existing notification with new content → embedding set to null
+7. **Blank content guard** — notification with empty title+content skipped during embedding phase
+8. **Grouping parser and response** — not needed (no LLM grouping)
 
-### On-Device Simulation Tests
+### On-device simulation tests
 
-Create a test utility class `TestNotificationInjector` that inserts fake `NotificationEntity` rows directly into Room (bypassing NotificationListenerService). This allows controlled testing without needing real notifications.
+A `TestNotificationInjector` helper inserts `NotificationEntity` rows directly into Room, bypassing NotificationListenerService. Scenarios:
 
-**Test scenarios:**
+1. **Cross-app person merge** — Phone "Mom" missed call + WhatsApp "Mom" message about Sunday → one topic, both apps as sources.
+2. **Fuzzy name match** — Gmail from "Subhankar Bhadra" + Slack from "Subhankar B." → one topic (EmbeddingGemma's semantic space should map both near each other).
+3. **Financial cross-app** — Messages "₹44,000 spent on ICICI Card" + Truecaller "₹44,000 ICICI Bank" → one topic.
+4. **Unrelated stays unrelated** — Messages "OTP is 483921" + Messages "Your flight PNR" → two topics.
+5. **Incremental** — Inject N1-N3, trigger worker, verify 2-3 topics. Inject N4 related to N1's topic, trigger worker, verify N4 appended (check `notificationIds` JSON), verify only that topic's headline changed.
+6. **Pull-to-refresh** — After incremental test, trigger full rebuild, verify all processed flags reset and topics recomputed.
+7. **2 AM reset** — Inject notifications with posted_at before current day window, run DailyResetWorker directly, verify topics purged and old notifications deleted.
 
-1. **Cross-app person merge**
-   - Inject: Phone "Mom" missed call + WhatsApp "Mom" message about Sunday lunch
-   - Trigger worker
-   - Verify: ONE topic with both apps as sources, headline mentions Mom + Sunday lunch
+## 10. Pitfalls
 
-2. **Fuzzy name match**
-   - Inject: Gmail from "Subhankar Bhadra" + Slack from "Subhankar B."
-   - Trigger worker
-   - Verify: ONE topic (LLM correctly identifies same person)
-
-3. **Financial cross-app merge**
-   - Inject: Messages SMS "₹44,000 spent on ICICI Card" + Truecaller "₹44,000 ICICI Bank"
-   - Trigger worker
-   - Verify: ONE financial story, not two
-
-4. **Dedup — identical content**
-   - Inject: Messages SMS "OTP is 483921" + Truecaller showing exact same text
-   - Trigger worker
-   - Verify: Duplicate filtered, only one notification reaches LLM
-
-5. **Incremental processing**
-   - Inject N1, N2, N3 → trigger worker → verify 2 topics created, 3 marked processed
-   - Inject N4 (related to topic 1) → trigger worker → verify N4 merged into topic 1, headline regenerated, only N4 was sent to LLM grouping
-
-6. **Pull-to-refresh full rebuild**
-   - After incremental test above, trigger pull-to-refresh
-   - Verify: all processed flags reset, all 4 notifications re-grouped, same or better topics produced
-
-7. **Day boundary reset**
-   - Inject notifications, generate topics
-   - Simulate 2 AM reset (call the purge method directly)
-   - Verify: topics deleted, processed flags reset, digest is empty until new notifications arrive
+1. **Forgetting to L2-normalize at storage time** — normalize once in the embedder; never re-normalize at query time.
+2. **Mixing embedding prompt templates** — pick one template and use it consistently.
+3. **Re-embedding on every worker run** — embed once, persist, reuse.
+4. **Empty-content embeddings** — skip, do not produce degenerate vectors.
+5. **Stale embeddings after content update** — invalidate in `upsertNotification`.
+6. **Forgetting custom equals/hashCode** — Room will behave incorrectly with ByteArray columns in data classes otherwise.
+7. **Native model lifecycle** — EmbeddingGemma and Gemma 4 E2B both hold native resources; ensure `close()` is called on app shutdown to avoid leaks.
+8. **Running both models concurrently** — serialize model usage via the existing single-thread dispatcher; do not embed and generate in parallel.
