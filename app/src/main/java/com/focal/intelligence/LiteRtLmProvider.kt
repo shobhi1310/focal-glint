@@ -35,14 +35,14 @@ class LiteRtLmProvider @Inject constructor(
     // Recreated on each initialize() so Stop → Start works correctly.
     private var llmDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
-    override suspend fun initialize(modelPath: String, useGpu: Boolean) {
+    override suspend fun initialize(modelPath: String, useGpu: Boolean, maxContextTokens: Int) {
         withContext(Dispatchers.IO) {
             val backend: Backend = if (useGpu) Backend.GPU() else Backend.CPU()
             val config = EngineConfig(
                 modelPath = modelPath,
                 backend = backend,
                 cacheDir = context.cacheDir.absolutePath,
-                maxNumTokens = 8192
+                maxNumTokens = maxContextTokens
             )
             val newEngine = Engine(config)
             newEngine.initialize()
@@ -53,12 +53,12 @@ class LiteRtLmProvider @Inject constructor(
         }
     }
 
-    override suspend fun restart(modelPath: String, useGpu: Boolean) {
+    override suspend fun restart(modelPath: String, useGpu: Boolean, maxContextTokens: Int) {
         withContext(Dispatchers.IO) {
             engine?.close()
             engine = null
         }
-        initialize(modelPath, useGpu)
+        initialize(modelPath, useGpu, maxContextTokens)
     }
 
     override suspend fun generate(prompt: String, maxTokens: Int): String {

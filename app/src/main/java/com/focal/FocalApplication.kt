@@ -8,6 +8,7 @@ import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.DefaultRules
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
+import com.focal.intelligence.ModelVariant
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,10 +67,11 @@ class FocalApplication : Application(), Configuration.Provider {
         }
 
         val useGpu = modelManager.getBackendPreference()
+        val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
         applicationScope.launch {
             try {
-                inferenceProvider.initialize(modelManager.modelPath, useGpu)
-                Log.d(TAG, "LLM engine initialized successfully (gpu=$useGpu)")
+                inferenceProvider.initialize(modelManager.modelPath, useGpu, variant.maxContextTokens)
+                Log.d(TAG, "LLM engine initialized successfully (gpu=$useGpu, context=${variant.maxContextTokens})")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize LLM engine", e)
             }

@@ -10,6 +10,7 @@ import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
+import com.focal.intelligence.ModelVariant
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -109,7 +110,8 @@ class SettingsViewModel @Inject constructor(
             modelManager.saveBackendPreference(useGpu)
             if (modelManager.isModelAvailable) {
                 try {
-                    inferenceProvider.restart(modelManager.modelPath, useGpu)
+                    val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
+                    inferenceProvider.restart(modelManager.modelPath, useGpu, variant.maxContextTokens)
                 } catch (e: Exception) {
                     val fallback = !useGpu
                     modelManager.saveBackendPreference(fallback)

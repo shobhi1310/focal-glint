@@ -13,19 +13,22 @@ enum class ModelVariant(
     val fileName: String,
     val url: String,
     val displayName: String,
-    val sizeLabel: String
+    val sizeLabel: String,
+    val maxContextTokens: Int
 ) {
     GEMMA3_1B(
         fileName = "gemma3-1b-it-int4.litertlm",
         url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.litertlm",
         displayName = "Gemma 3 1B",
-        sizeLabel = "~500 MB"
+        sizeLabel = "~500 MB",
+        maxContextTokens = 8192
     ),
     GEMMA4_E2B(
         fileName = "gemma-4-E2B-it.litertlm",
         url = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
         displayName = "Gemma 4 E2B",
-        sizeLabel = "2.58 GB"
+        sizeLabel = "2.58 GB",
+        maxContextTokens = 32768
     )
 }
 

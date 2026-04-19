@@ -109,8 +109,10 @@ class SetupViewModel @Inject constructor(
     fun onStartEngine() {
         viewModelScope.launch {
             try {
+                val variant = _uiState.value.selectedModel
                 inferenceProvider.initialize(
-                    modelManager.modelFileFor(_uiState.value.selectedModel).absolutePath
+                    modelManager.modelFileFor(variant).absolutePath,
+                    maxContextTokens = variant.maxContextTokens
                 )
                 _uiState.value = _uiState.value.copy(engineRunning = true, errorMessage = null)
             } catch (e: Exception) {
