@@ -74,6 +74,19 @@ fun AllNotificationsScreen(
             }
         }
 
+        if (state.uncategorized.isNotEmpty()) {
+            item {
+                CategorySection(
+                    label = "UNCLASSIFIED",
+                    count = state.uncategorized.size,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    notifications = state.uncategorized,
+                    initiallyExpanded = true
+                )
+            }
+        }
+
         if (state.totalCount == 0) {
             item {
                 Text(
