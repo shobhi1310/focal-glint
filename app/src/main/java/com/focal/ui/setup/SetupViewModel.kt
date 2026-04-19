@@ -6,9 +6,11 @@ import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
+import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,9 @@ data class SetupUiState(
     val modelsOnDevice: Set<ModelVariant> = emptySet(),
     val downloadProgress: Int? = null,
     val engineRunning: Boolean = false,
+    val useGpu: Boolean = true,
+    val backendSwitching: Boolean = false,
+    val engineStopping: Boolean = false,
     val errorMessage: String? = null,
     val embeddingModelAvailable: Boolean = false,
     val embeddingDownloadProgress: Int? = null,
@@ -55,6 +60,7 @@ class SetupViewModel @Inject constructor(
             activeModel = activeModel,
             modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
+            useGpu = modelManager.getBackendPreference(),
             embeddingModelAvailable = modelManager.isEmbeddingModelAvailable
         )
     }
@@ -70,15 +76,21 @@ class SetupViewModel @Inject constructor(
     fun onModelSelected(variant: ModelVariant) {
         val alreadyOnDevice = modelManager.isModelAvailable(variant)
         modelManager.saveSelectedVariant(variant)
-        if (inferenceProvider.isReady()) {
-            inferenceProvider.close()
-            modelManager.setEngineEnabled(false)
-        }
         _uiState.value = _uiState.value.copy(
             selectedModel = variant,
-            activeModel = if (alreadyOnDevice) variant else null,
-            engineRunning = false
+            activeModel = if (alreadyOnDevice) variant else null
         )
+        if (inferenceProvider.isReady()) {
+            _uiState.value = _uiState.value.copy(engineStopping = true)
+            viewModelScope.launch {
+                cancelWorkerAndWait()
+                inferenceProvider.close()
+                modelManager.setEngineEnabled(false)
+                _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(engineRunning = false)
+        }
     }
 
     fun onDownload() {
@@ -89,10 +101,12 @@ class SetupViewModel @Inject constructor(
     fun onRedownload() {
         val variant = _uiState.value.selectedModel
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(engineStopping = true)
+            cancelWorkerAndWait()
             inferenceProvider.close()
             modelManager.setEngineEnabled(false)
             modelManager.deleteModel(variant)
-            _uiState.value = _uiState.value.copy(activeModel = null, engineRunning = false)
+            _uiState.value = _uiState.value.copy(activeModel = null, engineRunning = false, engineStopping = false)
             startDownload(variant)
         }
     }
@@ -113,11 +127,13 @@ class SetupViewModel @Inject constructor(
     }
 
     fun onStartEngine() {
+        if (_uiState.value.engineStopping) return
         viewModelScope.launch {
             try {
                 val variant = _uiState.value.selectedModel
                 inferenceProvider.initialize(
                     modelManager.modelFileFor(variant).absolutePath,
+                    useGpu = _uiState.value.useGpu,
                     maxContextTokens = variant.maxContextTokens
                 )
                 modelManager.setEngineEnabled(true)
@@ -129,9 +145,44 @@ class SetupViewModel @Inject constructor(
     }
 
     fun onStopEngine() {
-        inferenceProvider.close()
-        modelManager.setEngineEnabled(false)
-        _uiState.value = _uiState.value.copy(engineRunning = false)
+        if (_uiState.value.engineStopping) return
+        _uiState.value = _uiState.value.copy(engineStopping = true)
+        viewModelScope.launch {
+            cancelWorkerAndWait()
+            inferenceProvider.close()
+            modelManager.setEngineEnabled(false)
+            _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
+        }
+    }
+
+    private suspend fun cancelWorkerAndWait() {
+        ClassificationWorker.cancelAndWait(WorkManager.getInstance(context))
+    }
+
+    fun onToggleBackend(useGpu: Boolean) {
+        if (_uiState.value.backendSwitching) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(backendSwitching = true, useGpu = useGpu)
+            modelManager.saveBackendPreference(useGpu)
+            if (inferenceProvider.isReady()) {
+                try {
+                    val variant = _uiState.value.selectedModel
+                    inferenceProvider.restart(
+                        modelManager.modelFileFor(variant).absolutePath,
+                        useGpu,
+                        variant.maxContextTokens
+                    )
+                } catch (e: Exception) {
+                    val fallback = !useGpu
+                    modelManager.saveBackendPreference(fallback)
+                    _uiState.value = _uiState.value.copy(
+                        useGpu = fallback,
+                        errorMessage = "Backend switch failed: ${e.message}"
+                    )
+                }
+            }
+            _uiState.value = _uiState.value.copy(backendSwitching = false)
+        }
     }
 
     fun onDownloadEmbeddingModel() {
