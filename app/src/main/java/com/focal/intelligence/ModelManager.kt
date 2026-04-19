@@ -211,7 +211,7 @@ class ModelManager(private val context: Context) {
         const val MIN_MODEL_SIZE = 100_000_000L
         const val GECKO_MODEL_FILENAME = "Gecko_256_f32.tflite"
         const val GECKO_TOKENIZER_FILENAME = "sentencepiece.model"
-        const val GECKO_MODEL_URL = "https://storage.googleapis.com/mediapipe-assets/Gecko_256_f32.tflite"
-        const val GECKO_TOKENIZER_URL = "https://storage.googleapis.com/mediapipe-assets/sentencepiece.model"
+        const val GECKO_MODEL_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/Gecko_256_f32.tflite"
+        const val GECKO_TOKENIZER_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/sentencepiece.model"
     }
 }
