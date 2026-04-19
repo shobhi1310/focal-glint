@@ -6,6 +6,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.DefaultRules
+import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.focal.worker.DailyResetWorker
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -28,12 +30,16 @@ class FocalApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var inferenceProvider: InferenceProvider
 
+    @Inject
+    lateinit var embeddingProvider: EmbeddingProvider
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
         seedDefaultRules()
         initializeLlmIfModelExists()
+        scheduleDailyReset()
     }
 
     override val workManagerConfiguration: Configuration
@@ -76,6 +82,46 @@ class FocalApplication : Application(), Configuration.Provider {
                 Log.e(TAG, "Failed to initialize LLM engine", e)
             }
         }
+
+        if (modelManager.isEmbeddingModelAvailable) {
+            applicationScope.launch {
+                try {
+                    embeddingProvider.initialize(
+                        modelManager.geckoModelFile.absolutePath,
+                        modelManager.geckoTokenizerFile.absolutePath,
+                        modelManager.getBackendPreference()
+                    )
+                    Log.d(TAG, "Embedding model initialized successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize embedding model", e)
+                }
+            }
+        } else {
+            Log.d(TAG, "Embedding model not found at ${modelManager.embeddingModelDir}")
+        }
+    }
+
+    private fun scheduleDailyReset() {
+        val now = java.util.Calendar.getInstance()
+        val target = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 2)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            if (before(now)) add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        val initialDelay = target.timeInMillis - now.timeInMillis
+
+        val request = androidx.work.PeriodicWorkRequestBuilder<DailyResetWorker>(
+            24, java.util.concurrent.TimeUnit.HOURS
+        )
+            .setInitialDelay(initialDelay, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            DailyResetWorker.WORK_NAME,
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 
     companion object {

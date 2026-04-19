@@ -5,6 +5,8 @@ import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.data.repository.TopicRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.GeckoEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
@@ -43,6 +45,12 @@ object IntelligenceModule {
     @Singleton
     fun provideClassifier(inferenceProvider: InferenceProvider): Classifier {
         return Classifier(inferenceProvider)
+    }
+
+    @Provides
+    @Singleton
+    fun provideEmbeddingProvider(): EmbeddingProvider {
+        return GeckoEmbeddingProvider()
     }
 
     @Provides

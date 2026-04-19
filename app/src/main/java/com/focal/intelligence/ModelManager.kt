@@ -42,6 +42,23 @@ class ModelManager(private val context: Context) {
     private val legacyModelDir: File
         get() = File(context.filesDir, "models")
 
+    val embeddingModelDir: File
+        get() = File(modelDir, "embeddings")
+
+    val geckoModelFile: File
+        get() = File(embeddingModelDir, GECKO_MODEL_FILENAME)
+
+    val geckoTokenizerFile: File
+        get() = File(embeddingModelDir, GECKO_TOKENIZER_FILENAME)
+
+    val isEmbeddingModelAvailable: Boolean
+        get() = geckoModelFile.exists() && geckoModelFile.length() > 1_000_000L &&
+                geckoTokenizerFile.exists()
+
+    fun ensureEmbeddingModelDir() {
+        if (!embeddingModelDir.exists()) embeddingModelDir.mkdirs()
+    }
+
     // Legacy single-model API — kept for FocalApplication.initializeLlmIfModelExists()
     val modelFile: File
         get() = File(modelDir, MODEL_FILENAME)
@@ -131,5 +148,7 @@ class ModelManager(private val context: Context) {
     companion object {
         const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
         const val MIN_MODEL_SIZE = 100_000_000L
+        const val GECKO_MODEL_FILENAME = "Gecko_256_f32.tflite"
+        const val GECKO_TOKENIZER_FILENAME = "sentencepiece.model"
     }
 }
