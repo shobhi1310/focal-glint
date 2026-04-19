@@ -29,8 +29,8 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideInferenceProvider(): InferenceProvider {
-        return LiteRtLmProvider()
+    fun provideInferenceProvider(@ApplicationContext context: Context): InferenceProvider {
+        return LiteRtLmProvider(context)
     }
 
     @Provides

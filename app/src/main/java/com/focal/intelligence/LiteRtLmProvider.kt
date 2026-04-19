@@ -1,34 +1,48 @@
 package com.focal.intelligence
 
+import android.content.Context
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
-import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
-class LiteRtLmProvider : InferenceProvider {
+class LiteRtLmProvider @Inject constructor(
+    @ApplicationContext private val context: Context
+) : InferenceProvider {
 
     private var engine: Engine? = null
     private val mutex = Mutex()
 
-    override suspend fun initialize(modelPath: String) {
+    override suspend fun initialize(modelPath: String, useGpu: Boolean) {
         withContext(Dispatchers.IO) {
             val config = EngineConfig(
                 modelPath = modelPath,
-                backend = Backend.CPU,
+                backend = if (useGpu) Backend.GPU() else Backend.CPU,
+                cacheDir = context.cacheDir.absolutePath,
+                maxNumTokens = 8192
             )
             val newEngine = Engine(config)
             newEngine.initialize()
             engine = newEngine
-            Log.d(TAG, "Engine initialized with model: $modelPath")
+            Log.d(TAG, "Engine initialized with model: $modelPath, gpu=$useGpu")
         }
+    }
+
+    override suspend fun restart(modelPath: String, useGpu: Boolean) {
+        withContext(Dispatchers.IO) {
+            engine?.close()
+            engine = null
+        }
+        initialize(modelPath, useGpu)
     }
 
     override suspend fun generate(prompt: String, maxTokens: Int): String {
@@ -40,33 +54,27 @@ class LiteRtLmProvider : InferenceProvider {
                 val conversationConfig = ConversationConfig(
                     samplerConfig = SamplerConfig(
                         topK = 10,
-                        topP = 0.95,
-                        temperature = 0.3,
+                        topP = 0.95f,
+                        temperature = 0.3f,
                     )
                 )
                 eng.createConversation(conversationConfig).use { conversation ->
-                    val inputMessage = Message.of(prompt)
-                    val response = conversation.sendMessage(inputMessage)
+                    val response = conversation.sendMessage(prompt)
                     extractText(response)
                 }
             }
         }
     }
 
-    override fun isReady(): Boolean {
-        return engine != null
-    }
+    override fun isReady(): Boolean = engine != null
 
     override fun close() {
         engine?.close()
         engine = null
     }
 
-    private fun extractText(message: Message): String {
-        return message.contents
-            .filterIsInstance<Content.Text>()
-            .joinToString("") { it.text }
-    }
+    private fun extractText(message: Message): String =
+        message.toString()
 
     companion object {
         private const val TAG = "LiteRtLmProvider"
