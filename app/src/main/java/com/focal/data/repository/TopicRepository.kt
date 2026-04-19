@@ -55,4 +55,44 @@ class TopicRepository(
         val cutoff = System.currentTimeMillis() - twentyFourHoursMs
         topicDao.deleteOlderThan(cutoff)
     }
+
+    suspend fun getActiveTopicsInWindow(since: Long, until: Long): List<TopicEntity> {
+        return topicDao.getActiveTopicsInWindow(since, until)
+    }
+
+    suspend fun getBriefingInWindow(since: Long, until: Long): TopicEntity? {
+        return topicDao.getBriefingInWindow(since, until)
+    }
+
+    suspend fun saveTopic(topic: TopicEntity) {
+        topicDao.insert(topic)
+    }
+
+    suspend fun updateTopicMembers(topicId: String, notificationIds: String, sourceApps: String, channelCount: Int) {
+        val topic = topicDao.getById(topicId) ?: return
+        topicDao.update(topic.copy(
+            notificationIds = notificationIds,
+            sourceApps = sourceApps,
+            channelCount = channelCount,
+            updatedAt = System.currentTimeMillis()
+        ))
+    }
+
+    suspend fun updateTopicHeadline(topicId: String, headline: String, summary: String, briefingContribution: String?) {
+        val topic = topicDao.getById(topicId) ?: return
+        topicDao.update(topic.copy(
+            headline = headline,
+            summary = summary,
+            briefingContribution = briefingContribution,
+            updatedAt = System.currentTimeMillis()
+        ))
+    }
+
+    suspend fun markDirty(topicId: String) {
+        topicDao.markDirty(topicId, System.currentTimeMillis())
+    }
+
+    suspend fun markClean(topicId: String) {
+        topicDao.markClean(topicId)
+    }
 }

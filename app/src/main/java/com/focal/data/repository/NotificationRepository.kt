@@ -65,6 +65,9 @@ class NotificationRepository(
                 classifiedBy = if (existing.classifiedBy != "pending") existing.classifiedBy else notification.classifiedBy,
                 processedAt = existing.processedAt
             ))
+            if (existing.title != notification.title || existing.content != notification.content || existing.bigText != notification.bigText) {
+                notificationDao.invalidateEmbedding(existing.id)
+            }
         } else {
             notificationDao.insert(notification)
             appProfileDao.insertIfNew(AppProfileEntity(
@@ -111,5 +114,33 @@ class NotificationRepository(
 
     suspend fun getByIds(ids: List<String>): List<NotificationEntity> {
         return notificationDao.getByIds(ids)
+    }
+
+    suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity> {
+        return notificationDao.getUnembedded(since, until)
+    }
+
+    suspend fun getUnprocessedMatters(since: Long, until: Long): List<NotificationEntity> {
+        return notificationDao.getUnprocessedMatters(since, until)
+    }
+
+    suspend fun setEmbedding(id: String, embedding: ByteArray) {
+        notificationDao.setEmbedding(id, embedding, System.currentTimeMillis())
+    }
+
+    suspend fun markProcessedForTopics(ids: List<String>) {
+        notificationDao.markProcessedForTopics(ids)
+    }
+
+    suspend fun resetAllProcessedFlags() {
+        notificationDao.resetAllProcessedFlags()
+    }
+
+    suspend fun invalidateEmbedding(id: String) {
+        notificationDao.invalidateEmbedding(id)
+    }
+
+    suspend fun purgeOlderThan(before: Long) {
+        notificationDao.deleteOlderThan(before)
     }
 }

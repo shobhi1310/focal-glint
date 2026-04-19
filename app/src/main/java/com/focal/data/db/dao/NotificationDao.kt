@@ -45,4 +45,22 @@ interface NotificationDao {
 
     @Query("SELECT * FROM notifications WHERE notification_key = :key LIMIT 1")
     suspend fun getByNotificationKey(key: String): NotificationEntity?
+
+    @Query("SELECT * FROM notifications WHERE embedding IS NULL AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+    suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity>
+
+    @Query("SELECT * FROM notifications WHERE processed_for_topics = 0 AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+    suspend fun getUnprocessedMatters(since: Long, until: Long): List<NotificationEntity>
+
+    @Query("UPDATE notifications SET embedding = :embedding, embedded_at = :timestamp WHERE id = :id")
+    suspend fun setEmbedding(id: String, embedding: ByteArray, timestamp: Long)
+
+    @Query("UPDATE notifications SET processed_for_topics = 1 WHERE id IN (:ids)")
+    suspend fun markProcessedForTopics(ids: List<String>)
+
+    @Query("UPDATE notifications SET processed_for_topics = 0")
+    suspend fun resetAllProcessedFlags()
+
+    @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL WHERE id = :id")
+    suspend fun invalidateEmbedding(id: String)
 }
