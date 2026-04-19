@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -31,6 +33,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
+import com.focal.ui.components.UserPreference
 import com.focal.ui.theme.FocalAccent
 import com.focal.ui.theme.ThemeMode
 import com.focal.ui.theme.ThemePreference
@@ -77,6 +83,33 @@ fun TuneScreen(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
+
+            // Name setting
+            item {
+                SectionHeader(title = "YOUR NAME")
+            }
+            item {
+                val context = LocalContext.current
+                var name by remember { mutableStateOf(UserPreference.getUserName(context)) }
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newName ->
+                        name = newName
+                        UserPreference.setUserName(context, newName)
+                    },
+                    placeholder = { Text("Enter your name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
 
             // Theme toggle
             item {

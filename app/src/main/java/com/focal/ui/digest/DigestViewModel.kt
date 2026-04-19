@@ -79,7 +79,8 @@ class DigestViewModel @Inject constructor(
             hour in 17..20 -> "Good evening"
             else -> "Good night"
         }
-        return "$timeOfDay, Shubhankar."
+        val name = com.focal.ui.components.UserPreference.getUserName(context)
+        return if (name.isNotBlank()) "$timeOfDay, $name." else "$timeOfDay."
     }
 
     private fun buildDayTimeLabel(): String {
