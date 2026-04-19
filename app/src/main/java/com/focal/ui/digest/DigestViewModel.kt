@@ -24,8 +24,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DigestUiState(
-    val briefing: String? = null,
+    val greeting: String = "",
+    val dayTimeLabel: String = "",
     val stories: List<TopicEntity> = emptyList(),
+    val mattersCount: Int = 0,
     val noiseCount: Int = 0,
     val totalNotifications: Int = 0,
     val isProcessing: Boolean = false
@@ -44,19 +46,22 @@ class DigestViewModel @Inject constructor(
     val uiState: StateFlow<DigestUiState> = combine(
         topicRepository.getStoryTopics(),
         topicRepository.getBriefing(),
+        notificationRepository.countByCategory(ClassificationResult.MATTERS),
         notificationRepository.countByCategory(ClassificationResult.NOISE),
         notificationRepository.totalCount(),
         isProcessing
     ) { values ->
         val stories = values[0] as List<TopicEntity>
-        val briefingTopic = values[1] as TopicEntity?
-        val noiseCount = values[2] as Int
-        val totalNotifications = values[3] as Int
-        val processing = values[4] as Boolean
+        val mattersCount = values[2] as Int
+        val noiseCount = values[3] as Int
+        val totalNotifications = values[4] as Int
+        val processing = values[5] as Boolean
 
         DigestUiState(
-            briefing = briefingTopic?.summary,
+            greeting = buildGreeting(),
+            dayTimeLabel = buildDayTimeLabel(),
             stories = stories,
+            mattersCount = mattersCount,
             noiseCount = noiseCount,
             totalNotifications = totalNotifications,
             isProcessing = processing
@@ -66,6 +71,22 @@ class DigestViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DigestUiState()
     )
+
+    private fun buildGreeting(): String {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val timeOfDay = when {
+            hour in 5..11 -> "Good morning"
+            hour in 12..16 -> "Good afternoon"
+            hour in 17..20 -> "Good evening"
+            else -> "Good night"
+        }
+        return "$timeOfDay, Shubhankar."
+    }
+
+    private fun buildDayTimeLabel(): String {
+        val sdf = java.text.SimpleDateFormat("EEEE · h:mm a", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date()).uppercase()
+    }
 
     fun onRefresh() {
         viewModelScope.launch {

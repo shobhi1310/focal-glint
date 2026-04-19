@@ -14,9 +14,16 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.focal.ui.components.SectionHeader
+import com.focal.ui.theme.FocalAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,12 +44,56 @@ fun DigestScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Day/time label
             item {
                 Text(
-                    text = "Your Digest",
+                    text = state.dayTimeLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 2.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+
+            // Greeting with name in accent color
+            item {
+                val parts = state.greeting.split(", ", limit = 2)
+                val annotated = buildAnnotatedString {
+                    append(parts.getOrElse(0) { "" })
+                    if (parts.size > 1) {
+                        append(", ")
+                        withStyle(SpanStyle(color = FocalAccent)) {
+                            append(parts[1])
+                        }
+                    }
+                }
+                Text(
+                    text = annotated,
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
+            }
+
+            // Stats line
+            item {
+                val statsText = buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("${state.mattersCount} matters")
+                    }
+                    append(" · ${state.noiseCount} noise · ${state.totalNotifications} total")
+                }
+                Text(
+                    text = statsText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+
+            item { Spacer(modifier = Modifier.height(4.dp)) }
+
+            // Section header
+            item {
+                SectionHeader(title = "MATTERS TO YOU", count = state.mattersCount)
             }
 
             if (state.isProcessing) {
@@ -55,19 +106,6 @@ fun DigestScreen(
                     )
                 }
             } else {
-                state.briefing?.let { briefingText ->
-                    item {
-                        Text(
-                            text = briefingText,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                }
-
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-
                 if (state.stories.isEmpty() && state.totalNotifications == 0) {
                     item {
                         Text(
@@ -91,17 +129,6 @@ fun DigestScreen(
                         TopicCard(
                             topic = topic,
                             onClick = { onTopicClick(topic.id) }
-                        )
-                    }
-                }
-
-                if (state.noiseCount > 0) {
-                    item {
-                        Text(
-                            text = "${state.noiseCount} promotional notifications hidden",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
                 }
