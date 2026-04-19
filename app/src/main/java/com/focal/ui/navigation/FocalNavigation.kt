@@ -22,6 +22,7 @@ import com.focal.ui.all.AllNotificationsScreen
 import com.focal.ui.digest.DigestScreen
 import com.focal.ui.digest.TopicDetailScreen
 import com.focal.ui.settings.SettingsScreen
+import com.focal.ui.setup.SetupScreen
 
 val bottomNavItems = listOf(Screen.Digest, Screen.All, Screen.Settings)
 
@@ -71,7 +72,12 @@ fun FocalNavigation() {
                 AllNotificationsScreen()
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onNavigateToSetup = { navController.navigate(Screen.Setup.route) }
+                )
+            }
+            composable(Screen.Setup.route) {
+                SetupScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Screen.TopicDetail.route,
