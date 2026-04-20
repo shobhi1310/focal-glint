@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
@@ -123,5 +124,51 @@ class ClassifierTest {
         val results = classifier.classifyBatch(notifications)
         assertEquals(3, results.size)
         results.forEach { (_, result) -> assertEquals(ClassificationResult.NOISE, result.category) }
+    }
+
+    @Test
+    fun `synthetic tool echo with parentheses is ignored`() {
+        assertTrue(
+            isSyntheticToolEcho(
+                """classifyNotification(category="noise", reason="promo")"""
+            )
+        )
+    }
+
+    @Test
+    fun `synthetic tool echo with braces is ignored`() {
+        assertTrue(
+            isSyntheticToolEcho(
+                """classifyNotification{category:<|"|>matters<|"|>,reason:<|"|>bank OTP<|"|>}"""
+            )
+        )
+    }
+
+    @Test
+    fun `tool execution is detected from captured category`() {
+        val tool = ClassifyNotificationTool()
+        tool.classifyNotification("matters", "OTP from bank")
+
+        assertTrue(wasToolExecuted(tool))
+    }
+
+    @Test
+    fun `unexpected prose warning is suppressed when tool already executed`() {
+        assertFalse(
+            shouldWarnAboutUnexpectedProse(
+                """classifyNotification(category="noise", reason="promo")""",
+                toolExecuted = true
+            )
+        )
+    }
+
+    @Test
+    fun `unexpected prose warning still fires when tool did not execute`() {
+        assertTrue(
+            shouldWarnAboutUnexpectedProse(
+                "some random prose from model",
+                toolExecuted = false
+            )
+        )
     }
 }

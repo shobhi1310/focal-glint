@@ -8,6 +8,20 @@ import kotlinx.coroutines.flow.collect
 private const val TAG = "Classifier"
 private const val CLASSIFICATION_SYSTEM =
     "You are a notification classifier. Classify each notification as 'matters' (personally relevant to the user) or 'noise' (generic, promotional, or irrelevant). Call classifyNotification exactly once. No prose."
+private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
+
+internal fun isSyntheticToolEcho(text: String): Boolean {
+    val trimmed = text.trim()
+    return trimmed.startsWith("response:") ||
+        trimmed.contains("<tool_call|>") ||
+        TOOL_ECHO_PREFIX.containsMatchIn(trimmed)
+}
+
+internal fun wasToolExecuted(tool: ClassifyNotificationTool): Boolean =
+    !tool.lastCategory.isNullOrBlank()
+
+internal fun shouldWarnAboutUnexpectedProse(finalText: String, toolExecuted: Boolean): Boolean =
+    finalText.isNotEmpty() && !toolExecuted && !isSyntheticToolEcho(finalText)
 
 class Classifier(
     private val inferenceProvider: InferenceProvider
@@ -46,9 +60,15 @@ class Classifier(
                 }
 
             val finalText = ThinkingMode.stripThoughtBlocks(rawResponse.toString()).trim()
-            Log.i(TAG, "stream done: messages=$messageCount toolCalls=$toolCallCount rawChars=${rawResponse.length} finalChars=${finalText.length}")
-            val isSyntheticToolEcho = finalText.startsWith("response:") || finalText.contains("<tool_call|>")
-            if (finalText.isNotEmpty() && !isSyntheticToolEcho) {
+            val toolExecuted = wasToolExecuted(tool)
+            Log.i(
+                TAG,
+                "stream done: messages=$messageCount toolCalls=$toolCallCount toolExecuted=$toolExecuted rawChars=${rawResponse.length} finalChars=${finalText.length}"
+            )
+            if (toolExecuted && toolCallCount == 0) {
+                Log.i(TAG, "tool executed through automatic tool calling without surfaced message.toolCalls")
+            }
+            if (shouldWarnAboutUnexpectedProse(finalText, toolExecuted)) {
                 Log.w(TAG, "unexpected prose after tool execution (tool may not have fired): '${finalText.take(200)}'")
             }
 

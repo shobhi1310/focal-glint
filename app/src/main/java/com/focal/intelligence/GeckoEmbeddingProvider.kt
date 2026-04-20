@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import java.util.Optional
 
 class GeckoEmbeddingProvider(
-    private val taskType: EmbedData.TaskType = EmbedData.TaskType.CLUSTERING
+    private val taskType: EmbedData.TaskType = EmbedData.TaskType.SEMANTIC_SIMILARITY
 ) : EmbeddingProvider {
 
     @Volatile private var model: GeckoEmbeddingModel? = null
