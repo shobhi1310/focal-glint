@@ -38,11 +38,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.data.db.entity.NotificationEntity
 import com.focal.intelligence.ActionIntentResolver
 import com.focal.intelligence.SuggestedAction
-import com.focal.ui.components.AppIcon
-import com.focal.ui.components.SectionHeader
-import com.focal.ui.components.formatRelativeTime
-import com.focal.ui.components.getAppCategory
-import com.focal.ui.theme.FocalAccent
 
 @Composable
 fun TopicDetailScreen(
