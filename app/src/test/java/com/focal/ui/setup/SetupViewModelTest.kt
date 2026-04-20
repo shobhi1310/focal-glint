@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.focal.data.db.FocalDatabase
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
@@ -21,6 +22,7 @@ import org.junit.Test
 class SetupViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
+    private lateinit var database: FocalDatabase
     private lateinit var modelManager: ModelManager
     private lateinit var inferenceProvider: InferenceProvider
     private lateinit var workManager: WorkManager
@@ -29,6 +31,7 @@ class SetupViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         context = mockk(relaxed = true)
+        database = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
         inferenceProvider = mockk(relaxed = true)
         workManager = mockk(relaxed = true)
@@ -62,7 +65,7 @@ class SetupViewModelTest {
         unmockkStatic(WorkManager::class)
     }
 
-    private fun createViewModel() = SetupViewModel(context, modelManager, inferenceProvider)
+    private fun createViewModel() = SetupViewModel(context, database, modelManager, inferenceProvider)
 
     @Test
     fun `init sets notificationAccessGranted true when permission present`() = runTest {
@@ -127,9 +130,9 @@ class SetupViewModelTest {
         advanceUntilIdle()
         vm.onModelSelected(ModelVariant.GEMMA4_E2B)
         advanceUntilIdle()
-        verify { inferenceProvider.close() }
+        verify(timeout = 1_000) { inferenceProvider.close() }
         verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA4_E2B) }
-        verify { modelManager.setEngineEnabled(false) }
+        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
         assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.selectedModel)
         assertNull(vm.uiState.value.activeModel)
         assertFalse(vm.uiState.value.engineRunning)
@@ -170,10 +173,10 @@ class SetupViewModelTest {
         advanceUntilIdle()
         vm.onRedownload()
         advanceUntilIdle()
-        verify { inferenceProvider.close() }
+        verify(timeout = 1_000) { inferenceProvider.close() }
         verify { modelManager.deleteModel(ModelVariant.GEMMA3_1B) }
-        verify { modelManager.setEngineEnabled(false) }
-        coVerify { modelManager.downloadModel(ModelVariant.GEMMA3_1B, any()) }
+        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
+        coVerify(timeout = 1_000) { modelManager.downloadModel(ModelVariant.GEMMA3_1B, any()) }
     }
 
     @Test
@@ -203,8 +206,8 @@ class SetupViewModelTest {
         advanceUntilIdle()
         vm.onStopEngine()
         advanceUntilIdle()
-        verify { inferenceProvider.close() }
-        verify { modelManager.setEngineEnabled(false) }
+        verify(timeout = 1_000) { inferenceProvider.close() }
+        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
         assertFalse(vm.uiState.value.engineRunning)
     }
 }

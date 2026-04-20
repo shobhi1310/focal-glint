@@ -55,25 +55,27 @@ class ClassificationWorker @AssistedInject constructor(
 
         val pending = notificationRepository.getPendingForClassification()
         if (pending.isNotEmpty()) {
-            Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications")
+            Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10")
             var classified = 0
-            for (notification in pending) {
+            for (batch in pending.chunked(10)) {
                 try {
-                    val result = classifier.classify(notification)
-                    if (result.classifiedBy == "pending") {
-                        Log.d("ClassificationWorker", "LLM not ready, will retry ${notification.id}")
-                    } else {
-                        notificationRepository.markClassified(
-                            notification = notification,
-                            category = result.category,
-                            classifiedBy = result.classifiedBy
-                        )
-                        classified++
+                    val results = classifier.classifyBatch(batch)
+                    for ((notification, result) in results) {
+                        if (result.classifiedBy == "pending") {
+                            Log.d("ClassificationWorker", "LLM not ready, will retry ${notification.id}")
+                        } else {
+                            notificationRepository.markClassified(
+                                notification = notification,
+                                category = result.category,
+                                classifiedBy = result.classifiedBy
+                            )
+                            classified++
+                        }
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.e("ClassificationWorker", "Failed to classify ${notification.id}", e)
+                    Log.e("ClassificationWorker", "Batch classification failed", e)
                 }
             }
             Log.d("ClassificationWorker", "Classified $classified/${pending.size}")

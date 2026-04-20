@@ -43,11 +43,11 @@ class NotificationRepositoryTest {
     @Test
     fun `upsert inserts new notification when key is unseen`() = kotlinx.coroutines.test.runTest {
         val incoming = notification()
-        coEvery { notificationDao.getLatestByNotificationKey("whatsapp:key:1") } returns null
+        coEvery { notificationDao.getByKeyAndHash(any(), any()) } returns null
 
         repository.upsertNotification(incoming)
 
-        coVerify { notificationDao.insert(incoming) }
+        coVerify { notificationDao.insert(match { it.id == incoming.id && it.contentHash != null }) }
         coVerify { appProfileDao.insertIfNew(any()) }
         coVerify { appProfileDao.incrementCount("com.whatsapp", 1000L) }
     }
@@ -56,7 +56,7 @@ class NotificationRepositoryTest {
     fun `upsert ignores duplicate callback when notification content is unchanged`() = kotlinx.coroutines.test.runTest {
         val existing = notification(id = "existing")
         val duplicate = notification(id = "incoming")
-        coEvery { notificationDao.getLatestByNotificationKey("whatsapp:key:1") } returns existing
+        coEvery { notificationDao.getByKeyAndHash(any(), any()) } returns existing
 
         repository.upsertNotification(duplicate)
 
@@ -67,18 +67,17 @@ class NotificationRepositoryTest {
 
     @Test
     fun `upsert inserts new row when notification content changes for same key`() = kotlinx.coroutines.test.runTest {
-        val existing = notification(id = "existing")
         val updated = notification(
             id = "incoming",
             content = "I found a nice hotel near Old Manali for 3500 per night",
             postedAt = 2000L,
             capturedAt = 2000L
         )
-        coEvery { notificationDao.getLatestByNotificationKey("whatsapp:key:1") } returns existing
+        coEvery { notificationDao.getByKeyAndHash(any(), any()) } returns null
 
         repository.upsertNotification(updated)
 
-        coVerify { notificationDao.insert(updated) }
+        coVerify { notificationDao.insert(match { it.id == updated.id && it.contentHash != null }) }
         coVerify(exactly = 0) { notificationDao.update(any()) }
         coVerify { appProfileDao.incrementCount("com.whatsapp", 2000L) }
     }

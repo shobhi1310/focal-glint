@@ -1,6 +1,7 @@
 package com.focal.ui.settings
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
@@ -16,11 +17,13 @@ import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AppOverride(
@@ -141,7 +144,9 @@ class SettingsViewModel @Inject constructor(
     private suspend fun reinitializeEmbeddings(useGpu: Boolean) {
         if (!modelManager.isEmbeddingModelAvailable) return
         if (embeddingProvider.isReady()) {
-            embeddingProvider.close()
+            withContext(Dispatchers.IO) {
+                embeddingProvider.close()
+            }
         }
         embeddingProvider.initialize(
             modelManager.geckoModelFile.absolutePath,
@@ -173,6 +178,7 @@ class SettingsViewModel @Inject constructor(
                     snackbarMessage = "Embedding engine started."
                 )
             } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Failed to start embedding engine", e)
                 _uiState.value = _uiState.value.copy(snackbarMessage = "Failed to start embedding engine.")
             } finally {
                 _uiState.value = _uiState.value.copy(isEmbeddingInitializing = false)

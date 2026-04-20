@@ -11,7 +11,8 @@ import java.util.UUID
     indices = [
         Index(value = ["package_name", "posted_at"]),
         Index(value = ["category", "posted_at"]),
-        Index(value = ["processed_at"])
+        Index(value = ["processed_at"]),
+        Index(value = ["notification_key"])
     ]
 )
 data class NotificationEntity(
@@ -72,7 +73,10 @@ data class NotificationEntity(
     val embeddedAt: Long? = null,
 
     @ColumnInfo(name = "processed_for_topics")
-    val processedForTopics: Boolean = false
+    val processedForTopics: Boolean = false,
+
+    @ColumnInfo(name = "content_hash")
+    val contentHash: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

@@ -5,6 +5,7 @@ import com.focal.data.db.dao.NotificationDao
 import com.focal.data.db.entity.AppProfileEntity
 import com.focal.data.db.entity.NotificationEntity
 import kotlinx.coroutines.flow.Flow
+import java.security.MessageDigest
 
 class NotificationRepository(
     private val notificationDao: NotificationDao,
@@ -48,18 +49,15 @@ class NotificationRepository(
     }
 
     suspend fun upsertNotification(notification: NotificationEntity) {
-        val existing = if (notification.notificationKey != null) {
-            notificationDao.getLatestByNotificationKey(notification.notificationKey)
-        } else null
+        val hash = hashContent(buildCanonicalContent(notification))
+        val withHash = notification.copy(contentHash = hash)
 
-        if (existing != null) {
-            if (existing.hasSameVisibleContent(notification)) {
-                return
-            }
-            insertNewNotification(notification)
-        } else {
-            insertNewNotification(notification)
+        val key = notification.notificationKey
+        if (key != null && notificationDao.getByKeyAndHash(key, hash) != null) {
+            return
         }
+
+        insertNewNotification(withHash)
     }
 
     private suspend fun insertNewNotification(notification: NotificationEntity) {
@@ -71,12 +69,21 @@ class NotificationRepository(
         appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
     }
 
-    private fun NotificationEntity.hasSameVisibleContent(other: NotificationEntity): Boolean {
-        return title == other.title &&
-            content == other.content &&
-            bigText == other.bigText &&
-            conversation == other.conversation &&
-            extrasJson == other.extrasJson
+    private fun buildCanonicalContent(n: NotificationEntity): String {
+        val sb = StringBuilder()
+        for (value in listOf(n.title, n.content, n.bigText, n.conversation, n.extrasJson)) {
+            if (value.isNullOrBlank()) continue
+            val trimmed = value.trim()
+            if (sb.contains(trimmed)) continue
+            if (sb.isNotEmpty()) sb.append(' ')
+            sb.append(trimmed)
+        }
+        return sb.toString()
+    }
+
+    private fun hashContent(canonical: String): String {
+        val bytes = MessageDigest.getInstance("MD5").digest(canonical.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     suspend fun markClassified(notification: NotificationEntity, category: String, classifiedBy: String, ruleId: String? = null) {

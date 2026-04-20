@@ -3,19 +3,24 @@ package com.focal.ui.setup
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
+import com.focal.data.db.FocalDatabase
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.system.measureTimeMillis
 import javax.inject.Inject
 
 data class SetupUiState(
@@ -28,6 +33,8 @@ data class SetupUiState(
     val useGpu: Boolean = true,
     val backendSwitching: Boolean = false,
     val engineStopping: Boolean = false,
+    val databaseClearing: Boolean = false,
+    val databaseMessage: String? = null,
     val errorMessage: String? = null,
     val embeddingModelAvailable: Boolean = false,
     val embeddingDownloadProgress: Int? = null,
@@ -37,6 +44,7 @@ data class SetupUiState(
 @HiltViewModel
 class SetupViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val database: FocalDatabase,
     private val modelManager: ModelManager,
     private val inferenceProvider: InferenceProvider
 ) : ViewModel() {
@@ -83,13 +91,32 @@ class SetupViewModel @Inject constructor(
         if (inferenceProvider.isReady()) {
             _uiState.value = _uiState.value.copy(engineStopping = true)
             viewModelScope.launch {
-                cancelWorkerAndWait()
-                inferenceProvider.close()
-                modelManager.setEngineEnabled(false)
+                stopEngine("model switch to ${variant.name}")
                 _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
             }
         } else {
             _uiState.value = _uiState.value.copy(engineRunning = false)
+        }
+    }
+
+    fun onClearDatabase() {
+        if (_uiState.value.databaseClearing) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(databaseClearing = true, databaseMessage = null)
+            try {
+                withContext(Dispatchers.IO) {
+                    database.clearAllTables()
+                }
+                _uiState.value = _uiState.value.copy(
+                    databaseClearing = false,
+                    databaseMessage = "Database cleared."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    databaseClearing = false,
+                    databaseMessage = "Failed to clear database: ${e.message}"
+                )
+            }
         }
     }
 
@@ -102,9 +129,7 @@ class SetupViewModel @Inject constructor(
         val variant = _uiState.value.selectedModel
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(engineStopping = true)
-            cancelWorkerAndWait()
-            inferenceProvider.close()
-            modelManager.setEngineEnabled(false)
+            stopEngine("redownload ${variant.name}")
             modelManager.deleteModel(variant)
             _uiState.value = _uiState.value.copy(activeModel = null, engineRunning = false, engineStopping = false)
             startDownload(variant)
@@ -148,15 +173,25 @@ class SetupViewModel @Inject constructor(
         if (_uiState.value.engineStopping) return
         _uiState.value = _uiState.value.copy(engineStopping = true)
         viewModelScope.launch {
-            cancelWorkerAndWait()
-            inferenceProvider.close()
-            modelManager.setEngineEnabled(false)
+            stopEngine("manual stop")
             _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
         }
     }
 
     private suspend fun cancelWorkerAndWait() {
         ClassificationWorker.cancelAndWait(WorkManager.getInstance(context))
+    }
+
+    private suspend fun stopEngine(reason: String) {
+        Log.i(TAG, "Engine stop requested: reason=$reason. Active conversation will be dropped.")
+        val elapsedMs = measureTimeMillis {
+            cancelWorkerAndWait()
+            withContext(Dispatchers.IO) {
+                inferenceProvider.close()
+            }
+            modelManager.setEngineEnabled(false)
+        }
+        Log.i(TAG, "Engine stopped: reason=$reason elapsedMs=$elapsedMs")
     }
 
     fun onToggleBackend(useGpu: Boolean) {
@@ -203,5 +238,9 @@ class SetupViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    companion object {
+        private const val TAG = "SetupViewModel"
     }
 }

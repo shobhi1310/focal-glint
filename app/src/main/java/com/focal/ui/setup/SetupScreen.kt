@@ -9,7 +9,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,11 +31,37 @@ fun SetupScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    var showClearDatabaseDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.refresh()
         }
+    }
+
+    if (showClearDatabaseDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDatabaseDialog = false },
+            title = { Text("Clear all database data?") },
+            text = {
+                Text("This deletes notifications and other Room-backed app data, but keeps models, preferences, and downloaded files.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDatabaseDialog = false
+                        viewModel.onClearDatabase()
+                    }
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDatabaseDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -239,6 +268,38 @@ fun SetupScreen(
                                 text = error,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                StepCard(
+                    number = 7,
+                    title = "Developer Reset",
+                    description = "Delete all Room database data and start fresh without clearing app data",
+                    isComplete = false
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { showClearDatabaseDialog = true },
+                            enabled = !state.databaseClearing,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Text(if (state.databaseClearing) "Clearing..." else "Clear Database")
+                        }
+                        state.databaseMessage?.let { message ->
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (message.startsWith("Failed"))
+                                    MaterialTheme.colorScheme.error
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
                     }

@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import com.focal.ui.navigation.FocalNavigation
 import com.focal.ui.theme.FocalTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.content.edit
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -30,7 +31,7 @@ class MainActivity : ComponentActivity() {
         if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
             val prefs = getSharedPreferences("focal_prefs", MODE_PRIVATE)
             if (!prefs.getBoolean("battery_exemption_prompted", false)) {
-                prefs.edit().putBoolean("battery_exemption_prompted", true).apply()
+                prefs.edit { putBoolean("battery_exemption_prompted", true) }
                 startActivity(
                     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                         data = Uri.parse("package:$packageName")

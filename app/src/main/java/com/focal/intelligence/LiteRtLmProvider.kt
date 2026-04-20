@@ -118,11 +118,13 @@ class LiteRtLmProvider @Inject constructor(
     override fun isReady(): Boolean = engine != null
 
     override fun close() {
+        Log.i(TAG, "Closing engine. Active conversation will be dropped immediately if present.")
         activeConversation?.close()
         activeConversation = null
         engine?.close()
         engine = null
         llmDispatcher.close()
+        Log.i(TAG, "Engine resources released")
     }
 
     companion object {

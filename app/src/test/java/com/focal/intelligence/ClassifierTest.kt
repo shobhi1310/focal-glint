@@ -112,18 +112,53 @@ class ClassifierTest {
     }
 
     @Test
-    fun `classifyBatch processes all notifications`() = runTest {
+    fun `classifyBatch returns pending when LLM not ready`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns false
+        val notifications = listOf(notification(), notification())
+        val results = classifier.classifyBatch(notifications)
+        assertEquals(2, results.size)
+        results.forEach { (_, result) ->
+            assertEquals(ClassificationResult.UNCATEGORIZED, result.category)
+            assertEquals("pending", result.classifiedBy)
+        }
+    }
+
+    @Test
+    fun `classifyBatch processes all notifications using BatchClassifyNotificationTool`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
             val tools = thirdArg<List<ToolSet>>()
-            tools.filterIsInstance<ClassifyNotificationTool>().first()
-                .classifyNotification("noise", "promo")
+            val batchTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
+            batchTool.classifyNotification(1, "noise", "promotional")
+            batchTool.classifyNotification(2, "matters", "personal message")
+            batchTool.classifyNotification(3, "noise", "spam")
             emptyFlow()
         }
         val notifications = listOf(notification(), notification(), notification())
         val results = classifier.classifyBatch(notifications)
         assertEquals(3, results.size)
-        results.forEach { (_, result) -> assertEquals(ClassificationResult.NOISE, result.category) }
+        assertEquals(ClassificationResult.NOISE, results[0].second.category)
+        assertEquals(ClassificationResult.MATTERS, results[1].second.category)
+        assertEquals(ClassificationResult.NOISE, results[2].second.category)
+        results.forEach { (_, result) -> assertEquals("llm", result.classifiedBy) }
+    }
+
+    @Test
+    fun `classifyBatch returns pending for unclassified index`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            val tools = thirdArg<List<ToolSet>>()
+            val batchTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
+            batchTool.classifyNotification(1, "noise", "promo")
+            // index 2 intentionally not called — model skipped it
+            emptyFlow()
+        }
+        val notifications = listOf(notification(), notification())
+        val results = classifier.classifyBatch(notifications)
+        assertEquals(ClassificationResult.NOISE, results[0].second.category)
+        assertEquals("llm", results[0].second.classifiedBy)
+        assertEquals(ClassificationResult.UNCATEGORIZED, results[1].second.category)
+        assertEquals("pending", results[1].second.classifiedBy)
     }
 
     @Test

@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.collect
 private const val TAG = "Classifier"
 private const val CLASSIFICATION_SYSTEM =
     "You are a notification classifier. Classify each notification as 'matters' (personally relevant to the user) or 'noise' (generic, promotional, or irrelevant). Call classifyNotification exactly once. No prose."
+private const val BATCH_CLASSIFICATION_SYSTEM =
+    "You are a notification classifier. For each notification below, think through what kind of notification it is — for example: personal message, marketing/promotional, transactional (receipt/OTP/delivery), service update, social media post, news/alert, or other. Then decide whether it genuinely matters to this specific user personally, or is just noise. Call classifyNotification once for each notification using its [index]. Category must be exactly 'matters' or 'noise'. No prose."
 private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
 
 internal fun isSyntheticToolEcho(text: String): Boolean {
@@ -95,9 +97,46 @@ class Classifier(
     }
 
     suspend fun classifyBatch(notifications: List<NotificationEntity>): List<Pair<NotificationEntity, ClassificationResult>> {
-        return notifications.map { notification ->
-            val result = classify(notification)
-            notification to result
+        if (notifications.isEmpty()) return emptyList()
+
+        if (!inferenceProvider.isReady()) {
+            return notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
+        }
+
+        val prompt = PromptBuilder.buildBatchClassificationPrompt(notifications)
+        Log.i(TAG, "classifyBatch: count=${notifications.size} promptLen=${prompt.length}")
+
+        val tool = BatchClassifyNotificationTool()
+
+        return try {
+            var messageCount = 0
+            var toolCallCount = 0
+
+            inferenceProvider.generateWithTools(BATCH_CLASSIFICATION_SYSTEM, prompt, listOf(tool))
+                .catch { e -> Log.e(TAG, "batch stream error: ${e.message}", e); throw e }
+                .collect { message ->
+                    message.toolCalls?.forEachIndexed { i, call ->
+                        Log.i(TAG, "batch toolCall[$i]: name=${call.name} args=${call.arguments}")
+                        toolCallCount++
+                    }
+                    messageCount++
+                }
+
+            Log.i(TAG, "batch done: messages=$messageCount toolCalls=$toolCallCount classified=${tool.resultCount()}/${notifications.size}")
+
+            notifications.mapIndexed { i, notification ->
+                val (category, reason) = tool.getResult(i + 1)
+                    ?: return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                val resolved = when (category.lowercase().trim()) {
+                    "matters" -> ClassificationResult.MATTERS
+                    "noise" -> ClassificationResult.NOISE
+                    else -> return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                }
+                notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "batch LLM inference failed", e)
+            notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
         }
     }
 }

@@ -23,7 +23,7 @@ import com.focal.data.db.entity.TopicEntity
         AppProfileEntity::class,
         TopicEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class FocalDatabase : RoomDatabase() {
@@ -87,6 +87,13 @@ abstract class FocalDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE topics ADD COLUMN suggested_actions TEXT")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notifications ADD COLUMN content_hash TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notifications_notification_key ON notifications(notification_key)")
             }
         }
     }

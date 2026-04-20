@@ -197,8 +197,8 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         verify { modelManager.saveBackendPreference(false) }
-        verify { embeddingProvider.close() }
-        coVerify {
+        verify(timeout = 1_000) { embeddingProvider.close() }
+        coVerify(timeout = 1_000) {
             embeddingProvider.initialize(
                 "/models/Gecko_256_f32.tflite",
                 "/models/sentencepiece.model",
@@ -227,14 +227,14 @@ class SettingsViewModelTest {
         vm.setBackendPreference(false)
         advanceUntilIdle()
 
-        coVerify {
+        coVerify(timeout = 1_000) {
             inferenceProvider.restart(
                 "/models/gemma-4-E2B-it.litertlm",
                 false,
                 ModelVariant.GEMMA4_E2B.maxContextTokens
             )
         }
-        coVerify {
+        coVerify(timeout = 1_000) {
             embeddingProvider.initialize(
                 "/models/Gecko_256_f32.tflite",
                 "/models/sentencepiece.model",

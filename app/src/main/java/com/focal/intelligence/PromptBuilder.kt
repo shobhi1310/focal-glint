@@ -6,7 +6,16 @@ object PromptBuilder {
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {
         val message = notification.bigText ?: notification.content
-        return "App: ${notification.appName}\nTitle: ${notification.title}\nContent: ${message.take(200)}"
+        return "Package: ${notification.packageName}\nApp: ${notification.appName}\nTitle: ${notification.title}\nContent: ${message.take(200)}"
+    }
+
+    fun buildBatchClassificationPrompt(notifications: List<NotificationEntity>): String {
+        val sb = StringBuilder()
+        notifications.forEachIndexed { i, n ->
+            val body = (n.bigText ?: n.content).take(200)
+            sb.appendLine("[${i + 1}] Package: ${n.packageName} · App: ${n.appName} · Title: ${n.title} · Content: $body")
+        }
+        return sb.toString().trimEnd()
     }
 
     fun buildTopicPrompt(notifications: List<NotificationEntity>): String {

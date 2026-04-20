@@ -38,7 +38,9 @@ class FocalNotificationListener : NotificationListenerService() {
             applicationContext,
             FocalDatabase::class.java,
             "focal_database"
-        ).build()
+        )
+            .addMigrations(FocalDatabase.MIGRATION_1_2, FocalDatabase.MIGRATION_2_3, FocalDatabase.MIGRATION_3_4, FocalDatabase.MIGRATION_4_5, FocalDatabase.MIGRATION_5_6, FocalDatabase.MIGRATION_6_7)
+            .build()
 
         repository = NotificationRepository(db.notificationDao(), db.appProfileDao())
         val ruleRepository = RuleRepository(db.ruleDao(), db.correctionDao())
