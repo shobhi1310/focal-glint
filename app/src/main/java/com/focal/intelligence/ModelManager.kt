@@ -54,8 +54,12 @@ class ModelManager(private val context: Context) {
     val gemmaEmbeddingModelFile: File
         get() = File(embeddingModelDir, GEMMA_MODEL_FILENAME)
 
+    val gemmaTokenizerFile: File
+        get() = File(embeddingModelDir, GEMMA_TOKENIZER_FILENAME)
+
     val isGemmaEmbeddingAvailable: Boolean
-        get() = gemmaEmbeddingModelFile.exists() && gemmaEmbeddingModelFile.length() > 50_000_000L
+        get() = gemmaEmbeddingModelFile.exists() && gemmaEmbeddingModelFile.length() > 50_000_000L &&
+                gemmaTokenizerFile.exists()
 
     fun getEmbeddingModelPreference(): EmbeddingModelType {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
@@ -252,5 +256,6 @@ class ModelManager(private val context: Context) {
         const val GECKO_MODEL_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/Gecko_256_f32.tflite"
         const val GECKO_TOKENIZER_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/sentencepiece.model"
         const val GEMMA_MODEL_FILENAME = "embeddinggemma-300M_seq512_mixed-precision.tflite"
+        const val GEMMA_TOKENIZER_FILENAME = "sentencepiece.model.2"
     }
 }

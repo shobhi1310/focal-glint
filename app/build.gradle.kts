@@ -83,7 +83,6 @@ dependencies {
     // AI Edge RAG SDK for on-device embeddings
     implementation("com.google.ai.edge.localagents:localagents-rag:0.1.0")
     implementation("com.google.mediapipe:tasks-genai:0.10.22")
-    implementation("com.google.mediapipe:tasks-text:latest.release")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")

@@ -159,8 +159,10 @@ class SettingsViewModel @Inject constructor(
             modelManager.isEmbeddingModelAvailable -> modelManager.geckoModelFile
             else -> return
         }
-        val tokenizerPath = if (type == EmbeddingModelType.GECKO)
-            modelManager.geckoTokenizerFile.absolutePath else ""
+        val tokenizerPath = when (type) {
+            EmbeddingModelType.GECKO -> modelManager.geckoTokenizerFile.absolutePath
+            EmbeddingModelType.GEMMA -> modelManager.gemmaTokenizerFile.absolutePath
+        }
         if (embeddingProvider.isReady()) {
             withContext(Dispatchers.IO) { embeddingProvider.close() }
         }
@@ -185,7 +187,7 @@ class SettingsViewModel @Inject constructor(
                 withContext(Dispatchers.IO) { switchable.close() }
 
                 switchable.inner = when (type) {
-                    EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider(context)
+                    EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider()
                     EmbeddingModelType.GECKO -> GeckoEmbeddingProvider()
                 }
 
@@ -193,8 +195,10 @@ class SettingsViewModel @Inject constructor(
                     EmbeddingModelType.GEMMA -> modelManager.gemmaEmbeddingModelFile
                     EmbeddingModelType.GECKO -> modelManager.geckoModelFile
                 }
-                val tokenizerPath = if (type == EmbeddingModelType.GECKO)
-                    modelManager.geckoTokenizerFile.absolutePath else ""
+                val tokenizerPath = when (type) {
+                    EmbeddingModelType.GECKO -> modelManager.geckoTokenizerFile.absolutePath
+                    EmbeddingModelType.GEMMA -> modelManager.gemmaTokenizerFile.absolutePath
+                }
                 val useGpu = modelManager.getBackendPreference()
 
                 embeddingProvider.initialize(modelFile.absolutePath, tokenizerPath, useGpu)

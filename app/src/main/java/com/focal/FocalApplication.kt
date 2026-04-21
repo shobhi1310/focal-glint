@@ -123,7 +123,7 @@ class FocalApplication : Application(), Configuration.Provider {
         if (modelFile != null && resolvedType != null) {
             val switchable = embeddingProvider as SwitchableEmbeddingProvider
             switchable.inner = when (resolvedType) {
-                EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider(this@FocalApplication)
+                EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider()
                 EmbeddingModelType.GECKO -> GeckoEmbeddingProvider()
             }
             applicationScope.launch {
@@ -131,8 +131,10 @@ class FocalApplication : Application(), Configuration.Provider {
                     val useGpu = ModelBackendPolicy.useGpuForEmbeddings(
                         llmUseGpu = modelManager.getBackendPreference()
                     )
-                    val tokenizerPath = if (resolvedType == EmbeddingModelType.GECKO)
-                        modelManager.geckoTokenizerFile.absolutePath else ""
+                    val tokenizerPath = when (resolvedType) {
+                        EmbeddingModelType.GECKO -> modelManager.geckoTokenizerFile.absolutePath
+                        EmbeddingModelType.GEMMA -> modelManager.gemmaTokenizerFile.absolutePath
+                    }
                     embeddingProvider.initialize(modelFile.absolutePath, tokenizerPath, useGpu)
                     Log.d(TAG, "Embedding model initialized: $resolvedType (gpu=$useGpu)")
                 } catch (e: Exception) {
