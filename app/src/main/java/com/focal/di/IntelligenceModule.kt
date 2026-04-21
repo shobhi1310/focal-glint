@@ -6,7 +6,7 @@ import com.focal.data.repository.RuleRepository
 import com.focal.data.repository.TopicRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EmbeddingProvider
-import com.focal.intelligence.GeckoEmbeddingProvider
+import com.focal.intelligence.SwitchableEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
@@ -50,7 +50,7 @@ object IntelligenceModule {
     @Provides
     @Singleton
     fun provideEmbeddingProvider(): EmbeddingProvider {
-        return GeckoEmbeddingProvider()
+        return SwitchableEmbeddingProvider()
     }
 
     @Provides
