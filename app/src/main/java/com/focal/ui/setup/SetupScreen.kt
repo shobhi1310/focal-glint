@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.focal.intelligence.EmbeddingModelType
 import com.focal.intelligence.ModelVariant
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -277,6 +278,43 @@ fun SetupScreen(
             item {
                 StepCard(
                     number = 7,
+                    title = "Embedding Model",
+                    description = "Switch between Gecko 110M (256 tokens) and Gemma 300M (512 tokens). Switching clears all embeddings and triggers a full rebuild.",
+                    isComplete = true
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = state.activeEmbeddingModel == EmbeddingModelType.GECKO,
+                                onClick = { if (!state.isSwitchingEmbeddingModel) viewModel.switchEmbeddingModel(EmbeddingModelType.GECKO) },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                enabled = !state.isSwitchingEmbeddingModel
+                            ) {
+                                Text("Gecko 110M")
+                            }
+                            SegmentedButton(
+                                selected = state.activeEmbeddingModel == EmbeddingModelType.GEMMA,
+                                onClick = { if (!state.isSwitchingEmbeddingModel && state.isGemmaAvailable) viewModel.switchEmbeddingModel(EmbeddingModelType.GEMMA) },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                enabled = !state.isSwitchingEmbeddingModel && state.isGemmaAvailable
+                            ) {
+                                Text(if (state.isGemmaAvailable) "Gemma 300M" else "Gemma 300M\n(not found)")
+                            }
+                        }
+                        if (state.isSwitchingEmbeddingModel) {
+                            Text(
+                                text = "Switching · re-embedding…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                StepCard(
+                    number = 8,
                     title = "Developer Reset",
                     description = "Delete all Room database data and start fresh without clearing app data",
                     isComplete = false
