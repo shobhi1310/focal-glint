@@ -28,6 +28,9 @@ class FocalNotificationListener : NotificationListenerService() {
     private lateinit var rulesEngine: RulesEngine
     private lateinit var wakeLock: PowerManager.WakeLock
 
+    // Keyed by notificationKey+title+content; values are timestamps. Main-thread only — no lock needed.
+    private val recentlySeen = HashMap<String, Long>()
+
     override fun onCreate() {
         super.onCreate()
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
@@ -53,8 +56,16 @@ class FocalNotificationListener : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         if (NotificationExtractor.IGNORED_PACKAGES.contains(sbn.packageName)) return
         if (sbn.isOngoing) return
-
         if (sbn.notification?.flags?.and(android.app.Notification.FLAG_GROUP_SUMMARY) != 0) return
+
+        val extras = sbn.notification?.extras
+        val title = extras?.getCharSequence("android.title")?.toString() ?: ""
+        val text  = extras?.getCharSequence("android.text")?.toString() ?: ""
+        val dedupKey = "${sbn.key}|$title|$text"
+        val now = System.currentTimeMillis()
+        if (now - (recentlySeen[dedupKey] ?: 0L) < 10_000L) return
+        recentlySeen[dedupKey] = now
+        if (recentlySeen.size > 200) recentlySeen.entries.removeIf { now - it.value > 30_000L }
 
         serviceScope.launch {
             val entity = extractor.extract(sbn)

@@ -1,5 +1,6 @@
 package com.focal.data.repository
 
+import com.focal.DebugLogger
 import com.focal.data.db.dao.AppProfileDao
 import com.focal.data.db.dao.NotificationDao
 import com.focal.data.db.entity.AppProfileEntity
@@ -61,6 +62,7 @@ class NotificationRepository(
     }
 
     private suspend fun insertNewNotification(notification: NotificationEntity) {
+        DebugLogger.logNotification(notification)
         notificationDao.insert(notification)
         appProfileDao.insertIfNew(AppProfileEntity(
             packageName = notification.packageName,
@@ -150,6 +152,10 @@ class NotificationRepository(
 
     suspend fun invalidateEmbedding(id: String) {
         notificationDao.invalidateEmbedding(id)
+    }
+
+    suspend fun resetAllEmbeddings() {
+        notificationDao.resetAllEmbeddings()
     }
 
     suspend fun purgeOlderThan(before: Long) {

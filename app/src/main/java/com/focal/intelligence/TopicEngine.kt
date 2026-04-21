@@ -1,6 +1,7 @@
 package com.focal.intelligence
 
 import android.util.Log
+import com.focal.DebugLogger
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import com.focal.data.db.entity.NotificationEntity
@@ -28,6 +29,7 @@ class TopicEngine(
 
             if (fullRebuild) {
                 Log.d(TAG, "Full rebuild requested")
+                notificationRepository.resetAllEmbeddings()
                 notificationRepository.resetAllProcessedFlags()
                 notificationRepository.resetUncategorizedForReclassification()
                 topicRepository.clearAndSaveTopics(emptyList())
@@ -100,10 +102,24 @@ class TopicEngine(
         dayEnd: Long
     ) {
         val activeTopics = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
+        val embeddingText = buildEmbeddingText(notif)
 
         if (activeTopics.isEmpty()) {
             createNewTopic(notif)
             return
+        }
+
+        // Channel-first: same notification slot → same topic, no cosine needed
+        if (notif.notificationKey != null) {
+            for (topic in activeTopics) {
+                val members = notificationRepository.getByIds(parseJsonArray(topic.notificationIds))
+                if (members.any { it.notificationKey == notif.notificationKey }) {
+                    appendToTopic(topic.id, notif)
+                    topicRepository.markDirty(topic.id)
+                    Log.d(TAG, "Channel-matched ${notif.appName}/${notif.title} to topic ${topic.id}")
+                    return
+                }
+            }
         }
 
         var bestTopicId: String? = null
@@ -120,14 +136,37 @@ class TopicEngine(
                 if (s > topicBest) topicBest = s
             }
 
+            DebugLogger.logEmbeddingScore(
+                notifId = notif.id,
+                notifTitle = notif.title,
+                embeddingText = embeddingText,
+                topicId = topic.id,
+                score = topicBest,
+                threshold = TopicClusteringPolicy.ASSIGN_THRESHOLD,
+                assigned = false
+            )
+
             if (topicBest > bestScore) {
                 bestScore = topicBest
                 bestTopicId = topic.id
             }
         }
 
-        if (bestScore >= TopicClusteringPolicy.ASSIGN_THRESHOLD && bestTopicId != null) {
-            appendToTopic(bestTopicId, notif)
+        val assigned = bestScore >= TopicClusteringPolicy.ASSIGN_THRESHOLD && bestTopicId != null
+        if (bestTopicId != null) {
+            DebugLogger.logEmbeddingScore(
+                notifId = notif.id,
+                notifTitle = notif.title,
+                embeddingText = embeddingText,
+                topicId = "BEST=$bestTopicId",
+                score = bestScore,
+                threshold = TopicClusteringPolicy.ASSIGN_THRESHOLD,
+                assigned = assigned
+            )
+        }
+
+        if (assigned) {
+            appendToTopic(bestTopicId!!, notif)
             topicRepository.markDirty(bestTopicId)
             Log.d(TAG, "Assigned ${notif.appName}/${notif.title} to topic $bestTopicId (score=$bestScore)")
         } else {
@@ -244,9 +283,38 @@ class TopicEngine(
     }
 
     private fun buildEmbeddingText(notif: NotificationEntity): String {
-        val content = notif.bigText ?: notif.content
-        if (notif.title.isBlank() && content.isBlank()) return ""
-        return "${notif.appName} — ${notif.title}: ${content.take(300)}"
+        if (notif.title.isBlank()) return ""
+        val channelId = notif.notificationKey?.split("|")?.getOrNull(2)
+            ?.takeIf { it.isNotBlank() && it != "null" }
+        val appPrefix = if (channelId != null) "${notif.appName}/$channelId" else notif.appName
+        val body = when {
+            notif.extrasJson != null -> extractRecentThreadText(notif.extrasJson)
+            notif.bigText != null    -> buildEmailBody(notif.content, notif.bigText)
+            else                     -> notif.content.takeIf { it.isNotBlank() }
+        } ?: return ""
+        return "$appPrefix — ${notif.title}: ${body.take(600)}"
+    }
+
+    private fun extractRecentThreadText(extrasJson: String?): String? {
+        if (extrasJson == null) return null
+        return try {
+            val arr = JSONArray(extrasJson)
+            val texts = (0 until arr.length())
+                .mapNotNull { arr.optJSONObject(it)?.optString("text")?.takeIf { t -> t.isNotBlank() } }
+                .distinct()
+                .takeLast(3)
+            if (texts.isEmpty()) null else texts.joinToString(" | ")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse extrasJson for embedding", e)
+            null
+        }
+    }
+
+    private fun buildEmailBody(content: String, bigText: String): String {
+        val preview = bigText.take(500)
+        // bigText usually starts with the subject — avoid duplicating it
+        return if (preview.startsWith(content.take(50))) preview
+               else "$content\n$preview"
     }
 
     private fun resolveActionPackages(

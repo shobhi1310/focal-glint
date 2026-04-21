@@ -66,4 +66,7 @@ interface NotificationDao {
 
     @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL WHERE id = :id")
     suspend fun invalidateEmbedding(id: String)
+
+    @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL")
+    suspend fun resetAllEmbeddings()
 }
