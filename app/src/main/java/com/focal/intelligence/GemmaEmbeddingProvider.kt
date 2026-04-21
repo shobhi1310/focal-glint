@@ -50,7 +50,6 @@ class GemmaEmbeddingProvider(private val context: Context) : EmbeddingProvider {
         return withContext(Dispatchers.IO) {
             val result = e.embed(text)
             val floats = result.embeddingResult().embeddings().first().floatEmbedding()!!
-                .toFloatArray()
             VectorMath.l2Normalize(floats)
         }
     }
