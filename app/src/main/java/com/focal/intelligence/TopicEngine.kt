@@ -292,7 +292,9 @@ class TopicEngine(
             notif.bigText != null    -> buildEmailBody(notif.content, notif.bigText)
             else                     -> notif.content.takeIf { it.isNotBlank() }
         } ?: return ""
-        return "$appPrefix — ${notif.title}: ${body.take(600)}"
+        // Gecko model hard limit is 256 tokens. Cap body at 400 chars to stay safely within
+        // that limit for mixed-language content (Telugu/Hindi ~2-3 chars/token vs English ~4).
+        return "$appPrefix — ${notif.title}: ${body.take(400)}"
     }
 
     private fun extractRecentThreadText(extrasJson: String?): String? {
@@ -311,7 +313,9 @@ class TopicEngine(
     }
 
     private fun buildEmailBody(content: String, bigText: String): String {
-        val preview = bigText.take(500)
+        // Strip Unicode format/zero-width chars (email tracking pixels like ͏ inflate token count)
+        val clean = bigText.replace(Regex("\\p{Cf}"), "").replace(Regex("\\s{2,}"), " ").trim()
+        val preview = clean.take(400)
         // bigText usually starts with the subject — avoid duplicating it
         return if (preview.startsWith(content.take(50))) preview
                else "$content\n$preview"
