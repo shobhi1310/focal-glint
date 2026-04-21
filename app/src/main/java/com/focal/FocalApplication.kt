@@ -9,11 +9,15 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.DefaultRules
+import com.focal.intelligence.EmbeddingModelType
 import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.GeckoEmbeddingProvider
+import com.focal.intelligence.GemmaEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelBackendPolicy
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
+import com.focal.intelligence.SwitchableEmbeddingProvider
 import com.focal.intelligence.TopicClusteringPolicy
 import com.focal.intelligence.TopicEngine
 import com.focal.ui.theme.ThemePreference
@@ -106,25 +110,37 @@ class FocalApplication : Application(), Configuration.Provider {
             Log.d(TAG, "No LLM model found at ${modelManager.modelDir}")
         }
 
-        // Initialize embedding model (independent of LLM)
-        if (modelManager.isEmbeddingModelAvailable) {
+        // Initialize embedding model — pick provider based on saved preference
+        val preferredType = modelManager.getEmbeddingModelPreference()
+        val (modelFile, resolvedType) = when {
+            preferredType == EmbeddingModelType.GEMMA && modelManager.isGemmaEmbeddingAvailable ->
+                modelManager.gemmaEmbeddingModelFile to EmbeddingModelType.GEMMA
+            modelManager.isEmbeddingModelAvailable ->
+                modelManager.geckoModelFile to EmbeddingModelType.GECKO
+            else -> null to null
+        }
+
+        if (modelFile != null && resolvedType != null) {
+            val switchable = embeddingProvider as SwitchableEmbeddingProvider
+            switchable.inner = when (resolvedType) {
+                EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider(this@FocalApplication)
+                EmbeddingModelType.GECKO -> GeckoEmbeddingProvider()
+            }
             applicationScope.launch {
                 try {
                     val useGpu = ModelBackendPolicy.useGpuForEmbeddings(
                         llmUseGpu = modelManager.getBackendPreference()
                     )
-                    embeddingProvider.initialize(
-                        modelManager.geckoModelFile.absolutePath,
-                        modelManager.geckoTokenizerFile.absolutePath,
-                        useGpu
-                    )
-                    Log.d(TAG, "Embedding model initialized successfully (gpu=$useGpu)")
+                    val tokenizerPath = if (resolvedType == EmbeddingModelType.GECKO)
+                        modelManager.geckoTokenizerFile.absolutePath else ""
+                    embeddingProvider.initialize(modelFile.absolutePath, tokenizerPath, useGpu)
+                    Log.d(TAG, "Embedding model initialized: $resolvedType (gpu=$useGpu)")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to initialize embedding model", e)
                 }
             }
         } else {
-            Log.d(TAG, "Embedding model not found at ${modelManager.embeddingModelDir}")
+            Log.d(TAG, "No embedding model found at ${modelManager.embeddingModelDir}")
         }
     }
 
