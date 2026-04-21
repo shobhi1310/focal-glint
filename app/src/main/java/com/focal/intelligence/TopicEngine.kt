@@ -292,9 +292,10 @@ class TopicEngine(
             notif.bigText != null    -> buildEmailBody(notif.content, notif.bigText)
             else                     -> notif.content.takeIf { it.isNotBlank() }
         } ?: return ""
-        // Gecko model hard limit is 256 tokens. Cap body at 400 chars to stay safely within
-        // that limit for mixed-language content (Telugu/Hindi ~2-3 chars/token vs English ~4).
-        return "$appPrefix — ${notif.title}: ${body.take(400)}"
+        // Gecko hard limit is 256 tokens. Worst-case tokenization (code, punctuation) is ~1 char/token,
+        // so cap the entire assembled string at 200 chars to stay safe regardless of content type.
+        val clean = body.replace(Regex("\\p{Cf}"), "").replace(Regex("\\s{2,}"), " ").trim()
+        return "$appPrefix — ${notif.title}: $clean".take(200)
     }
 
     private fun extractRecentThreadText(extrasJson: String?): String? {
