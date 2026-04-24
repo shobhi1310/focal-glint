@@ -10,6 +10,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -27,6 +28,7 @@ class TopicEngineTest {
         embeddingProvider = mockk(relaxed = true)
         notificationRepo = mockk(relaxed = true)
         topicRepo = mockk(relaxed = true)
+        TopicEngine.pendingFullRebuild.set(false)
         engine = TopicEngine(inferenceProvider, embeddingProvider, notificationRepo, topicRepo)
     }
 
@@ -134,7 +136,7 @@ class TopicEngineTest {
     @Test
     fun `creates new topic when score is below stricter threshold`() = runTest {
         val existingVec = makeVec(1f, 0f, 0f)
-        val newVec = makeVec(0.92f, 0.39191836f, 0f)
+        val newVec = makeVec(0.87f, 0.4930517f, 0f)
 
         val existingNotif = notification(id = "n1", embedding = VectorMath.toBytes(existingVec))
         val newNotif = notification(id = "n2", title = "Market update", content = "Watchlist move",
@@ -190,5 +192,21 @@ class TopicEngineTest {
 
         coVerify { notificationRepo.resetAllProcessedFlags() }
         coVerify { topicRepo.clearAndSaveTopics(emptyList()) }
+    }
+
+    @Test
+    fun `full rebuild exits early and preserves pending flag when embeddings are not ready`() = runTest {
+        val notif = notification(embedding = vecBytes(1f, 0f, 0f))
+        TopicEngine.pendingFullRebuild.set(false)
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(notif)
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics(fullRebuild = true)
+
+        coVerify(exactly = 0) { notificationRepo.markProcessedForTopics(any()) }
+        coVerify(exactly = 0) { topicRepo.saveTopic(any()) }
+        assertTrue(TopicEngine.pendingFullRebuild.get())
     }
 }

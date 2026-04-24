@@ -81,6 +81,28 @@ class ModelManagerTest {
     }
 
     @Test
+    fun `isGemmaEmbeddingAvailable returns false when gemma file missing`() {
+        assertFalse(modelManager.isGemmaEmbeddingAvailable)
+    }
+
+    @Test
+    fun `isGemmaEmbeddingAvailable returns true when gemma model exists without tokenizer`() {
+        val file = modelManager.gemmaEmbeddingModelFile
+        file.parentFile?.mkdirs()
+        RandomAccessFile(file, "rw").use { it.setLength(50_000_001L) }
+
+        assertTrue(modelManager.isGemmaEmbeddingAvailable)
+    }
+
+    @Test
+    fun `tokenizerFile points to gemma sentencepiece model in embedding directory`() {
+        assertEquals(
+            File(tempDir, "external_models/embeddings/sentencepiece.model.2").absolutePath,
+            modelManager.tokenizerFile.absolutePath
+        )
+    }
+
+    @Test
     fun `activeVariant returns null when no models present`() {
         assertNull(modelManager.activeVariant())
     }

@@ -33,6 +33,11 @@ class TopicEngine(
                 notificationRepository.resetAllProcessedFlags()
                 notificationRepository.resetUncategorizedForReclassification()
                 topicRepository.clearAndSaveTopics(emptyList())
+                if (!embeddingProvider.isReady()) {
+                    pendingFullRebuild.set(true)
+                    Log.d(TAG, "Embedding provider not ready; deferring full rebuild until a later worker run")
+                    return
+                }
             }
 
             // Phase 1: Embed unembedded notifications
@@ -42,9 +47,8 @@ class TopicEngine(
                     Log.d(TAG, "Embedding ${unembedded.size} notifications")
                     for (notif in unembedded) {
                         try {
-                            val text = buildEmbeddingText(notif)
-                            if (text.isBlank()) continue
-                            val vec = embeddingProvider.embed(text)
+                            val request = EmbeddingTextFormatter.buildRequest(notif) ?: continue
+                            val vec = embeddingProvider.embed(request)
                             notificationRepository.setEmbedding(notif.id, VectorMath.toBytes(vec))
                         } catch (e: CancellationException) {
                             throw e
@@ -101,8 +105,9 @@ class TopicEngine(
         dayStart: Long,
         dayEnd: Long
     ) {
+        val assignThreshold = TopicClusteringPolicy.ASSIGN_THRESHOLD
         val activeTopics = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
-        val embeddingText = buildEmbeddingText(notif)
+        val embeddingText = EmbeddingTextFormatter.buildRequest(notif)?.combinedText ?: ""
 
         if (activeTopics.isEmpty()) {
             createNewTopic(notif)
@@ -142,7 +147,7 @@ class TopicEngine(
                 embeddingText = embeddingText,
                 topicId = topic.id,
                 score = topicBest,
-                threshold = TopicClusteringPolicy.ASSIGN_THRESHOLD,
+                threshold = assignThreshold,
                 assigned = false
             )
 
@@ -152,7 +157,7 @@ class TopicEngine(
             }
         }
 
-        val assigned = bestScore >= TopicClusteringPolicy.ASSIGN_THRESHOLD && bestTopicId != null
+        val assigned = bestScore >= assignThreshold && bestTopicId != null
         if (bestTopicId != null) {
             DebugLogger.logEmbeddingScore(
                 notifId = notif.id,
@@ -160,7 +165,7 @@ class TopicEngine(
                 embeddingText = embeddingText,
                 topicId = "BEST=$bestTopicId",
                 score = bestScore,
-                threshold = TopicClusteringPolicy.ASSIGN_THRESHOLD,
+                threshold = assignThreshold,
                 assigned = assigned
             )
         }
@@ -280,46 +285,6 @@ class TopicEngine(
             }
             if (!llmSkipped) topicRepository.markClean(topic.id)
         }
-    }
-
-    private fun buildEmbeddingText(notif: NotificationEntity): String {
-        if (notif.title.isBlank()) return ""
-        val channelId = notif.notificationKey?.split("|")?.getOrNull(2)
-            ?.takeIf { it.isNotBlank() && it != "null" }
-        val appPrefix = if (channelId != null) "${notif.appName}/$channelId" else notif.appName
-        val body = when {
-            notif.extrasJson != null -> extractRecentThreadText(notif.extrasJson)
-            notif.bigText != null    -> buildEmailBody(notif.content, notif.bigText)
-            else                     -> notif.content.takeIf { it.isNotBlank() }
-        } ?: return ""
-        // Gecko hard limit is 256 tokens. Worst-case tokenization (code, punctuation) is ~1 char/token,
-        // so cap the entire assembled string at 200 chars to stay safe regardless of content type.
-        val clean = body.replace(Regex("\\p{Cf}"), "").replace(Regex("\\s{2,}"), " ").trim()
-        return "$appPrefix — ${notif.title}: $clean".take(200)
-    }
-
-    private fun extractRecentThreadText(extrasJson: String?): String? {
-        if (extrasJson == null) return null
-        return try {
-            val arr = JSONArray(extrasJson)
-            val texts = (0 until arr.length())
-                .mapNotNull { arr.optJSONObject(it)?.optString("text")?.takeIf { t -> t.isNotBlank() } }
-                .distinct()
-                .takeLast(3)
-            if (texts.isEmpty()) null else texts.joinToString(" | ")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse extrasJson for embedding", e)
-            null
-        }
-    }
-
-    private fun buildEmailBody(content: String, bigText: String): String {
-        // Strip Unicode format/zero-width chars (email tracking pixels like ͏ inflate token count)
-        val clean = bigText.replace(Regex("\\p{Cf}"), "").replace(Regex("\\s{2,}"), " ").trim()
-        val preview = clean.take(400)
-        // bigText usually starts with the subject — avoid duplicating it
-        return if (preview.startsWith(content.take(50))) preview
-               else "$content\n$preview"
     }
 
     private fun resolveActionPackages(

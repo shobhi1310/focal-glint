@@ -11,17 +11,7 @@ import kotlin.random.Random
  * Benchmarks the greedy clustering algorithm against 100 synthetic notifications
  * across 10 deliberately hard topic clusters.
  *
- * Two simulated "embedding quality" modes correspond to what CLUSTERING vs
- * SEMANTIC_SIMILARITY Gecko task types might produce on notification text:
- *
- *   CLUSTERING simulation    : hard-pair topic centroids stay far apart (hardPairBlend = 0.0)
- *   SEMANTIC_SIM simulation  : hard-pair topic centroids are pulled together (hardPairBlend = 0.3)
- *
  * Run with: ./gradlew :app:test --tests "*EmbeddingClusteringBenchmarkTest*"
- *
- * For a real device benchmark with the actual Gecko model, swap SyntheticEmbeddingProvider
- * for GeckoEmbeddingProvider(taskType = EmbedData.TaskType.CLUSTERING) and run as
- * an instrumented test on a device that has the model file on storage.
  */
 class EmbeddingClusteringBenchmarkTest {
 

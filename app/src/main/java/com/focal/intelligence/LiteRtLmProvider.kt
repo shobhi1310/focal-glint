@@ -125,6 +125,7 @@ class LiteRtLmProvider @Inject constructor(
         engine = null
         llmDispatcher.close()
         Log.i(TAG, "Engine resources released")
+        Log.i(TAG, "LLM engine has stopped completely (isReady=${isReady()})")
     }
 
     companion object {

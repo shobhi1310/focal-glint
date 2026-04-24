@@ -21,7 +21,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.focal.intelligence.EmbeddingModelType
 import com.focal.intelligence.ModelVariant
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,7 +110,6 @@ fun SetupScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { viewModel.onModelSelected(variant) }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -230,7 +228,7 @@ fun SetupScreen(
                 ) {
                     Button(
                         onClick = if (state.engineRunning) viewModel::onStopEngine else viewModel::onStartEngine,
-                        enabled = modelAvailable && !isDownloading && !state.engineStopping
+                        enabled = isStartStopButtonEnabled(state)
                     ) {
                         Text(when {
                             state.engineStopping -> "Stopping…"
@@ -242,79 +240,26 @@ fun SetupScreen(
             }
 
             item {
-                val isDownloading = state.embeddingDownloadProgress != null
-
                 StepCard(
                     number = 6,
                     title = "Embedding Model",
-                    description = "Download the Gecko embedding model for smart notification grouping (~30 MB)",
+                    description = "Place embeddinggemma-300M_seq1024_mixed-precision.tflite in the app's embeddings folder to enable smart notification grouping.",
                     isComplete = state.embeddingModelAvailable
                 ) {
-                    Column {
-                        Button(
-                            onClick = viewModel::onDownloadEmbeddingModel,
-                            enabled = !state.embeddingModelAvailable && !isDownloading
-                        ) {
-                            Text(
-                                text = when {
-                                    isDownloading -> "Downloading ${state.embeddingDownloadProgress}%"
-                                    state.embeddingModelAvailable -> "Downloaded ✓"
-                                    else -> "Download"
-                                }
-                            )
-                        }
-                        state.embeddingErrorMessage?.let { error ->
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = error,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
+                    Text(
+                        text = if (state.embeddingModelAvailable) "Model found ✓" else "Model not found",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.embeddingModelAvailable)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
                 }
             }
 
             item {
                 StepCard(
                     number = 7,
-                    title = "Embedding Model",
-                    description = "Switch between Gecko 110M (256 tokens) and Gemma 300M (512 tokens). Switching clears all embeddings and triggers a full rebuild.",
-                    isComplete = true
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = state.activeEmbeddingModel == EmbeddingModelType.GECKO,
-                                onClick = { if (!state.isSwitchingEmbeddingModel) viewModel.switchEmbeddingModel(EmbeddingModelType.GECKO) },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                                enabled = !state.isSwitchingEmbeddingModel
-                            ) {
-                                Text("Gecko 110M")
-                            }
-                            SegmentedButton(
-                                selected = state.activeEmbeddingModel == EmbeddingModelType.GEMMA,
-                                onClick = { if (!state.isSwitchingEmbeddingModel && state.isGemmaAvailable) viewModel.switchEmbeddingModel(EmbeddingModelType.GEMMA) },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                                enabled = !state.isSwitchingEmbeddingModel && state.isGemmaAvailable
-                            ) {
-                                Text(if (state.isGemmaAvailable) "Gemma 300M" else "Gemma 300M\n(not found)")
-                            }
-                        }
-                        if (state.isSwitchingEmbeddingModel) {
-                            Text(
-                                text = "Switching · re-embedding…",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                StepCard(
-                    number = 8,
                     title = "Developer Reset",
                     description = "Delete all Room database data and start fresh without clearing app data",
                     isComplete = false
@@ -345,6 +290,12 @@ fun SetupScreen(
             }
         }
     }
+}
+
+internal fun isStartStopButtonEnabled(state: SetupUiState): Boolean {
+    if (state.engineStopping) return false
+    if (state.engineRunning) return true
+    return state.selectedModel in state.modelsOnDevice && state.downloadProgress == null
 }
 
 @Composable

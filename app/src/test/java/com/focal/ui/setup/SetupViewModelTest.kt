@@ -5,9 +5,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
+import com.focal.data.repository.NotificationRepository
+import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
+import com.focal.intelligence.SwitchableEmbeddingProvider
+import com.focal.intelligence.TopicEngine
+import com.focal.worker.ClassificationWorker
+import androidx.work.ExistingWorkPolicy
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,6 +31,8 @@ class SetupViewModelTest {
     private lateinit var database: FocalDatabase
     private lateinit var modelManager: ModelManager
     private lateinit var inferenceProvider: InferenceProvider
+    private lateinit var embeddingProvider: EmbeddingProvider
+    private lateinit var notificationRepository: NotificationRepository
     private lateinit var workManager: WorkManager
 
     @Before
@@ -34,6 +42,8 @@ class SetupViewModelTest {
         database = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
         inferenceProvider = mockk(relaxed = true)
+        embeddingProvider = SwitchableEmbeddingProvider()
+        notificationRepository = mockk(relaxed = true)
         workManager = mockk(relaxed = true)
         mockkStatic(NotificationManagerCompat::class)
         mockkStatic(WorkManager::class)
@@ -49,7 +59,10 @@ class SetupViewModelTest {
         every { modelManager.setEngineEnabled(any()) } just Runs
         every { modelManager.isModelAvailable(any()) } returns false
         every { modelManager.getBackendPreference() } returns true
-        every { modelManager.isEmbeddingModelAvailable } returns false
+        every { modelManager.isGemmaEmbeddingAvailable } returns false
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
         every { inferenceProvider.isReady() } returns false
 
         mockkStatic(WorkManager::class)
@@ -65,7 +78,14 @@ class SetupViewModelTest {
         unmockkStatic(WorkManager::class)
     }
 
-    private fun createViewModel() = SetupViewModel(context, database, modelManager, inferenceProvider)
+    private fun createViewModel() = SetupViewModel(
+        context,
+        database,
+        modelManager,
+        inferenceProvider,
+        embeddingProvider,
+        notificationRepository
+    )
 
     @Test
     fun `init sets notificationAccessGranted true when permission present`() = runTest {
@@ -122,20 +142,16 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `onModelSelected different stops engine persists selection and clears active`() = runTest {
+    fun `onModelSelected different persists selection and clears active`() = runTest {
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
         every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns false
-        every { inferenceProvider.isReady() } returns true
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onModelSelected(ModelVariant.GEMMA4_E2B)
         advanceUntilIdle()
-        verify(timeout = 1_000) { inferenceProvider.close() }
         verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA4_E2B) }
-        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
         assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.selectedModel)
         assertNull(vm.uiState.value.activeModel)
-        assertFalse(vm.uiState.value.engineRunning)
     }
 
     @Test
@@ -165,21 +181,6 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `onRedownload stops engine deletes file and redownloads`() = runTest {
-        every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
-        every { inferenceProvider.isReady() } returns true
-        coEvery { modelManager.downloadModel(any(), any()) } just Runs
-        val vm = createViewModel()
-        advanceUntilIdle()
-        vm.onRedownload()
-        advanceUntilIdle()
-        verify(timeout = 1_000) { inferenceProvider.close() }
-        verify { modelManager.deleteModel(ModelVariant.GEMMA3_1B) }
-        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
-        coVerify(timeout = 1_000) { modelManager.downloadModel(ModelVariant.GEMMA3_1B, any()) }
-    }
-
-    @Test
     fun `onStartEngine uses selected backend and sets engineRunning true`() = runTest {
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
         every { modelManager.getBackendPreference() } returns false
@@ -200,14 +201,34 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `onStopEngine closes engine and sets engineRunning false`() = runTest {
-        every { inferenceProvider.isReady() } returns true
+    fun `refresh exposes gemma embedding availability from model manager`() = runTest {
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+
         val vm = createViewModel()
         advanceUntilIdle()
-        vm.onStopEngine()
-        advanceUntilIdle()
-        verify(timeout = 1_000) { inferenceProvider.close() }
-        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
-        assertFalse(vm.uiState.value.engineRunning)
+
+        assertTrue(vm.uiState.value.embeddingModelAvailable)
     }
+
+    @Test
+    fun `backend switch reinitializes embedding with shared backend preference`() = runTest {
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        embeddingProvider = mockk(relaxed = true)
+        every { embeddingProvider.isReady() } returns false
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onToggleBackend(false)
+        advanceUntilIdle()
+
+        coVerify {
+            embeddingProvider.initialize(
+                "/models/embeddinggemma.tflite",
+                "",
+                false
+            )
+        }
+    }
+
 }

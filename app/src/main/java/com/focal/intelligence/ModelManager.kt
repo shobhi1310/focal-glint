@@ -45,36 +45,14 @@ class ModelManager(private val context: Context) {
     val embeddingModelDir: File
         get() = File(modelDir, "embeddings")
 
-    val geckoModelFile: File
-        get() = File(embeddingModelDir, GECKO_MODEL_FILENAME)
-
-    val geckoTokenizerFile: File
-        get() = File(embeddingModelDir, GECKO_TOKENIZER_FILENAME)
-
     val gemmaEmbeddingModelFile: File
         get() = File(embeddingModelDir, GEMMA_MODEL_FILENAME)
 
-    val gemmaTokenizerFile: File
-        get() = File(embeddingModelDir, GEMMA_TOKENIZER_FILENAME)
+    val tokenizerFile: File
+        get() = File(embeddingModelDir, TOKENIZER_FILENAME)
 
     val isGemmaEmbeddingAvailable: Boolean
-        get() = gemmaEmbeddingModelFile.exists() && gemmaEmbeddingModelFile.length() > 50_000_000L &&
-                gemmaTokenizerFile.exists()
-
-    fun getEmbeddingModelPreference(): EmbeddingModelType {
-        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
-        val raw = prefs.getString("embedding_model_type", EmbeddingModelType.GECKO.name)
-        return EmbeddingModelType.entries.firstOrNull { it.name == raw } ?: EmbeddingModelType.GECKO
-    }
-
-    fun saveEmbeddingModelPreference(type: EmbeddingModelType) {
-        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("embedding_model_type", type.name).apply()
-    }
-
-    val isEmbeddingModelAvailable: Boolean
-        get() = geckoModelFile.exists() && geckoModelFile.length() > 1_000_000L &&
-                geckoTokenizerFile.exists()
+        get() = gemmaEmbeddingModelFile.exists() && gemmaEmbeddingModelFile.length() > 50_000_000L
 
     fun ensureEmbeddingModelDir() {
         if (!embeddingModelDir.exists()) embeddingModelDir.mkdirs()
@@ -187,75 +165,10 @@ class ModelManager(private val context: Context) {
         }
     }
 
-    suspend fun downloadEmbeddingModel(onProgress: (Int) -> Unit) {
-        ensureEmbeddingModelDir()
-
-        val dm = context.getSystemService(DownloadManager::class.java)
-
-        // Download model file
-        val modelRequest = DownloadManager.Request(Uri.parse(GECKO_MODEL_URL))
-            .setDestinationUri(Uri.fromFile(geckoModelFile))
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setTitle("Downloading Gecko embedding model...")
-            .setAllowedNetworkTypes(
-                DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
-            )
-        val modelDownloadId = dm.enqueue(modelRequest)
-
-        withContext(Dispatchers.IO) {
-            while (true) {
-                delay(1000)
-                val cursor = dm.query(DownloadManager.Query().setFilterById(modelDownloadId))
-                if (!cursor.moveToFirst()) { cursor.close(); continue }
-                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                cursor.close()
-                when (status) {
-                    DownloadManager.STATUS_SUCCESSFUL -> { onProgress(90); break }
-                    DownloadManager.STATUS_FAILED -> throw IOException("Embedding model download failed")
-                    else -> {
-                        val percent = if (total > 0) ((downloaded * 80) / total).toInt() else 0
-                        onProgress(percent)
-                    }
-                }
-            }
-        }
-
-        // Download tokenizer
-        val tokenizerRequest = DownloadManager.Request(Uri.parse(GECKO_TOKENIZER_URL))
-            .setDestinationUri(Uri.fromFile(geckoTokenizerFile))
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setTitle("Downloading tokenizer...")
-            .setAllowedNetworkTypes(
-                DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
-            )
-        val tokenizerDownloadId = dm.enqueue(tokenizerRequest)
-
-        withContext(Dispatchers.IO) {
-            while (true) {
-                delay(500)
-                val cursor = dm.query(DownloadManager.Query().setFilterById(tokenizerDownloadId))
-                if (!cursor.moveToFirst()) { cursor.close(); continue }
-                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                cursor.close()
-                when (status) {
-                    DownloadManager.STATUS_SUCCESSFUL -> { onProgress(100); return@withContext }
-                    DownloadManager.STATUS_FAILED -> throw IOException("Tokenizer download failed")
-                    else -> onProgress(95)
-                }
-            }
-        }
-    }
-
     companion object {
         const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
         const val MIN_MODEL_SIZE = 100_000_000L
-        const val GECKO_MODEL_FILENAME = "Gecko_256_f32.tflite"
-        const val GECKO_TOKENIZER_FILENAME = "sentencepiece.model"
-        const val GECKO_MODEL_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/Gecko_256_f32.tflite"
-        const val GECKO_TOKENIZER_URL = "https://huggingface.co/litert-community/Gecko-110m-en/resolve/main/sentencepiece.model"
-        const val GEMMA_MODEL_FILENAME = "embeddinggemma-300M_seq512_mixed-precision.tflite"
-        const val GEMMA_TOKENIZER_FILENAME = "sentencepiece.model.2"
+        const val GEMMA_MODEL_FILENAME = "embeddinggemma-300M_seq1024_mixed-precision.tflite"
+        const val TOKENIZER_FILENAME = "sentencepiece.model.2"
     }
 }

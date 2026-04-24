@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.focal.intelligence.EmbeddingModelType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,15 +74,6 @@ fun SettingsScreen(
                     isReady = state.isEmbeddingReady,
                     isInitializing = state.isEmbeddingInitializing,
                     onInitialize = { viewModel.initializeEmbedding() }
-                )
-            }
-
-            item {
-                EmbeddingModelRow(
-                    activeModel = state.activeEmbeddingModel,
-                    isGemmaAvailable = state.isGemmaAvailable,
-                    isSwitching = state.isSwitchingEmbeddingModel,
-                    onSelect = { viewModel.switchEmbeddingModel(it) }
                 )
             }
 
@@ -249,55 +239,6 @@ private fun EmbeddingEngineRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EmbeddingModelRow(
-    activeModel: EmbeddingModelType,
-    isGemmaAvailable: Boolean,
-    isSwitching: Boolean,
-    onSelect: (EmbeddingModelType) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "Embedding Model",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = activeModel == EmbeddingModelType.GECKO,
-                    onClick = { if (!isSwitching) onSelect(EmbeddingModelType.GECKO) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    enabled = !isSwitching
-                ) {
-                    Text("Gecko 110M")
-                }
-                SegmentedButton(
-                    selected = activeModel == EmbeddingModelType.GEMMA,
-                    onClick = { if (!isSwitching && isGemmaAvailable) onSelect(EmbeddingModelType.GEMMA) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    enabled = !isSwitching && isGemmaAvailable
-                ) {
-                    Text(if (isGemmaAvailable) "Gemma 300M" else "Gemma 300M\n(not downloaded)")
-                }
-            }
-            if (isSwitching) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Switching model · re-embedding notifications…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

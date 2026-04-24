@@ -25,3 +25,16 @@ model/
 
 # Visual companion brainstorming files
 .superpowers/
+
+# Claude Code session files
+.claude/
+
+# Kotlin build cache
+.kotlin/
+
+# CMake build cache
+app/.cxx/
+
+# Debug output files
+focal_embeddings_debug.txt
+focal_notifications_debug.txt

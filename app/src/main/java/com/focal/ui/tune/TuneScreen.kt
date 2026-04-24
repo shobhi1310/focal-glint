@@ -46,7 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.focal.ui.components.AppIcon
+import com.focal.ui.components.SectionHeader
 import com.focal.ui.components.UserPreference
+import com.focal.ui.theme.FocalAccent
 import com.focal.ui.theme.ThemeMode
 import com.focal.ui.theme.ThemePreference
 

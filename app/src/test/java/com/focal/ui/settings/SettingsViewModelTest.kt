@@ -9,8 +9,11 @@ import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
+import com.focal.intelligence.TopicEngine
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.ExistingWorkPolicy
+import com.focal.worker.ClassificationWorker
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -42,6 +45,7 @@ class SettingsViewModelTest {
     private lateinit var embeddingProvider: EmbeddingProvider
     private lateinit var modelManager: ModelManager
     private lateinit var context: Context
+    private lateinit var workManager: WorkManager
 
     @Before
     fun setup() {
@@ -53,11 +57,14 @@ class SettingsViewModelTest {
         modelManager = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { modelManager.isEngineEnabled() } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns false
+        every { embeddingProvider.isReady() } returns false
 
         mockkStatic(WorkManager::class)
-        val workManager = mockk<WorkManager>(relaxed = true)
+        workManager = mockk(relaxed = true)
         every { WorkManager.getInstance(any()) } returns workManager
         every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList<WorkInfo>())
+        TopicEngine.pendingFullRebuild.set(false)
     }
 
     @After
@@ -180,14 +187,15 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setBackendPreference reinitializes embedding model with selected backend`() = runTest {
+    fun `setBackendPreference closes active embedding model before reinit`() = runTest {
         setupProfiles("whatsapp" to 10)
         coEvery { ruleRepository.getUserOverrides() } returns emptyList()
         coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
         every { modelManager.getBackendPreference() } returns true
-        every { modelManager.isEmbeddingModelAvailable } returns true
-        every { modelManager.geckoModelFile } returns mockk { every { absolutePath } returns "/models/Gecko_256_f32.tflite" }
-        every { modelManager.geckoTokenizerFile } returns mockk { every { absolutePath } returns "/models/sentencepiece.model" }
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
         every { embeddingProvider.isReady() } returns true
 
         val vm = createViewModel()
@@ -198,17 +206,10 @@ class SettingsViewModelTest {
 
         verify { modelManager.saveBackendPreference(false) }
         verify(timeout = 1_000) { embeddingProvider.close() }
-        coVerify(timeout = 1_000) {
-            embeddingProvider.initialize(
-                "/models/Gecko_256_f32.tflite",
-                "/models/sentencepiece.model",
-                false
-            )
-        }
     }
 
     @Test
-    fun `setBackendPreference restarts llm and embedding when both models exist`() = runTest {
+    fun `setBackendPreference restarts llm and reinitializes embedding`() = runTest {
         setupProfiles("whatsapp" to 10)
         coEvery { ruleRepository.getUserOverrides() } returns emptyList()
         coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
@@ -216,9 +217,10 @@ class SettingsViewModelTest {
         every { modelManager.isModelAvailable } returns true
         every { modelManager.activeVariant() } returns ModelVariant.GEMMA4_E2B
         every { modelManager.modelPath } returns "/models/gemma-4-E2B-it.litertlm"
-        every { modelManager.isEmbeddingModelAvailable } returns true
-        every { modelManager.geckoModelFile } returns mockk { every { absolutePath } returns "/models/Gecko_256_f32.tflite" }
-        every { modelManager.geckoTokenizerFile } returns mockk { every { absolutePath } returns "/models/sentencepiece.model" }
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
         every { embeddingProvider.isReady() } returns false
 
         val vm = createViewModel()
@@ -235,11 +237,7 @@ class SettingsViewModelTest {
             )
         }
         coVerify(timeout = 1_000) {
-            embeddingProvider.initialize(
-                "/models/Gecko_256_f32.tflite",
-                "/models/sentencepiece.model",
-                false
-            )
+            embeddingProvider.initialize("/models/embeddinggemma.tflite", "", false)
         }
     }
 
@@ -251,7 +249,7 @@ class SettingsViewModelTest {
         every { modelManager.getBackendPreference() } returns true
         every { modelManager.isEngineEnabled() } returns false
         every { modelManager.isModelAvailable } returns true
-        every { modelManager.isEmbeddingModelAvailable } returns false
+        every { modelManager.isGemmaEmbeddingAvailable } returns false
 
         val vm = createViewModel()
         advanceUntilIdle()
@@ -261,4 +259,31 @@ class SettingsViewModelTest {
 
         coVerify(exactly = 0) { inferenceProvider.restart(any(), any(), any()) }
     }
+
+    @Test
+    fun `setBackendPreference reinitializes gemma embedding without explicit tokenizer path`() = runTest {
+        setupProfiles("whatsapp" to 10)
+        coEvery { ruleRepository.getUserOverrides() } returns emptyList()
+        coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
+        every { modelManager.getBackendPreference() } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.setBackendPreference(false)
+        advanceUntilIdle()
+
+        coVerify(timeout = 1_000) {
+            embeddingProvider.initialize(
+                "/models/embeddinggemma.tflite",
+                "",
+                false
+            )
+        }
+    }
+
 }

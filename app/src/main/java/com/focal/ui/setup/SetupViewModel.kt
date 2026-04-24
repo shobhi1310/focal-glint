@@ -12,15 +12,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
-import com.focal.intelligence.EmbeddingModelType
 import com.focal.intelligence.EmbeddingProvider
-import com.focal.intelligence.GeckoEmbeddingProvider
-import com.focal.intelligence.GemmaEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.ModelBackendPolicy
-import com.focal.intelligence.SwitchableEmbeddingProvider
 import com.focal.intelligence.TopicEngine
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,12 +42,7 @@ data class SetupUiState(
     val databaseClearing: Boolean = false,
     val databaseMessage: String? = null,
     val errorMessage: String? = null,
-    val embeddingModelAvailable: Boolean = false,
-    val embeddingDownloadProgress: Int? = null,
-    val embeddingErrorMessage: String? = null,
-    val activeEmbeddingModel: EmbeddingModelType = EmbeddingModelType.GECKO,
-    val isGemmaAvailable: Boolean = false,
-    val isSwitchingEmbeddingModel: Boolean = false
+    val embeddingModelAvailable: Boolean = false
 )
 
 @HiltViewModel
@@ -84,9 +75,7 @@ class SetupViewModel @Inject constructor(
             modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
             useGpu = modelManager.getBackendPreference(),
-            embeddingModelAvailable = modelManager.isEmbeddingModelAvailable,
-            activeEmbeddingModel = modelManager.getEmbeddingModelPreference(),
-            isGemmaAvailable = modelManager.isGemmaEmbeddingAvailable
+            embeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable
         )
     }
 
@@ -206,6 +195,7 @@ class SetupViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 inferenceProvider.close()
             }
+            Log.i(TAG, "LLM close completed: reason=$reason isReady=${inferenceProvider.isReady()}")
             modelManager.setEngineEnabled(false)
         }
         Log.i(TAG, "Engine stopped: reason=$reason elapsedMs=$elapsedMs")
@@ -224,6 +214,7 @@ class SetupViewModel @Inject constructor(
                         useGpu,
                         variant.maxContextTokens
                     )
+                    reinitializeEmbeddings(useGpu)
                 } catch (e: Exception) {
                     val fallback = !useGpu
                     modelManager.saveBackendPreference(fallback)
@@ -232,82 +223,23 @@ class SetupViewModel @Inject constructor(
                         errorMessage = "Backend switch failed: ${e.message}"
                     )
                 }
+            } else {
+                reinitializeEmbeddings(useGpu)
             }
             _uiState.value = _uiState.value.copy(backendSwitching = false)
         }
     }
 
-    fun onDownloadEmbeddingModel() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(embeddingDownloadProgress = 0, embeddingErrorMessage = null)
-            try {
-                modelManager.downloadEmbeddingModel { progress ->
-                    _uiState.value = _uiState.value.copy(embeddingDownloadProgress = progress)
-                }
-                _uiState.value = _uiState.value.copy(
-                    embeddingDownloadProgress = null,
-                    embeddingModelAvailable = true
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    embeddingDownloadProgress = null,
-                    embeddingErrorMessage = "Download failed: ${e.message}"
-                )
-            }
+    private suspend fun reinitializeEmbeddings(useGpu: Boolean) {
+        if (!modelManager.isGemmaEmbeddingAvailable) return
+        if (embeddingProvider.isReady()) {
+            withContext(Dispatchers.IO) { embeddingProvider.close() }
         }
-    }
-
-    fun switchEmbeddingModel(type: EmbeddingModelType) {
-        if (_uiState.value.isSwitchingEmbeddingModel) return
-        if (type == modelManager.getEmbeddingModelPreference()) return
-        if (type == EmbeddingModelType.GEMMA && !modelManager.isGemmaEmbeddingAvailable) return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSwitchingEmbeddingModel = true)
-            try {
-                val switchable = embeddingProvider as SwitchableEmbeddingProvider
-                withContext(Dispatchers.IO) { switchable.close() }
-
-                switchable.inner = when (type) {
-                    EmbeddingModelType.GEMMA -> GemmaEmbeddingProvider()
-                    EmbeddingModelType.GECKO -> GeckoEmbeddingProvider()
-                }
-
-                val modelFile = when (type) {
-                    EmbeddingModelType.GEMMA -> modelManager.gemmaEmbeddingModelFile
-                    EmbeddingModelType.GECKO -> modelManager.geckoModelFile
-                }
-                val tokenizerPath = when (type) {
-                    EmbeddingModelType.GECKO -> modelManager.geckoTokenizerFile.absolutePath
-                    EmbeddingModelType.GEMMA -> modelManager.gemmaTokenizerFile.absolutePath
-                }
-                val useGpu = ModelBackendPolicy.useGpuForEmbeddings(
-                    llmUseGpu = modelManager.getBackendPreference()
-                )
-
-                embeddingProvider.initialize(modelFile.absolutePath, tokenizerPath, useGpu)
-                modelManager.saveEmbeddingModelPreference(type)
-
-                withContext(Dispatchers.IO) {
-                    notificationRepository.resetAllEmbeddings()
-                }
-                TopicEngine.pendingFullRebuild.set(true)
-                val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
-                WorkManager.getInstance(context).enqueueUniqueWork(
-                    ClassificationWorker.WORK_NAME,
-                    ExistingWorkPolicy.KEEP,
-                    workRequest
-                )
-
-                _uiState.value = _uiState.value.copy(
-                    activeEmbeddingModel = type,
-                    isSwitchingEmbeddingModel = false
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to switch embedding model", e)
-                _uiState.value = _uiState.value.copy(isSwitchingEmbeddingModel = false)
-            }
-        }
+        embeddingProvider.initialize(
+            modelManager.gemmaEmbeddingModelFile.absolutePath,
+            "",
+            ModelBackendPolicy.useGpuForEmbeddings(useGpu)
+        )
     }
 
     companion object {
