@@ -1,9 +1,13 @@
 package com.focal.di
 
 import android.content.Context
+import com.focal.data.db.dao.ExtractedDataDao
+import com.focal.data.db.dao.WidgetConfigDao
+import com.focal.data.db.dao.WidgetStateDao
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.data.repository.TopicRepository
+import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.SwitchableEmbeddingProvider
@@ -67,5 +71,15 @@ object IntelligenceModule {
         topicRepository: TopicRepository
     ): TopicEngine {
         return TopicEngine(embeddingProvider, notificationRepository, topicRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWidgetRepository(
+        configDao: WidgetConfigDao,
+        extractedDataDao: ExtractedDataDao,
+        stateDao: WidgetStateDao
+    ): WidgetRepository {
+        return WidgetRepository(configDao, extractedDataDao, stateDao)
     }
 }
