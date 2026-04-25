@@ -30,7 +30,7 @@ data class PulseUiState(
 @HiltViewModel
 class PulseViewModel @Inject constructor(
     private val widgetRepository: WidgetRepository,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val isRefreshing = MutableStateFlow(false)
