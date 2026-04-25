@@ -16,6 +16,7 @@ import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
+import com.focal.intelligence.WidgetComputeEngine
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -81,5 +82,11 @@ object IntelligenceModule {
         stateDao: WidgetStateDao
     ): WidgetRepository {
         return WidgetRepository(configDao, extractedDataDao, stateDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWidgetComputeEngine(widgetRepository: WidgetRepository): WidgetComputeEngine {
+        return WidgetComputeEngine(widgetRepository)
     }
 }
