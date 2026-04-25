@@ -122,6 +122,16 @@ class ModelManager(private val context: Context) {
         prefs.edit().putString("backend_preference", if (useGpu) "gpu" else "cpu").apply()
     }
 
+    fun setPendingRebuild(pending: Boolean) {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("pending_topic_rebuild", pending).apply()
+    }
+
+    fun getPendingRebuild(): Boolean {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("pending_topic_rebuild", false)
+    }
+
     suspend fun downloadModel(variant: ModelVariant, onProgress: (Int) -> Unit) {
         ensureModelDir()
         val destFile = modelFileFor(variant)

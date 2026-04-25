@@ -10,11 +10,16 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.focal.intelligence.GemmaEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelBackendPolicy
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.SwitchableEmbeddingProvider
+import com.focal.intelligence.TopicEngine
+import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +97,16 @@ class LlmForegroundService : Service() {
                     useGpu
                 )
                 Log.d(TAG, "EmbeddingGemma initialized gpu=$useGpu")
+                if (modelManager.getPendingRebuild()) {
+                    modelManager.setPendingRebuild(false)
+                    TopicEngine.pendingFullRebuild.set(true)
+                    WorkManager.getInstance(this).enqueueUniqueWork(
+                        ClassificationWorker.WORK_NAME,
+                        ExistingWorkPolicy.REPLACE,
+                        OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+                    )
+                    Log.d(TAG, "Triggered full topic rebuild after engine init")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Embedding init failed", e)
             }

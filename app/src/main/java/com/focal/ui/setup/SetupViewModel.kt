@@ -17,7 +17,6 @@ import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.ModelBackendPolicy
-import com.focal.intelligence.TopicEngine
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -159,7 +158,7 @@ class SetupViewModel @Inject constructor(
     fun onStartEngine() {
         if (_uiState.value.engineStopping) return
         modelManager.setEngineEnabled(true)
-        TopicEngine.pendingFullRebuild.set(true)
+        modelManager.setPendingRebuild(true)
         context.startForegroundService(Intent(context, LlmForegroundService::class.java))
         WorkManager.getInstance(context).enqueueUniqueWork(
             ClassificationWorker.WORK_NAME,
