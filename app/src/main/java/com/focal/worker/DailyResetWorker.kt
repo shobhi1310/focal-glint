@@ -26,6 +26,7 @@ class DailyResetWorker @AssistedInject constructor(
         notificationRepository.purgeOlderThan(dayStart)
         topicRepository.clearAndSaveTopics(emptyList())
         notificationRepository.resetAllProcessedFlags()
+        Log.d(TAG, "Widget data preserved (not part of daily reset)")
 
         Log.d(TAG, "Daily reset complete — new window starts at $dayStart")
         return Result.success()

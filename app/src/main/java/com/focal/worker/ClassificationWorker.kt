@@ -10,12 +10,15 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EngineWarmupCoordinator
+import com.focal.intelligence.ExtractionToolFactory
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
+import com.focal.intelligence.WidgetComputeEngine
 import com.focal.service.LlmForegroundService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -33,7 +36,9 @@ class ClassificationWorker @AssistedInject constructor(
     private val topicEngine: TopicEngine,
     private val inferenceProvider: InferenceProvider,
     private val modelManager: ModelManager,
-    private val engineWarmupCoordinator: EngineWarmupCoordinator
+    private val engineWarmupCoordinator: EngineWarmupCoordinator,
+    private val widgetRepository: WidgetRepository,
+    private val widgetComputeEngine: WidgetComputeEngine
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -87,11 +92,21 @@ class ClassificationWorker @AssistedInject constructor(
                 }
             }
             if (inferenceProvider.isReady()) {
-                Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10")
+                val activeCategories = widgetRepository.getActiveCategories()
+                val extractionTools = if (activeCategories.isNotEmpty()) {
+                    ExtractionToolFactory.createTools(activeCategories)
+                } else {
+                    emptyMap()
+                }
+                Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10 (extraction categories: $activeCategories)")
                 var classified = 0
                 for (batch in pending.chunked(10)) {
                     try {
-                        val results = classifier.classifyBatch(batch)
+                        val results = if (extractionTools.isNotEmpty()) {
+                            classifier.classifyAndExtractBatch(batch, extractionTools)
+                        } else {
+                            classifier.classifyBatch(batch)
+                        }
                         for ((notification, result) in results) {
                             if (result.classifiedBy != "pending") {
                                 notificationRepository.markClassified(
@@ -125,6 +140,15 @@ class ClassificationWorker @AssistedInject constructor(
             throw e
         } catch (e: Exception) {
             Log.e("ClassificationWorker", "Topic generation failed", e)
+        }
+
+        try {
+            widgetComputeEngine.computeAll()
+            Log.d("ClassificationWorker", "Widget compute complete")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("ClassificationWorker", "Widget compute failed", e)
         }
 
         return Result.success()
