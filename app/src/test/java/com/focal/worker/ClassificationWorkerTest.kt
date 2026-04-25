@@ -7,17 +7,13 @@ import androidx.work.WorkerParameters
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import com.focal.intelligence.TopicNarrativeProcessor
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import io.mockk.verify
+import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -33,6 +29,7 @@ class ClassificationWorkerTest {
     private lateinit var topicEngine: TopicEngine
     private lateinit var inferenceProvider: InferenceProvider
     private lateinit var modelManager: ModelManager
+    private lateinit var engineWarmupCoordinator: EngineWarmupCoordinator
     private lateinit var workManager: WorkManager
 
     @Before
@@ -45,6 +42,7 @@ class ClassificationWorkerTest {
         topicEngine = mockk(relaxed = true)
         inferenceProvider = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
+        engineWarmupCoordinator = mockk(relaxed = true)
         workManager = mockk(relaxed = true)
 
         every { modelManager.isEngineEnabled() } returns false
@@ -52,6 +50,7 @@ class ClassificationWorkerTest {
         coEvery { notificationRepository.getRecentNotificationsSnapshot() } returns emptyList()
         coEvery { notificationRepository.getPendingForClassification() } returns emptyList()
         coEvery { topicEngine.generateTopics() } returns Unit
+        coEvery { engineWarmupCoordinator.warmEmbeddings() } returns Unit
 
         mockkStatic(WorkManager::class)
         every { WorkManager.getInstance(any()) } returns workManager
@@ -70,7 +69,8 @@ class ClassificationWorkerTest {
         rulesEngine = rulesEngine,
         topicEngine = topicEngine,
         inferenceProvider = inferenceProvider,
-        modelManager = modelManager
+        modelManager = modelManager,
+        engineWarmupCoordinator = engineWarmupCoordinator
     )
 
     @Test
@@ -84,6 +84,17 @@ class ClassificationWorkerTest {
                 any<OneTimeWorkRequest>()
             )
         }
+    }
+
+    @Test
+    fun `engine disabled skips llm classification but still warms embeddings and generates topics`() = runTest {
+        coEvery { notificationRepository.getPendingForClassification() } returns listOf(mockk(relaxed = true))
+
+        createWorker().doWork()
+
+        coVerify(exactly = 0) { classifier.classifyBatch(any()) }
+        coVerify { engineWarmupCoordinator.warmEmbeddings() }
+        coVerify { topicEngine.generateTopics() }
     }
 }
 

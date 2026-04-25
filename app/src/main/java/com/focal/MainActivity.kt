@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestBatteryExemptionIfNeeded()
-        warmEngineIfEnabled()
+        warmEngines()
         setContent {
             FocalTheme {
                 FocalNavigation()
@@ -38,11 +38,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun warmEngineIfEnabled() {
-        if (!modelManager.isEngineEnabled()) return
+    private fun warmEngines() {
         lifecycleScope.launch {
             try {
-                if (engineWarmupCoordinator.warmUp()) {
+                engineWarmupCoordinator.warmEmbeddings()
+                if (modelManager.isEngineEnabled() && engineWarmupCoordinator.warmUp()) {
                     startForegroundService(Intent(this@MainActivity, LlmForegroundService::class.java))
                 }
             } catch (e: Exception) {

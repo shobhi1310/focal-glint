@@ -164,7 +164,7 @@ class SetupViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(errorMessage = null)
         viewModelScope.launch {
             try {
-                val warmed = engineWarmupCoordinator.warmUp()
+                val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = true)
                 if (warmed) {
                     context.startForegroundService(Intent(context, LlmForegroundService::class.java))
                     WorkManager.getInstance(context).enqueueUniqueWork(
@@ -202,7 +202,6 @@ class SetupViewModel @Inject constructor(
             cancelWorkerAndWait()
             withContext(Dispatchers.IO) {
                 inferenceProvider.close()
-                if (embeddingProvider.isReady()) embeddingProvider.close()
             }
             Log.i(TAG, "LLM close completed: reason=$reason isReady=${inferenceProvider.isReady()}")
             modelManager.setEngineEnabled(false)

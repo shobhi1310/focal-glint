@@ -82,6 +82,20 @@ class EngineWarmupCoordinatorTest {
     }
 
     @Test
+    fun `warmEmbeddings initializes embedding without initializing llm`() = runTest {
+        coordinator.warmEmbeddings()
+
+        coVerify(exactly = 0) { inferenceProvider.initialize(any(), any(), any()) }
+        coVerify {
+            embeddingProvider.initialize(
+                "/models/embedding.tflite",
+                "/models/tokenizer.model",
+                true
+            )
+        }
+    }
+
+    @Test
     fun `warmUp reuses existing ready llm and still initializes missing embedding`() = runTest {
         inferenceReady = true
 

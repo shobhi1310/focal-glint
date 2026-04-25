@@ -61,7 +61,7 @@ class SetupViewModelTest {
             every { absolutePath } returns "/models/embeddinggemma.tflite"
         }
         every { inferenceProvider.isReady() } returns false
-        coEvery { engineWarmupCoordinator.warmUp() } returns true
+        coEvery { engineWarmupCoordinator.warmUp(any()) } returns true
 
         mockkStatic(WorkManager::class)
         workManager = mockk(relaxed = true)
@@ -186,7 +186,24 @@ class SetupViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.engineRunning)
         verify { modelManager.setEngineEnabled(true) }
-        coVerify { engineWarmupCoordinator.warmUp() }
+        coVerify { engineWarmupCoordinator.warmUp(recreateEmbeddings = true) }
+    }
+
+    @Test
+    fun `onStopEngine closes llm but keeps embedding loaded`() = runTest {
+        embeddingProvider = mockk(relaxed = true)
+        every { embeddingProvider.isReady() } returns true
+        every { inferenceProvider.isReady() } returns true
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onStopEngine()
+        advanceUntilIdle()
+
+        verify(timeout = 1_000) { inferenceProvider.close() }
+        advanceUntilIdle()
+        verify(exactly = 0) { embeddingProvider.close() }
+        verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
     }
 
     @Test

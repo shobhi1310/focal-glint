@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
@@ -31,7 +32,8 @@ class ClassificationWorker @AssistedInject constructor(
     private val rulesEngine: RulesEngine,
     private val topicEngine: TopicEngine,
     private val inferenceProvider: InferenceProvider,
-    private val modelManager: ModelManager
+    private val modelManager: ModelManager,
+    private val engineWarmupCoordinator: EngineWarmupCoordinator
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -72,43 +74,46 @@ class ClassificationWorker @AssistedInject constructor(
             if (!inferenceProvider.isReady()) {
                 if (!modelManager.isEngineEnabled()) {
                     Log.d("ClassificationWorker", "Engine disabled — skipping LLM classification")
-                    return Result.success()
-                }
-                // Wait up to 45s for the LLM to finish loading before classifying
-                val deadline = System.currentTimeMillis() + 45_000
-                while (!inferenceProvider.isReady() && System.currentTimeMillis() < deadline) {
-                    delay(500)
-                }
-                if (!inferenceProvider.isReady()) {
-                    Log.w("ClassificationWorker", "LLM not ready after 45s wait, will retry")
-                    return Result.retry()
-                }
-            }
-            Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10")
-            var classified = 0
-            for (batch in pending.chunked(10)) {
-                try {
-                    val results = classifier.classifyBatch(batch)
-                    for ((notification, result) in results) {
-                        if (result.classifiedBy != "pending") {
-                            notificationRepository.markClassified(
-                                notification = notification,
-                                category = result.category,
-                                classifiedBy = result.classifiedBy
-                            )
-                            classified++
-                        }
+                } else {
+                    // Wait up to 45s for the LLM to finish loading before classifying
+                    val deadline = System.currentTimeMillis() + 45_000
+                    while (!inferenceProvider.isReady() && System.currentTimeMillis() < deadline) {
+                        delay(500)
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e("ClassificationWorker", "Batch classification failed", e)
+                    if (!inferenceProvider.isReady()) {
+                        Log.w("ClassificationWorker", "LLM not ready after 45s wait, will retry")
+                        return Result.retry()
+                    }
                 }
             }
-            Log.d("ClassificationWorker", "Classified $classified/${pending.size}")
+            if (inferenceProvider.isReady()) {
+                Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10")
+                var classified = 0
+                for (batch in pending.chunked(10)) {
+                    try {
+                        val results = classifier.classifyBatch(batch)
+                        for ((notification, result) in results) {
+                            if (result.classifiedBy != "pending") {
+                                notificationRepository.markClassified(
+                                    notification = notification,
+                                    category = result.category,
+                                    classifiedBy = result.classifiedBy
+                                )
+                                classified++
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e("ClassificationWorker", "Batch classification failed", e)
+                    }
+                }
+                Log.d("ClassificationWorker", "Classified $classified/${pending.size}")
+            }
         }
 
         try {
+            engineWarmupCoordinator.warmEmbeddings()
             topicEngine.generateTopics()
             WorkManager.getInstance(applicationContext).enqueueUniqueWork(
                 TopicNarrativeWorker.WORK_NAME,

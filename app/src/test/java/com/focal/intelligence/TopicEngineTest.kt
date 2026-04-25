@@ -166,7 +166,7 @@ class TopicEngineTest {
     }
 
     @Test
-    fun `skips notifications with null embedding`() = runTest {
+    fun `defers notifications with null embedding without marking processed`() = runTest {
         val notif = notification(id = "n1", embedding = null)
 
         coEvery { embeddingProvider.isReady() } returns false
@@ -177,7 +177,7 @@ class TopicEngineTest {
 
         engine.generateTopics()
 
-        coVerify { notificationRepo.markProcessedForTopics(listOf("n1")) }
+        coVerify(exactly = 0) { notificationRepo.markProcessedForTopics(any()) }
         coVerify(exactly = 0) { topicRepo.saveTopic(any()) }
     }
 

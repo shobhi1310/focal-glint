@@ -17,7 +17,7 @@ class EngineWarmupCoordinator @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    suspend fun warmUp(): Boolean = mutex.withLock {
+    suspend fun warmUp(recreateEmbeddings: Boolean = false): Boolean = mutex.withLock {
         val selected = modelManager.getSelectedVariant()
         val variant = selected
             ?.takeIf { modelManager.isModelAvailable(it) }
@@ -44,12 +44,20 @@ class EngineWarmupCoordinator @Inject constructor(
             }
         }
 
-        warmEmbeddings()
+        warmEmbeddingsLocked(recreateEmbeddings)
         true
     }
 
-    private suspend fun warmEmbeddings() {
-        if (!modelManager.isGemmaEmbeddingAvailable || embeddingProvider.isReady()) return
+    suspend fun warmEmbeddings(recreate: Boolean = false) = mutex.withLock {
+        warmEmbeddingsLocked(recreate)
+    }
+
+    private suspend fun warmEmbeddingsLocked(recreate: Boolean = false) {
+        if (!modelManager.isGemmaEmbeddingAvailable) return
+        if (recreate && embeddingProvider.isReady()) {
+            embeddingProvider.close()
+        }
+        if (embeddingProvider.isReady()) return
         embeddingProvider.inner = GemmaEmbeddingProvider(context)
         val useGpu = ModelBackendPolicy.useGpuForEmbeddings(modelManager.getBackendPreference())
         embeddingProvider.initialize(

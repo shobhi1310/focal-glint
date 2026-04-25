@@ -71,7 +71,7 @@ class TopicEngine(
                 try {
                     val vec = notif.embedding?.let { VectorMath.toFloats(it) }
                     if (vec == null) {
-                        processedIds.add(notif.id)
+                        Log.d(TAG, "Deferring topic assignment for ${notif.id}: embedding missing")
                         continue
                     }
                     assignOrCreateTopic(notif, vec, dayStart, dayEnd)
