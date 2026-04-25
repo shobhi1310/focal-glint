@@ -48,8 +48,8 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideClassifier(inferenceProvider: InferenceProvider): Classifier {
-        return Classifier(inferenceProvider)
+    fun provideClassifier(inferenceProvider: InferenceProvider, widgetRepository: WidgetRepository): Classifier {
+        return Classifier(inferenceProvider, widgetRepository)
     }
 
     @Provides

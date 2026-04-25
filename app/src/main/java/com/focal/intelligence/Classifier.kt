@@ -1,7 +1,10 @@
 package com.focal.intelligence
 
 import android.util.Log
+import com.focal.data.db.entity.ExtractedDataEntity
 import com.focal.data.db.entity.NotificationEntity
+import com.focal.data.repository.WidgetRepository
+import com.google.ai.edge.litertlm.ToolSet
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 
@@ -26,7 +29,8 @@ internal fun shouldWarnAboutUnexpectedProse(finalText: String, toolExecuted: Boo
     finalText.isNotEmpty() && !toolExecuted && !isSyntheticToolEcho(finalText)
 
 class Classifier(
-    private val inferenceProvider: InferenceProvider
+    private val inferenceProvider: InferenceProvider,
+    private val widgetRepository: WidgetRepository? = null
 ) {
     suspend fun classify(notification: NotificationEntity): ClassificationResult {
         if (!inferenceProvider.isReady()) {
@@ -136,6 +140,72 @@ class Classifier(
             }
         } catch (e: Exception) {
             Log.e(TAG, "batch LLM inference failed", e)
+            notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
+        }
+    }
+
+    suspend fun classifyAndExtractBatch(
+        notifications: List<NotificationEntity>,
+        extractionTools: Map<String, ToolSet>
+    ): List<Pair<NotificationEntity, ClassificationResult>> {
+        if (notifications.isEmpty()) return emptyList()
+        if (!inferenceProvider.isReady()) {
+            return notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
+        }
+
+        val prompt = PromptBuilder.buildBatchClassificationPrompt(notifications)
+        val allToolCategories = extractionTools.keys.joinToString(", ")
+        Log.i(TAG, "classifyAndExtract: count=${notifications.size} extractions=[$allToolCategories] promptLen=${prompt.length}")
+
+        val classifyTool = BatchClassifyNotificationTool()
+        val allTools = mutableListOf<ToolSet>(classifyTool)
+        allTools.addAll(extractionTools.values)
+
+        val systemPrompt = BATCH_CLASSIFICATION_SYSTEM +
+            "\n\nAfter classifying each notification, if it is 'matters', also call the appropriate extraction tool(s) for it. " +
+            "A notification can match multiple extraction tools (e.g., a food delivery payment is both finance and logistics). " +
+            "Available extraction categories: $allToolCategories."
+
+        return try {
+            var messageCount = 0
+            inferenceProvider.generateWithTools(systemPrompt, prompt, allTools)
+                .catch { e -> Log.e(TAG, "extract batch error: ${e.message}", e); throw e }
+                .collect { message ->
+                    message.toolCalls?.forEachIndexed { i, call ->
+                        Log.i(TAG, "extract toolCall[$i]: name=${call.name}")
+                    }
+                    messageCount++
+                }
+
+            val extractionResults = ExtractionToolFactory.collectResults(extractionTools)
+            Log.i(TAG, "extract done: messages=$messageCount classified=${classifyTool.resultCount()}/${notifications.size} extracted=${extractionResults.size}")
+
+            if (extractionResults.isNotEmpty() && widgetRepository != null) {
+                val entities = extractionResults.mapNotNull { result ->
+                    val notif = notifications.getOrNull(result.notificationIndex - 1) ?: return@mapNotNull null
+                    ExtractedDataEntity(
+                        notificationId = notif.id,
+                        category = result.category,
+                        data = result.dataJson,
+                        appPackage = notif.packageName
+                    )
+                }
+                widgetRepository.saveExtractedData(entities)
+                Log.i(TAG, "Saved ${entities.size} extracted data rows")
+            }
+
+            notifications.mapIndexed { i, notification ->
+                val (category, reason) = classifyTool.getResult(i + 1)
+                    ?: return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                val resolved = when (category.lowercase().trim()) {
+                    "matters" -> ClassificationResult.MATTERS
+                    "noise" -> ClassificationResult.NOISE
+                    else -> return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                }
+                notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "classifyAndExtract failed", e)
             notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
         }
     }
