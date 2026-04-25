@@ -6,6 +6,7 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkerParameters
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.InferenceProvider
@@ -13,6 +14,7 @@ import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import com.focal.intelligence.TopicNarrativeProcessor
+import com.focal.intelligence.WidgetComputeEngine
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -30,6 +32,8 @@ class ClassificationWorkerTest {
     private lateinit var inferenceProvider: InferenceProvider
     private lateinit var modelManager: ModelManager
     private lateinit var engineWarmupCoordinator: EngineWarmupCoordinator
+    private lateinit var widgetRepository: WidgetRepository
+    private lateinit var widgetComputeEngine: WidgetComputeEngine
     private lateinit var workManager: WorkManager
 
     @Before
@@ -43,6 +47,8 @@ class ClassificationWorkerTest {
         inferenceProvider = mockk(relaxed = true)
         modelManager = mockk(relaxed = true)
         engineWarmupCoordinator = mockk(relaxed = true)
+        widgetRepository = mockk(relaxed = true)
+        widgetComputeEngine = mockk(relaxed = true)
         workManager = mockk(relaxed = true)
 
         every { modelManager.isEngineEnabled() } returns false
@@ -70,7 +76,9 @@ class ClassificationWorkerTest {
         topicEngine = topicEngine,
         inferenceProvider = inferenceProvider,
         modelManager = modelManager,
-        engineWarmupCoordinator = engineWarmupCoordinator
+        engineWarmupCoordinator = engineWarmupCoordinator,
+        widgetRepository = widgetRepository,
+        widgetComputeEngine = widgetComputeEngine
     )
 
     @Test
