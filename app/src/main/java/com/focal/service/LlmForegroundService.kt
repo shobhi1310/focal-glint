@@ -1,5 +1,6 @@
 package com.focal.service
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -66,7 +68,23 @@ class LlmForegroundService : Service() {
         return START_STICKY
     }
 
+    private suspend fun waitForMemory(requiredMb: Long = 600L): Boolean {
+        val am = getSystemService(ActivityManager::class.java)
+        val info = ActivityManager.MemoryInfo()
+        val deadline = System.currentTimeMillis() + 120_000L
+        while (System.currentTimeMillis() < deadline) {
+            am.getMemoryInfo(info)
+            val availMb = info.availMem / 1_000_000L
+            if (availMb >= requiredMb) return true
+            Log.d(TAG, "Waiting for memory: ${availMb}MB available, need ${requiredMb}MB")
+            delay(5_000)
+        }
+        Log.w(TAG, "Memory wait timed out — proceeding anyway")
+        return false
+    }
+
     private suspend fun initializeEngines() {
+        waitForMemory()
         val variant = modelManager.getSelectedVariant() ?: modelManager.activeVariant()
         if (variant != null) {
             val modelFile = modelManager.modelFileFor(variant)
