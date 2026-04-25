@@ -63,7 +63,8 @@ class LlmForegroundService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification())
         }
         if (!inferenceProvider.isReady()) {
-            scope.launch { initializeEngines() }
+            val isRestart = intent == null // null = OS restarted after kill
+            scope.launch { initializeEngines(isRestart) }
         }
         return START_STICKY
     }
@@ -75,15 +76,21 @@ class LlmForegroundService : Service() {
         while (System.currentTimeMillis() < deadline) {
             am.getMemoryInfo(info)
             val availMb = info.availMem / 1_000_000L
-            if (availMb >= requiredMb) return true
-            Log.d(TAG, "Waiting for memory: ${availMb}MB available, need ${requiredMb}MB")
+            if (!info.lowMemory && availMb >= requiredMb) return true
+            Log.d(TAG, "Waiting for memory: ${availMb}MB available lowMemory=${info.lowMemory}")
             delay(5_000)
         }
         Log.w(TAG, "Memory wait timed out — proceeding anyway")
         return false
     }
 
-    private suspend fun initializeEngines() {
+    private suspend fun initializeEngines(isRestart: Boolean = false) {
+        if (isRestart) {
+            // Previous process was OOM-killed. GPU memory (OpenCL) is freed by the driver
+            // asynchronously — availMem won't reflect it. Wait before attempting to reload.
+            Log.d(TAG, "Restarting after kill — waiting 15s for GPU memory to settle")
+            delay(15_000)
+        }
         waitForMemory()
         val variant = modelManager.getSelectedVariant() ?: modelManager.activeVariant()
         if (variant != null) {
