@@ -1,6 +1,7 @@
 package com.focal
 
 import android.app.Application
+import android.content.Intent
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.ExistingWorkPolicy
@@ -9,15 +10,10 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.DefaultRules
-import com.focal.intelligence.EmbeddingProvider
-import com.focal.intelligence.GemmaEmbeddingProvider
-import com.focal.intelligence.InferenceProvider
-import com.focal.intelligence.ModelBackendPolicy
 import com.focal.intelligence.ModelManager
-import com.focal.intelligence.ModelVariant
-import com.focal.intelligence.SwitchableEmbeddingProvider
 import com.focal.intelligence.TopicClusteringPolicy
 import com.focal.intelligence.TopicEngine
+import com.focal.service.LlmForegroundService
 import com.focal.ui.theme.ThemePreference
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -37,12 +33,6 @@ class FocalApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
-    @Inject
-    lateinit var inferenceProvider: InferenceProvider
-
-    @Inject
-    lateinit var embeddingProvider: EmbeddingProvider
-
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -51,7 +41,7 @@ class FocalApplication : Application(), Configuration.Provider {
         DebugLogger.init(this)
         seedDefaultRules()
         migrateTopicClusteringIfNeeded()
-        initializeLlmIfModelExists()
+        startLlmServiceIfNeeded()
         scheduleDailyReset()
     }
 
@@ -71,65 +61,18 @@ class FocalApplication : Application(), Configuration.Provider {
         }
     }
 
-    private fun initializeLlmIfModelExists() {
+    private fun startLlmServiceIfNeeded() {
         val modelManager = ModelManager(this)
         modelManager.ensureModelDir()
-
-        // Initialize LLM
-        val variant = modelManager.activeVariant()
         if (!modelManager.isEngineEnabled()) {
             Log.d(TAG, "LLM auto-start disabled by preference")
-        } else if (variant != null) {
-            val modelFile = modelManager.modelFileFor(variant)
-            val useGpu = modelManager.getBackendPreference()
-            Log.d(TAG, "Found model: ${variant.displayName} at ${modelFile.absolutePath} (${modelFile.length() / 1_000_000}MB, gpu=$useGpu)")
-            applicationScope.launch {
-                try {
-                    inferenceProvider.initialize(modelFile.absolutePath, useGpu, variant.maxContextTokens)
-                    Log.d(TAG, "LLM engine initialized: ${variant.displayName}")
-                } catch (e: Exception) {
-                    Log.e(TAG, "LLM init failed (${e.javaClass.simpleName}): ${e.message}")
-                    if (useGpu) {
-                        Log.d(TAG, "Retrying with CPU backend")
-                        try {
-                            inferenceProvider.initialize(modelFile.absolutePath, false, variant.maxContextTokens)
-                            Log.d(TAG, "LLM engine initialized with CPU fallback")
-                        } catch (e2: Exception) {
-                            Log.e(TAG, "CPU init also failed — model likely corrupt. Deleting: ${e2.message}")
-                            modelManager.deleteModel(variant)
-                        }
-                    } else {
-                        Log.e(TAG, "LLM init failed — model likely corrupt. Deleting: ${e.message}")
-                        modelManager.deleteModel(variant)
-                    }
-                }
-            }
-        } else {
+            return
+        }
+        if (modelManager.activeVariant() == null) {
             Log.d(TAG, "No LLM model found at ${modelManager.modelDir}")
+            return
         }
-
-        // Initialize EmbeddingGemma if model is on device
-        if (modelManager.isGemmaEmbeddingAvailable) {
-            val switchable = embeddingProvider as SwitchableEmbeddingProvider
-            switchable.inner = GemmaEmbeddingProvider(this@FocalApplication)
-            applicationScope.launch {
-                try {
-                    val useGpu = ModelBackendPolicy.useGpuForEmbeddings(
-                        llmUseGpu = modelManager.getBackendPreference()
-                    )
-                    embeddingProvider.initialize(
-                        modelManager.gemmaEmbeddingModelFile.absolutePath,
-                        modelManager.tokenizerFile.absolutePath,
-                        useGpu
-                    )
-                    Log.d(TAG, "EmbeddingGemma initialized (gpu=$useGpu)")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to initialize EmbeddingGemma", e)
-                }
-            }
-        } else {
-            Log.d(TAG, "No embedding model found at ${modelManager.embeddingModelDir}")
-        }
+        startForegroundService(Intent(this, LlmForegroundService::class.java))
     }
 
     private fun scheduleDailyReset() {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
+import com.focal.service.LlmForegroundService
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,7 +12,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
-import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
@@ -51,8 +51,7 @@ class SetupViewModel @Inject constructor(
     private val database: FocalDatabase,
     private val modelManager: ModelManager,
     private val inferenceProvider: InferenceProvider,
-    private val embeddingProvider: EmbeddingProvider,
-    private val notificationRepository: NotificationRepository
+    private val embeddingProvider: EmbeddingProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SetupUiState())
@@ -159,20 +158,15 @@ class SetupViewModel @Inject constructor(
 
     fun onStartEngine() {
         if (_uiState.value.engineStopping) return
-        viewModelScope.launch {
-            try {
-                val variant = _uiState.value.selectedModel
-                inferenceProvider.initialize(
-                    modelManager.modelFileFor(variant).absolutePath,
-                    useGpu = _uiState.value.useGpu,
-                    maxContextTokens = variant.maxContextTokens
-                )
-                modelManager.setEngineEnabled(true)
-                _uiState.value = _uiState.value.copy(engineRunning = true, errorMessage = null)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(errorMessage = "Failed to start engine: ${e.message}")
-            }
-        }
+        modelManager.setEngineEnabled(true)
+        TopicEngine.pendingFullRebuild.set(true)
+        context.startForegroundService(Intent(context, LlmForegroundService::class.java))
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            ClassificationWorker.WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+        )
+        _uiState.value = _uiState.value.copy(engineRunning = true, errorMessage = null)
     }
 
     fun onStopEngine() {
@@ -194,9 +188,11 @@ class SetupViewModel @Inject constructor(
             cancelWorkerAndWait()
             withContext(Dispatchers.IO) {
                 inferenceProvider.close()
+                if (embeddingProvider.isReady()) embeddingProvider.close()
             }
             Log.i(TAG, "LLM close completed: reason=$reason isReady=${inferenceProvider.isReady()}")
             modelManager.setEngineEnabled(false)
+            context.stopService(Intent(context, LlmForegroundService::class.java))
         }
         Log.i(TAG, "Engine stopped: reason=$reason elapsedMs=$elapsedMs")
     }

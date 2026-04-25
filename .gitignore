@@ -38,3 +38,9 @@ app/.cxx/
 # Debug output files
 focal_embeddings_debug.txt
 focal_notifications_debug.txt
+focal_embeddings_debug_*.txt
+focal_notifications_debug_*.txt
+focal_notifications_finetune_README.md
+focal_notifications_finetune_toolcalls.jsonl
+focal_notifications_label_summary.md
+focal_notifications_labeled_dedup.csv

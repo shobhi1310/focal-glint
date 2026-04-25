@@ -49,8 +49,14 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideEmbeddingProvider(): EmbeddingProvider {
+    fun provideSwitchableEmbeddingProvider(): SwitchableEmbeddingProvider {
         return SwitchableEmbeddingProvider()
+    }
+
+    @Provides
+    @Singleton
+    fun provideEmbeddingProvider(switchable: SwitchableEmbeddingProvider): EmbeddingProvider {
+        return switchable
     }
 
     @Provides

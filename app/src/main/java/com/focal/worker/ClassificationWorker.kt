@@ -1,6 +1,7 @@
 package com.focal.worker
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
@@ -8,11 +9,15 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.InferenceProvider
+import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
+import com.focal.service.LlmForegroundService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 @HiltWorker
@@ -22,11 +27,18 @@ class ClassificationWorker @AssistedInject constructor(
     private val notificationRepository: NotificationRepository,
     private val classifier: Classifier,
     private val rulesEngine: RulesEngine,
-    private val topicEngine: TopicEngine
+    private val topicEngine: TopicEngine,
+    private val inferenceProvider: InferenceProvider,
+    private val modelManager: ModelManager
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         Log.d("ClassificationWorker", "Starting batch processing")
+        if (modelManager.isEngineEnabled()) {
+            applicationContext.startForegroundService(
+                Intent(applicationContext, LlmForegroundService::class.java)
+            )
+        }
 
         // Re-apply rules to all recent notifications (catches rule updates)
         val allRecent = notificationRepository.getRecentNotificationsSnapshot()
@@ -55,15 +67,28 @@ class ClassificationWorker @AssistedInject constructor(
 
         val pending = notificationRepository.getPendingForClassification()
         if (pending.isNotEmpty()) {
+            if (!inferenceProvider.isReady()) {
+                if (!modelManager.isEngineEnabled()) {
+                    Log.d("ClassificationWorker", "Engine disabled — skipping LLM classification")
+                    return Result.success()
+                }
+                // Wait up to 45s for the LLM to finish loading before classifying
+                val deadline = System.currentTimeMillis() + 45_000
+                while (!inferenceProvider.isReady() && System.currentTimeMillis() < deadline) {
+                    delay(500)
+                }
+                if (!inferenceProvider.isReady()) {
+                    Log.w("ClassificationWorker", "LLM not ready after 45s wait, will retry")
+                    return Result.retry()
+                }
+            }
             Log.d("ClassificationWorker", "Classifying ${pending.size} pending notifications in batches of 10")
             var classified = 0
             for (batch in pending.chunked(10)) {
                 try {
                     val results = classifier.classifyBatch(batch)
                     for ((notification, result) in results) {
-                        if (result.classifiedBy == "pending") {
-                            Log.d("ClassificationWorker", "LLM not ready, will retry ${notification.id}")
-                        } else {
+                        if (result.classifiedBy != "pending") {
                             notificationRepository.markClassified(
                                 notification = notification,
                                 category = result.category,
