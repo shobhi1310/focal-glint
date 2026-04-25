@@ -1,6 +1,7 @@
 package com.focal.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -13,6 +14,7 @@ sealed class Screen(
 ) {
     data object Digest : Screen("digest", "Today", Icons.Default.Star)
     data object Pulse : Screen("pulse", "Pulse", Icons.Default.FavoriteBorder)
+    data object All : Screen("all", "All", Icons.AutoMirrored.Filled.FormatListBulleted)
     data object Settings : Screen("settings", "Tune", Icons.Default.Settings)
     data object Setup : Screen("setup", "Setup", Icons.Default.Settings)
     data object TopicDetail : Screen("topic/{topicId}", "Topic Detail", Icons.Default.Star) {

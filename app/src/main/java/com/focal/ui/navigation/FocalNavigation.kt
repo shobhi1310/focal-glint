@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.focal.ui.all.AllNotificationsScreen
 import com.focal.ui.digest.DigestScreen
 import com.focal.ui.digest.TopicDetailScreen
 import com.focal.ui.pulse.PulseDetailScreen
@@ -25,7 +26,7 @@ import com.focal.ui.pulse.PulseScreen
 import com.focal.ui.setup.SetupScreen
 import com.focal.ui.tune.TuneScreen
 
-val bottomNavItems = listOf(Screen.Digest, Screen.Pulse, Screen.Settings)
+val bottomNavItems = listOf(Screen.Digest, Screen.Pulse, Screen.All, Screen.Settings)
 
 @Composable
 fun FocalNavigation() {
@@ -75,6 +76,9 @@ fun FocalNavigation() {
                         navController.navigate(Screen.PulseDetail.createRoute(widgetId))
                     }
                 )
+            }
+            composable(Screen.All.route) {
+                AllNotificationsScreen()
             }
             composable(Screen.Settings.route) {
                 TuneScreen(
