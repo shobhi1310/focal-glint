@@ -1,8 +1,6 @@
 package com.focal
 
 import android.app.Application
-import android.content.Intent
-import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -10,10 +8,8 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.DefaultRules
-import com.focal.intelligence.ModelManager
 import com.focal.intelligence.TopicClusteringPolicy
 import com.focal.intelligence.TopicEngine
-import com.focal.service.LlmForegroundService
 import com.focal.ui.theme.ThemePreference
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +37,6 @@ class FocalApplication : Application(), Configuration.Provider {
         DebugLogger.init(this)
         seedDefaultRules()
         migrateTopicClusteringIfNeeded()
-        startLlmServiceIfNeeded()
         scheduleDailyReset()
     }
 
@@ -59,20 +54,6 @@ class FocalApplication : Application(), Configuration.Provider {
                 prefs.edit().putInt("rules_seed_version", currentVersion).apply()
             }
         }
-    }
-
-    private fun startLlmServiceIfNeeded() {
-        val modelManager = ModelManager(this)
-        modelManager.ensureModelDir()
-        if (!modelManager.isEngineEnabled()) {
-            Log.d(TAG, "LLM auto-start disabled by preference")
-            return
-        }
-        if (modelManager.activeVariant() == null) {
-            Log.d(TAG, "No LLM model found at ${modelManager.modelDir}")
-            return
-        }
-        startForegroundService(Intent(this, LlmForegroundService::class.java))
     }
 
     private fun scheduleDailyReset() {
@@ -113,9 +94,5 @@ class FocalApplication : Application(), Configuration.Provider {
         prefs.edit()
             .putInt("topic_clustering_config_version", TopicClusteringPolicy.CONFIG_VERSION)
             .apply()
-    }
-
-    companion object {
-        private const val TAG = "FocalApp"
     }
 }

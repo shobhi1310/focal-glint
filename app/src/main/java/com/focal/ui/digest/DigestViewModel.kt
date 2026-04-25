@@ -11,6 +11,8 @@ import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.TopicRepository
 import com.focal.intelligence.ClassificationResult
+import com.focal.intelligence.EngineWarmupCoordinator
+import com.focal.intelligence.ModelManager
 import com.focal.intelligence.TopicEngine
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,7 +39,9 @@ data class DigestUiState(
 class DigestViewModel @Inject constructor(
     private val topicRepository: TopicRepository,
     private val notificationRepository: NotificationRepository,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val modelManager: ModelManager,
+    private val engineWarmupCoordinator: EngineWarmupCoordinator
 ) : ViewModel() {
 
     private val isProcessing = MutableStateFlow(false)
@@ -92,6 +96,9 @@ class DigestViewModel @Inject constructor(
         viewModelScope.launch {
             isProcessing.value = true
             TopicEngine.pendingFullRebuild.set(true)
+            if (modelManager.isEngineEnabled()) {
+                engineWarmupCoordinator.warmUp()
+            }
             val workManager = WorkManager.getInstance(context)
             val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
             workManager.enqueueUniqueWork(

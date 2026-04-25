@@ -5,6 +5,8 @@ import android.content.Intent
 import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.focal.data.repository.NotificationRepository
@@ -108,6 +110,11 @@ class ClassificationWorker @AssistedInject constructor(
 
         try {
             topicEngine.generateTopics()
+            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                TopicNarrativeWorker.WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<TopicNarrativeWorker>().build()
+            )
             Log.d("ClassificationWorker", "Topic generation complete")
         } catch (e: CancellationException) {
             throw e

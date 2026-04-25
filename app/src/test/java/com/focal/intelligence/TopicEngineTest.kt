@@ -29,7 +29,7 @@ class TopicEngineTest {
         notificationRepo = mockk(relaxed = true)
         topicRepo = mockk(relaxed = true)
         TopicEngine.pendingFullRebuild.set(false)
-        engine = TopicEngine(inferenceProvider, embeddingProvider, notificationRepo, topicRepo)
+        engine = TopicEngine(embeddingProvider, notificationRepo, topicRepo)
     }
 
     private fun notification(
@@ -208,5 +208,32 @@ class TopicEngineTest {
         coVerify(exactly = 0) { notificationRepo.markProcessedForTopics(any()) }
         coVerify(exactly = 0) { topicRepo.saveTopic(any()) }
         assertTrue(TopicEngine.pendingFullRebuild.get())
+    }
+
+    @Test
+    fun `generateTopics does not run narrative llm inline`() = runTest {
+        val topic = TopicEntity(
+            id = "t1",
+            headline = "Team thread",
+            summary = "old",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1", "n2")).toString(),
+            sourceApps = JSONArray(listOf("Teams")).toString(),
+            needsNarrativeRegen = true
+        )
+        val first = notification(id = "n1", title = "Alice", content = "Can you review this?", appName = "Teams")
+        val second = notification(id = "n2", title = "Bob", content = "I will check it.", appName = "Teams")
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns emptyList()
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(topic)
+        coEvery { notificationRepo.getByIds(listOf("n1", "n2")) } returns listOf(first, second)
+        coEvery { inferenceProvider.isReady() } returns true
+        coEvery { inferenceProvider.generate(any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
+
+        engine.generateTopics()
+
+        coVerify(exactly = 0) { inferenceProvider.generate(any(), any()) }
+        coVerify(exactly = 0) { topicRepo.updateTopicHeadline(any(), any(), any(), any()) }
     }
 }

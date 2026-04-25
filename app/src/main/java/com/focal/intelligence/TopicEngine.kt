@@ -11,14 +11,12 @@ import com.focal.data.repository.TopicRepository
 import org.json.JSONArray
 
 class TopicEngine(
-    private val inferenceProvider: InferenceProvider,
     private val embeddingProvider: EmbeddingProvider,
     private val notificationRepository: NotificationRepository,
     private val topicRepository: TopicRepository
 ) {
     companion object {
         private const val TAG = "TopicEngine"
-        private const val MAX_LLM_CALLS = 8
 
         val pendingFullRebuild = AtomicBoolean(false)
     }
@@ -88,9 +86,6 @@ class TopicEngine(
             if (processedIds.isNotEmpty()) {
                 notificationRepository.markProcessedForTopics(processedIds)
             }
-
-            // Phase 3: Regenerate narratives for dirty topics
-            regenerateNarratives(dayStart, dayEnd)
 
         } catch (e: CancellationException) {
             throw e
@@ -218,92 +213,6 @@ class TopicEngine(
             sourceApps = JSONArray(existingApps.toList()).toString(),
             channelCount = existingApps.size
         )
-    }
-
-    private suspend fun regenerateNarratives(dayStart: Long, dayEnd: Long) {
-        val allTopicsInWindow = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
-        val dirtyTopics = allTopicsInWindow.filter { it.needsNarrativeRegen }
-
-        if (dirtyTopics.isEmpty()) return
-
-        var llmCallCount = 0
-
-        for (topic in dirtyTopics) {
-            val memberIds = parseJsonArray(topic.notificationIds)
-            val members = notificationRepository.getByIds(memberIds)
-
-            var headline: String
-            var summary: String
-            var isLlmGenerated = false
-            var actions: List<SuggestedAction> = emptyList()
-            val llmSkipped = members.size > 1 && (!inferenceProvider.isReady() || llmCallCount >= MAX_LLM_CALLS)
-
-            if (members.size == 1) {
-                val m = members.first()
-                headline = m.title.take(40)
-                summary = (m.bigText ?: m.content).take(300)
-                isLlmGenerated = true
-                actions = listOf(SuggestedAction(
-                    label = "Open in ${m.appName}",
-                    type = "open_app",
-                    app = m.appName,
-                    packageName = m.packageName
-                ))
-            } else if (inferenceProvider.isReady() && llmCallCount < MAX_LLM_CALLS) {
-                headline = try {
-                    val prompt = PromptBuilder.buildTopicPrompt(members)
-                    val raw = inferenceProvider.generate(prompt, maxTokens = 200)
-                    llmCallCount++
-                    val parsed = LlmResponseParser.parseTopicContent(raw)
-                    if (parsed != null) {
-                        isLlmGenerated = true
-                        summary = parsed.summary
-                        actions = resolveActionPackages(parsed.actions, members)
-                        parsed.title
-                    } else {
-                        summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
-                        "${members.first().appName} · ${members.size} messages"
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Topic generation failed for topic ${topic.id}", e)
-                    summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
-                    "${members.first().appName} · ${members.size} messages"
-                }
-            } else {
-                headline = "${members.first().appName} · ${members.size} messages"
-                summary = members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
-            }
-
-            topicRepository.updateTopicHeadline(
-                topicId = topic.id,
-                headline = headline,
-                summary = summary,
-                briefingContribution = null
-            )
-            if (actions.isNotEmpty()) {
-                topicRepository.updateTopicActions(topic.id, SuggestedAction.listToJson(actions))
-            }
-            if (!llmSkipped) topicRepository.markClean(topic.id)
-        }
-    }
-
-    private fun resolveActionPackages(
-        actions: List<SuggestedAction>,
-        members: List<NotificationEntity>
-    ): List<SuggestedAction> {
-        val knownApps = mapOf(
-            "phone" to "com.android.phone",
-            "messages" to "com.google.android.apps.messaging",
-            "chrome" to "com.android.chrome"
-        )
-        return actions.map { action ->
-            val packageName = members.firstOrNull {
-                it.appName.equals(action.app, ignoreCase = true)
-            }?.packageName
-                ?: knownApps[action.app.lowercase()]
-                ?: ""
-            action.copy(packageName = packageName)
-        }
     }
 
     private fun parseJsonArray(json: String): List<String> {

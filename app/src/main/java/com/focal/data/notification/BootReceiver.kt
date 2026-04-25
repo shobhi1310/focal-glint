@@ -5,8 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.service.notification.NotificationListenerService
-import com.focal.intelligence.ModelManager
-import com.focal.service.LlmForegroundService
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -16,10 +14,6 @@ class BootReceiver : BroadcastReceiver() {
             NotificationListenerService.requestRebind(
                 ComponentName(context, FocalNotificationListener::class.java)
             )
-            val modelManager = ModelManager(context)
-            if (modelManager.isEngineEnabled() && modelManager.activeVariant() != null) {
-                context.startForegroundService(Intent(context, LlmForegroundService::class.java))
-            }
         }
     }
 }

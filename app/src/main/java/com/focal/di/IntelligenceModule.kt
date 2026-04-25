@@ -62,11 +62,10 @@ object IntelligenceModule {
     @Provides
     @Singleton
     fun provideTopicEngine(
-        inferenceProvider: InferenceProvider,
         embeddingProvider: EmbeddingProvider,
         notificationRepository: NotificationRepository,
         topicRepository: TopicRepository
     ): TopicEngine {
-        return TopicEngine(inferenceProvider, embeddingProvider, notificationRepository, topicRepository)
+        return TopicEngine(embeddingProvider, notificationRepository, topicRepository)
     }
 }

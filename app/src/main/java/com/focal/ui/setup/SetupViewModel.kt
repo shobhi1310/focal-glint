@@ -13,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
 import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
@@ -50,7 +51,8 @@ class SetupViewModel @Inject constructor(
     private val database: FocalDatabase,
     private val modelManager: ModelManager,
     private val inferenceProvider: InferenceProvider,
-    private val embeddingProvider: EmbeddingProvider
+    private val embeddingProvider: EmbeddingProvider,
+    private val engineWarmupCoordinator: EngineWarmupCoordinator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SetupUiState())
@@ -159,13 +161,26 @@ class SetupViewModel @Inject constructor(
         if (_uiState.value.engineStopping) return
         modelManager.setEngineEnabled(true)
         modelManager.setPendingRebuild(true)
-        context.startForegroundService(Intent(context, LlmForegroundService::class.java))
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            ClassificationWorker.WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
-            OneTimeWorkRequestBuilder<ClassificationWorker>().build()
-        )
-        _uiState.value = _uiState.value.copy(engineRunning = true, errorMessage = null)
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+        viewModelScope.launch {
+            try {
+                val warmed = engineWarmupCoordinator.warmUp()
+                if (warmed) {
+                    context.startForegroundService(Intent(context, LlmForegroundService::class.java))
+                    WorkManager.getInstance(context).enqueueUniqueWork(
+                        ClassificationWorker.WORK_NAME,
+                        ExistingWorkPolicy.REPLACE,
+                        OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+                    )
+                }
+                _uiState.value = _uiState.value.copy(engineRunning = warmed)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    engineRunning = false,
+                    errorMessage = "Engine start failed: ${e.message}"
+                )
+            }
+        }
     }
 
     fun onStopEngine() {

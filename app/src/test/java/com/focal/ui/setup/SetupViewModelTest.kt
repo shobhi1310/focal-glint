@@ -6,6 +6,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
 import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
@@ -28,6 +29,7 @@ class SetupViewModelTest {
     private lateinit var modelManager: ModelManager
     private lateinit var inferenceProvider: InferenceProvider
     private lateinit var embeddingProvider: EmbeddingProvider
+    private lateinit var engineWarmupCoordinator: EngineWarmupCoordinator
     private lateinit var workManager: WorkManager
 
     @Before
@@ -38,6 +40,7 @@ class SetupViewModelTest {
         modelManager = mockk(relaxed = true)
         inferenceProvider = mockk(relaxed = true)
         embeddingProvider = SwitchableEmbeddingProvider()
+        engineWarmupCoordinator = mockk(relaxed = true)
         workManager = mockk(relaxed = true)
         mockkStatic(NotificationManagerCompat::class)
         mockkStatic(WorkManager::class)
@@ -58,6 +61,7 @@ class SetupViewModelTest {
             every { absolutePath } returns "/models/embeddinggemma.tflite"
         }
         every { inferenceProvider.isReady() } returns false
+        coEvery { engineWarmupCoordinator.warmUp() } returns true
 
         mockkStatic(WorkManager::class)
         workManager = mockk(relaxed = true)
@@ -77,7 +81,8 @@ class SetupViewModelTest {
         database,
         modelManager,
         inferenceProvider,
-        embeddingProvider
+        embeddingProvider,
+        engineWarmupCoordinator
     )
 
     @Test
@@ -181,7 +186,7 @@ class SetupViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.engineRunning)
         verify { modelManager.setEngineEnabled(true) }
-        coVerify(exactly = 0) { inferenceProvider.initialize(any(), any(), any()) }
+        coVerify { engineWarmupCoordinator.warmUp() }
     }
 
     @Test
