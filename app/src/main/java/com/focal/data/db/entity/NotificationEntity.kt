@@ -76,7 +76,10 @@ data class NotificationEntity(
     val processedForTopics: Boolean = false,
 
     @ColumnInfo(name = "content_hash")
-    val contentHash: String? = null
+    val contentHash: String? = null,
+
+    @ColumnInfo(name = "extracted_categories")
+    val extractedCategories: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
