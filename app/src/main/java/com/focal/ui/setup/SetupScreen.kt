@@ -100,6 +100,21 @@ fun SetupScreen(
             item {
                 StepCard(
                     number = 2,
+                    title = "Battery Optimization",
+                    description = "Prevent the OS from freezing Focal in the background. Required on Xiaomi/MIUI to receive notifications while the phone is locked.",
+                    isComplete = state.batteryOptimizationDisabled
+                ) {
+                    if (!state.batteryOptimizationDisabled) {
+                        Button(onClick = viewModel::onRequestBatteryOptimization) {
+                            Text("Disable Optimization")
+                        }
+                    }
+                }
+            }
+
+            item {
+                StepCard(
+                    number = 3,
                     title = "Select Model",
                     description = "Choose the AI model for your device",
                     isComplete = true
@@ -143,7 +158,7 @@ fun SetupScreen(
                 val isDownloading = state.downloadProgress != null
 
                 StepCard(
-                    number = 3,
+                    number = 4,
                     title = "Download Model",
                     description = "Download the selected model to your device",
                     isComplete = modelAvailable
@@ -184,7 +199,7 @@ fun SetupScreen(
 
             item {
                 StepCard(
-                    number = 4,
+                    number = 5,
                     title = "Backend",
                     description = "Choose GPU (faster) or CPU (more compatible) for model inference",
                     isComplete = true
@@ -220,7 +235,7 @@ fun SetupScreen(
                 val isDownloading = state.downloadProgress != null
 
                 StepCard(
-                    number = 5,
+                    number = 6,
                     title = "Start Engine",
                     description = "Load the AI model into memory for classification",
                     isComplete = state.engineRunning
@@ -240,7 +255,7 @@ fun SetupScreen(
 
             item {
                 StepCard(
-                    number = 6,
+                    number = 7,
                     title = "Embedding Model",
                     description = "Place embeddinggemma-300M_seq1024_mixed-precision.tflite in the app's embeddings folder to enable smart notification grouping.",
                     isComplete = state.embeddingModelAvailable
@@ -258,7 +273,7 @@ fun SetupScreen(
 
             item {
                 StepCard(
-                    number = 7,
+                    number = 8,
                     title = "Developer Reset",
                     description = "Delete all Room database data and start fresh without clearing app data",
                     isComplete = false

@@ -2,6 +2,8 @@ package com.focal.ui.setup
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import com.focal.service.LlmForegroundService
@@ -31,6 +33,7 @@ import javax.inject.Inject
 
 data class SetupUiState(
     val notificationAccessGranted: Boolean = false,
+    val batteryOptimizationDisabled: Boolean = false,
     val selectedModel: ModelVariant = ModelVariant.GEMMA3_1B,
     val activeModel: ModelVariant? = null,
     val modelsOnDevice: Set<ModelVariant> = emptySet(),
@@ -66,16 +69,27 @@ class SetupViewModel @Inject constructor(
         val activeModel = modelManager.activeVariant()
         val selected = modelManager.getSelectedVariant() ?: activeModel ?: _uiState.value.selectedModel
         val onDevice = ModelVariant.entries.filter { modelManager.isModelAvailable(it) }.toSet()
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         _uiState.value = _uiState.value.copy(
             notificationAccessGranted = NotificationManagerCompat
                 .getEnabledListenerPackages(context)
                 .contains(context.packageName),
+            batteryOptimizationDisabled = pm.isIgnoringBatteryOptimizations(context.packageName),
             selectedModel = selected,
             activeModel = activeModel,
             modelsOnDevice = onDevice,
             engineRunning = inferenceProvider.isReady(),
             useGpu = modelManager.getBackendPreference(),
             embeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable
+        )
+    }
+
+    fun onRequestBatteryOptimization() {
+        context.startActivity(
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
         )
     }
 
