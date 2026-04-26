@@ -1,5 +1,6 @@
 package com.focal.ui.digest
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,8 +41,9 @@ fun TopicCard(
     val category = getAppCategory(topic.actionPackage ?: "")
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

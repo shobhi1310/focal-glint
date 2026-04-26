@@ -163,7 +163,7 @@ fun PulseDetailScreen(
                         item { SectionHeader(title = "BREAKDOWN") }
                         items(details) { (label, value) ->
                             Surface(
-                                color = MaterialTheme.colorScheme.surface,
+                                color = MaterialTheme.colorScheme.surfaceContainer,
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Row(
