@@ -1,5 +1,11 @@
 package com.focal.ui.pulse
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -30,12 +37,23 @@ fun PulseCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "live")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(14.dp).animateContentSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -49,7 +67,7 @@ fun PulseCard(
                 if (state != null && System.currentTimeMillis() - state.lastUpdatedAt < 5 * 60 * 1000) {
                     Text(
                         text = "●",
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.semantics { contentDescription = "Recently updated" }
                     )

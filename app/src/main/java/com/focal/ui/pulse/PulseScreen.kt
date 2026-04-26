@@ -1,5 +1,10 @@
 package com.focal.ui.pulse
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +41,16 @@ fun PulseScreen(
     val recentlyUpdated = state.states.values.count {
         System.currentTimeMillis() - it.lastUpdatedAt < 60_000
     }
+    val infiniteTransition = rememberInfiniteTransition(label = "live")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
 
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
@@ -68,7 +83,7 @@ fun PulseScreen(
                     Text(
                         "LIVE",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = pulseAlpha)
                     )
                 }
             }
