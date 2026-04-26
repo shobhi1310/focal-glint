@@ -53,7 +53,7 @@ import com.focal.ui.components.UserPreference
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.VolumeOff
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material3.Icon
 import com.focal.ui.theme.ThemeMode
 import com.focal.ui.theme.ThemePreference
@@ -172,7 +172,7 @@ fun TuneScreen(
                         modifier = Modifier.weight(1f)
                     )
                     ExplanationCard(
-                        icon = { Icon(Icons.Outlined.VolumeOff, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.AutoMirrored.Outlined.VolumeOff, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         title = "Noise",
                         description = "Silenced. Bundled into a footnote.",
                         modifier = Modifier.weight(1f)

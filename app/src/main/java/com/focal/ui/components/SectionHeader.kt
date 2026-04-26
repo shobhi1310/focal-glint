@@ -20,7 +20,7 @@ fun SectionHeader(title: String, count: Int? = null, modifier: Modifier = Modifi
                 letterSpacing = 2.sp,
                 fontWeight = FontWeight.Medium
             ),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
