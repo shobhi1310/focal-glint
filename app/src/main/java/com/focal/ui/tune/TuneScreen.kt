@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -38,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +50,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.components.UserPreference
-import com.focal.ui.theme.FocalAccent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.VolumeOff
+import androidx.compose.material3.Icon
 import com.focal.ui.theme.ThemeMode
 import com.focal.ui.theme.ThemePreference
 
@@ -80,7 +85,7 @@ fun TuneScreen(
                 Text(
                     text = "Three tiers. Pick by hand, or let the model learn from how you read.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -101,7 +106,7 @@ fun TuneScreen(
                     placeholder = { Text("Enter your name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                         focusedBorderColor = MaterialTheme.colorScheme.primary
@@ -155,19 +160,19 @@ fun TuneScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ExplanationCard(
-                        icon = "\uD83D\uDD12",
+                        icon = { Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         title = "Matters",
                         description = "Always surface. You said so.",
                         modifier = Modifier.weight(1f)
                     )
                     ExplanationCard(
-                        icon = "\u2728",
+                        icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         title = "Auto",
                         description = "Let Focal decide what\u2019s worth telling you.",
                         modifier = Modifier.weight(1f)
                     )
                     ExplanationCard(
-                        icon = "\uD83D\uDD07",
+                        icon = { Icon(Icons.Outlined.VolumeOff, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         title = "Noise",
                         description = "Silenced. Bundled into a footnote.",
                         modifier = Modifier.weight(1f)
@@ -187,7 +192,7 @@ fun TuneScreen(
                     Text(
                         text = "No apps seen yet. Notifications will appear here as they arrive.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
@@ -209,7 +214,7 @@ fun TuneScreen(
                 ) {
                     Text(
                         text = "Developer Settings",
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -219,7 +224,7 @@ fun TuneScreen(
         state.snackbarMessage?.let { message ->
             Snackbar(
                 modifier = Modifier.padding(16.dp),
-                shape = RoundedCornerShape(8.dp)
+                shape = MaterialTheme.shapes.small
             ) {
                 Text(text = message)
             }
@@ -229,24 +234,21 @@ fun TuneScreen(
 
 @Composable
 private fun ExplanationCard(
-    icon: String,
+    icon: @Composable () -> Unit,
     title: String,
     description: String,
     modifier: Modifier = Modifier
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier.height(IntrinsicSize.Max)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text(
-                text = icon,
-                fontSize = 20.sp
-            )
+            icon()
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelMedium,
@@ -256,7 +258,7 @@ private fun ExplanationCard(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp
             )
         }
@@ -294,7 +296,7 @@ private fun TuneAppRow(
             Text(
                 text = if (app.isUserSet) "Set by you" else "system default",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -326,15 +328,16 @@ private fun MaNPill(
     onSelect: (Int) -> Unit
 ) {
     val labels = listOf("M", "A", "N")
+    val contentDescriptions = listOf("Matters", "Auto", "Noise")
 
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier
             .border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(20.dp)
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = MaterialTheme.shapes.large
             )
     ) {
         Row(
@@ -346,13 +349,13 @@ private fun MaNPill(
                 val isSelected = index == selected
                 val bgColor = when {
                     !isSelected -> MaterialTheme.colorScheme.surface
-                    index == 1 -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f) // A: darker fill
-                    else -> FocalAccent // M or N when user-set
+                    index == 1 -> MaterialTheme.colorScheme.surfaceContainerHigh // A: subtle fill
+                    else -> MaterialTheme.colorScheme.primary // M or N when user-set
                 }
                 val textColor = when {
-                    !isSelected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    !isSelected -> MaterialTheme.colorScheme.outline
                     index == 1 -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.surface // contrast text on accent
+                    else -> MaterialTheme.colorScheme.onPrimary // contrast text on accent
                 }
 
                 Box(
@@ -360,7 +363,8 @@ private fun MaNPill(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(bgColor)
-                        .clickable { onSelect(index) },
+                        .clickable { onSelect(index) }
+                        .semantics { contentDescription = contentDescriptions[index] },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

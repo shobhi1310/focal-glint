@@ -3,7 +3,6 @@ package com.focal.ui.setup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -130,7 +129,7 @@ fun SetupScreen(
                                             if (variant in state.modelsOnDevice) append(" · on device")
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -167,7 +166,7 @@ fun SetupScreen(
                                 Text(
                                     text = "Re-download",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -210,7 +209,7 @@ fun SetupScreen(
                         Text(
                             text = "Switching backend...",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -252,7 +251,7 @@ fun SetupScreen(
                         color = if (state.embeddingModelAvailable)
                             MaterialTheme.colorScheme.primary
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -282,7 +281,7 @@ fun SetupScreen(
                                 color = if (message.startsWith("Failed"))
                                     MaterialTheme.colorScheme.error
                                 else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -308,7 +307,7 @@ private fun StepCard(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -328,13 +327,13 @@ private fun StepCard(
                     color = if (isComplete)
                         MaterialTheme.colorScheme.primary
                     else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
             content()
