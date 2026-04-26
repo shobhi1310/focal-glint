@@ -8,9 +8,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.ui.components.AppIconCache
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class TuneAppItem(
     val packageName: String,
     val appName: String,
@@ -78,6 +81,11 @@ class TuneViewModel @Inject constructor(
                 }
 
             _uiState.value = _uiState.value.copy(apps = apps)
+
+            val packageNames = apps.map { it.packageName }
+            viewModelScope.launch(Dispatchers.IO) {
+                AppIconCache.prewarm(context, packageNames)
+            }
         }
     }
 

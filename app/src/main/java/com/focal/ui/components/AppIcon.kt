@@ -9,10 +9,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -28,29 +31,31 @@ fun AppIcon(
     size: Dp = 36.dp,
     modifier: Modifier = Modifier
 ) {
+    val cached = remember(packageName) { AppIconCache.get(packageName) }
+
+    if (cached != null) {
+        Image(
+            bitmap = cached,
+            contentDescription = appName,
+            modifier = modifier.size(size).clip(CircleShape)
+        )
+        return
+    }
+
     val context = LocalContext.current
-    val bitmap by produceState(
-        initialValue = AppIconCache.get(packageName),
-        key1 = packageName
-    ) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) {
-                AppIconCache.load(context.applicationContext, packageName)
-            }
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, key1 = packageName) {
+        value = withContext(Dispatchers.IO) {
+            AppIconCache.load(context.applicationContext, packageName)
         }
     }
-    val resolvedBitmap = bitmap
 
-    if (resolvedBitmap != null) {
+    if (bitmap != null) {
         Image(
-            bitmap = resolvedBitmap,
+            bitmap = bitmap!!,
             contentDescription = appName,
-            modifier = modifier
-                .size(size)
-                .clip(CircleShape)
+            modifier = modifier.size(size).clip(CircleShape)
         )
     } else {
-        // Fallback: first letter in circle
         Box(
             modifier = modifier
                 .size(size)
