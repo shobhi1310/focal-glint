@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -24,10 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.focal.ui.theme.FocalAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,15 +61,14 @@ fun PulseScreen(
                     Text(
                         "Ask your day a question.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (state.states.values.any { System.currentTimeMillis() - it.lastUpdatedAt < 5 * 60 * 1000 }) {
                     Text(
                         "LIVE",
                         style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -80,7 +76,7 @@ fun PulseScreen(
                 Text(
                     text = "● ${state.configs.size} widgets · $recentlyUpdated updated in the last minute",
                     style = MaterialTheme.typography.bodySmall,
-                    color = FocalAccent,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
@@ -96,7 +92,7 @@ fun PulseScreen(
                         Text(
                             "No widgets yet",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(onClick = viewModel::onShowWizard) { Text("+ New widget") }
@@ -121,7 +117,7 @@ fun PulseScreen(
                 Button(
                     onClick = viewModel::onShowWizard,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = MaterialTheme.shapes.extraLarge
                 ) {
                     Text("+ New widget")
                 }

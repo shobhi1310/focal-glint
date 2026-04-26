@@ -6,22 +6,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.WidgetConfigEntity
 import com.focal.data.db.entity.WidgetStateEntity
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.formatRelativeTime
-import com.focal.ui.theme.FocalAccent
 import kotlinx.serialization.json.Json
 
 @Composable
@@ -33,7 +32,7 @@ fun PulseCard(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -45,18 +44,22 @@ fun PulseCard(
                 Text(
                     text = config.category.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    letterSpacing = 2.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (state != null && System.currentTimeMillis() - state.lastUpdatedAt < 5 * 60 * 1000) {
-                    Text(text = "●", color = FocalAccent, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = "●",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.semantics { contentDescription = "Recently updated" }
+                    )
                 }
             }
             Text(
                 text = config.title,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 2.dp)
             )
             Text(
@@ -70,7 +73,7 @@ fun PulseCard(
             state?.badge?.let { badge ->
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Text(
@@ -104,7 +107,7 @@ fun PulseCard(
                     Text(
                         text = formatRelativeTime(state.lastUpdatedAt),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }

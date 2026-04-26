@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,9 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.WidgetConfigEntity
-import com.focal.ui.theme.FocalAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,8 +54,7 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                     }
                 }",
                 style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 2.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             when (step) {
                 1 -> {
@@ -71,9 +67,9 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                     STARTER_TEMPLATES.forEach { template ->
                         val isSelected = selectedTemplate == template
                         Surface(
-                            color = if (isSelected) FocalAccent.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                            border = if (isSelected) BorderStroke(1.dp, FocalAccent) else null,
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.medium,
+                            border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
@@ -87,17 +83,17 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                                 Text(
                                     template.description,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = MaterialTheme.shapes.medium,
                         border = BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            MaterialTheme.colorScheme.outlineVariant
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -106,7 +102,7 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                         Text(
                             "Ask a custom question... (coming soon)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            color = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.padding(14.dp)
                         )
                     }
@@ -120,16 +116,16 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                     )
                     Surface(
-                        color = FocalAccent.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, FocalAccent),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.medium,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
                                 "RECIPE · AUTO",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 "$selectedOperation of ${selectedTemplate?.title ?: "items"}",
@@ -142,8 +138,7 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                     Text(
                         "OPERATION",
                         style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(8.dp))
                     ALL_OPERATIONS.chunked(3).forEach { row ->
@@ -154,9 +149,9 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                             row.forEach { (op, desc) ->
                                 val isSelected = selectedOperation == op
                                 Surface(
-                                    color = if (isSelected) FocalAccent.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = if (isSelected) BorderStroke(1.dp, FocalAccent) else null,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.small,
+                                    border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                                     modifier = Modifier
                                         .weight(1f)
                                         .clickable { selectedOperation = op }
@@ -171,9 +166,7 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                                         Text(
                                             desc,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.5f
-                                            )
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -191,9 +184,9 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                     )
                     Surface(
-                        color = if (useAutoApps) FocalAccent.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        border = if (useAutoApps) BorderStroke(1.dp, FocalAccent) else null,
+                        color = if (useAutoApps) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.medium,
+                        border = if (useAutoApps) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { useAutoApps = true }
@@ -203,7 +196,7 @@ fun PulseWizard(onDismiss: () -> Unit, onCreate: (WidgetConfigEntity) -> Unit) {
                             Text(
                                 "Picks relevant apps from your notifications",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
