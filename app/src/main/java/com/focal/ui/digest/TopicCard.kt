@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,7 +27,6 @@ import com.focal.data.db.entity.TopicEntity
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.formatRelativeTime
 import com.focal.ui.components.getAppCategory
-import com.focal.ui.theme.FocalAccent
 import org.json.JSONArray
 
 @Composable
@@ -43,7 +41,7 @@ fun TopicCard(
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth().clickable { onClick() }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -56,23 +54,22 @@ fun TopicCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "●",
-                        color = FocalAccent,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 8.sp,
                         modifier = Modifier.padding(end = 6.dp)
                     )
                     Text(
                         text = "MATTERS · $category",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.5.sp,
                             fontWeight = FontWeight.Medium
                         ),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Text(
                     text = formatRelativeTime(topic.updatedAt),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    color = MaterialTheme.colorScheme.outline
                 )
             }
 
@@ -93,7 +90,7 @@ fun TopicCard(
             Text(
                 text = topic.summary,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -121,14 +118,14 @@ fun TopicCard(
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = app.take(1).uppercase(),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -137,7 +134,7 @@ fun TopicCard(
                     Text(
                         text = "$notificationCount notifications",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }

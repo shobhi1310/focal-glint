@@ -1,7 +1,6 @@
 package com.focal.ui.digest
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,12 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,7 +60,7 @@ fun TopicDetailScreen(
             Text(
                 text = "Topic not found",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         return
@@ -99,17 +94,16 @@ fun TopicDetailScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "\u25CF",
-                    color = FocalAccent,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 10.sp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "${category.uppercase()} \u00B7 ${relativeTime.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        letterSpacing = 2.sp,
                         fontWeight = FontWeight.Medium
                     ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -152,7 +146,7 @@ fun TopicDetailScreen(
                 SourceNotificationRow(notification = notification)
                 if (index < notifications.lastIndex) {
                     HorizontalDivider(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -169,18 +163,17 @@ fun TopicDetailScreen(
 @Composable
 private fun QuietSummaryCard(summary: String) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "SUMMARY",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    letterSpacing = 2.sp,
                     fontWeight = FontWeight.Medium
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -223,7 +216,7 @@ private fun SourceNotificationRow(notification: NotificationEntity) {
             Text(
                 text = notification.bigText ?: notification.content,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -235,7 +228,7 @@ private fun SourceNotificationRow(notification: NotificationEntity) {
         Text(
             text = formatRelativeTime(notification.postedAt),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -256,7 +249,7 @@ private fun SuggestedNextStepsSection(
         Surface(
             color = if (isPrimary) MaterialTheme.colorScheme.onBackground
                     else MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(14.dp),
+            shape = MaterialTheme.shapes.medium,
             border = if (!isPrimary) BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)) else null,
             modifier = Modifier
                 .fillMaxWidth()
@@ -285,7 +278,7 @@ private fun SuggestedNextStepsSection(
                     text = "\u2192 ${action.app.uppercase()}",
                     style = MaterialTheme.typography.labelMedium,
                     color = if (isPrimary) MaterialTheme.colorScheme.background.copy(alpha = 0.6f)
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

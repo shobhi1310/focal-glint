@@ -19,11 +19,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.components.SectionHeader
-import com.focal.ui.theme.FocalAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,10 +46,8 @@ fun DigestScreen(
             item {
                 Text(
                     text = state.dayTimeLabel,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        letterSpacing = 2.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -62,7 +58,7 @@ fun DigestScreen(
                     append(parts.getOrElse(0) { "" })
                     if (parts.size > 1) {
                         append(", ")
-                        withStyle(SpanStyle(color = FocalAccent)) {
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
                             append(parts[1])
                         }
                     }
@@ -85,7 +81,7 @@ fun DigestScreen(
                 Text(
                     text = statsText,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -101,7 +97,7 @@ fun DigestScreen(
                     Text(
                         text = "Refreshing your digest...",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
@@ -111,7 +107,7 @@ fun DigestScreen(
                         Text(
                             text = "No notifications yet. Make sure notification access is enabled in Settings.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 32.dp)
                         )
                     }
@@ -120,7 +116,7 @@ fun DigestScreen(
                         Text(
                             text = "Processing notifications into stories...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 32.dp)
                         )
                     }

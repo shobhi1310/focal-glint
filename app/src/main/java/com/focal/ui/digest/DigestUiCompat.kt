@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -24,9 +23,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
-
-internal val FocalAccent: Color
-    get() = Color(0xFFC8956C)
 
 @Composable
 internal fun AppIcon(
@@ -58,14 +54,14 @@ internal fun AppIcon(
             modifier = modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = appName.take(1).uppercase(),
                 fontSize = (size.value * 0.38f).sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -77,10 +73,9 @@ internal fun SectionHeader(title: String, count: Int? = null, modifier: Modifier
         Text(
             text = if (count != null) "$title · $count" else title,
             style = MaterialTheme.typography.labelSmall.copy(
-                letterSpacing = 2.sp,
                 fontWeight = FontWeight.Medium
             ),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

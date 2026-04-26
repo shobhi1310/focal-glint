@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -25,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.focal.data.db.entity.NotificationEntity
 
 @Composable
@@ -49,30 +47,29 @@ fun CategorySection(
             Text(
                 text = "$label · $count",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    letterSpacing = 2.sp,
                     fontWeight = FontWeight.Medium
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                tint = MaterialTheme.colorScheme.outline
             )
         }
 
         AnimatedVisibility(visible = expanded) {
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(12.dp)
+                shape = MaterialTheme.shapes.medium
             ) {
                 Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                     notifications.forEachIndexed { index, notification ->
                         NotificationCard(notification = notification)
                         if (index < notifications.lastIndex) {
                             HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh
                             )
                         }
                     }
