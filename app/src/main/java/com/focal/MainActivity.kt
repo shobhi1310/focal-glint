@@ -13,6 +13,8 @@ import androidx.lifecycle.lifecycleScope
 import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.ModelManager
 import com.focal.service.LlmForegroundService
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import com.focal.ui.navigation.FocalNavigation
 import com.focal.ui.theme.FocalTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,9 +33,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestBatteryExemptionIfNeeded()
         warmEngines()
+        @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
         setContent {
+            val windowSizeClass = calculateWindowSizeClass(this)
             FocalTheme {
-                FocalNavigation()
+                FocalNavigation(widthSizeClass = windowSizeClass.widthSizeClass)
             }
         }
     }
