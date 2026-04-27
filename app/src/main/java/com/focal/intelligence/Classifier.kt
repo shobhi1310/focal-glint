@@ -5,14 +5,15 @@ import com.focal.data.db.entity.ExtractedDataEntity
 import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.repository.WidgetRepository
 import com.google.ai.edge.litertlm.ToolSet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 
 private const val TAG = "Classifier"
 private const val CLASSIFICATION_SYSTEM =
-    "You are a notification classifier. Classify each notification as 'matters' (personally relevant to the user) or 'noise' (generic, promotional, or irrelevant). Call classifyNotification exactly once. No prose."
+    "You classify one Android notification using tool calls only. Call classifyNotification exactly once. Use category exactly 'matters' for direct human messages/calls, OTP/security alerts, banking/payment confirmations, orders/deliveries, bookings/travel, meetings, work tasks, mentions, or assigned actions. Use category exactly 'noise' for ads, offers, engagement prompts, newsletters, feeds, news/weather, social posts/reels/reactions, job/course promos, vague status-only items, or media-only items. Use a short snake_case reason. No prose."
 private const val BATCH_CLASSIFICATION_SYSTEM =
-    "You are a notification classifier. For each notification below, think through what kind of notification it is — for example: personal message, marketing/promotional, transactional (receipt/OTP/delivery), service update, social media post, news/alert, or other. Then decide whether it genuinely matters to this specific user personally, or is just noise. Call classifyNotification once for each notification using its [index]. Category must be exactly 'matters' or 'noise'. No prose."
+    "You classify Android notifications using tool calls only. For every [index], call classifyNotification exactly once with the same index. Use category exactly 'matters' for direct human messages/calls, OTP/security alerts, banking/payment confirmations, orders/deliveries, bookings/travel, meetings, work tasks, mentions, or assigned actions. Use category exactly 'noise' for ads, offers, engagement prompts, newsletters, feeds, news/weather, social posts/reels/reactions, job/course promos, vague status-only items, or media-only items. Use a short snake_case reason. No prose."
 private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
 
 internal fun isSyntheticToolEcho(text: String): Boolean {
@@ -90,6 +91,8 @@ class Classifier(
                 classifiedBy = "llm",
                 reason = tool.lastReason ?: "No reason provided"
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "LLM inference failed", e)
             ClassificationResult(
@@ -138,6 +141,8 @@ class Classifier(
                 }
                 notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "batch LLM inference failed", e)
             notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
@@ -162,9 +167,16 @@ class Classifier(
         allTools.addAll(extractionTools.values)
 
         val systemPrompt = BATCH_CLASSIFICATION_SYSTEM +
-            "\n\nAfter classifying each notification, if it is 'matters', also call the appropriate extraction tool(s) for it. " +
-            "A notification can match multiple extraction tools (e.g., a food delivery payment is both finance and logistics). " +
-            "Available extraction categories: $allToolCategories."
+            "\n\nAfter all classifications, internally compare notifications across the whole batch before choosing extraction calls. " +
+            "Do not output reasoning. Extraction calls represent distinct real-world events, not notification count. " +
+            "If multiple notifications describe the same event across SMS, Gmail, bank app, payment app, or other channels, call the extraction tool only once using the most authoritative notification index. " +
+            "For finance duplicates, same rounded amount plus same direction in one batch usually means one transaction; prefer bank SMS, then bank alert email, then receipt email, then app push. " +
+            "For personal duplicates, collapse same sender plus same channel into one extractPersonal call and set count to the number of collapsed messages. " +
+            "For logistics duplicates, collapse same merchant/order flow and keep the latest or most advanced status. " +
+            "For work duplicates, collapse same sender plus same work entity/thread. " +
+            "Call extraction tools only for 'matters' notifications and only when required fields are explicit. " +
+            "A single notification may call multiple extraction tools only when it truly contains multiple event types. " +
+            "Available extraction categories: $allToolCategories. No prose."
 
         return try {
             var messageCount = 0
@@ -204,6 +216,8 @@ class Classifier(
                 }
                 notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "classifyAndExtract failed", e)
             notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }

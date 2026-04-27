@@ -144,6 +144,53 @@ class ClassifierTest {
     }
 
     @Test
+    fun `classifyBatch system prompt requires one classify tool call per index`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        var capturedSystemInstruction: String? = null
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            capturedSystemInstruction = firstArg()
+            emptyFlow()
+        }
+
+        classifier.classifyBatch(listOf(notification(), notification()))
+
+        val prompt = capturedSystemInstruction.orEmpty()
+        assertTrue(prompt.contains("tool calls only"))
+        assertTrue(prompt.contains("For every [index], call classifyNotification exactly once"))
+        assertTrue(prompt.contains("Use category exactly 'matters'"))
+        assertTrue(prompt.contains("Use category exactly 'noise'"))
+        assertTrue(prompt.contains("No prose"))
+    }
+
+    @Test
+    fun `classifyAndExtractBatch system prompt deduplicates extraction by real-world event`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        var capturedSystemInstruction: String? = null
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+            capturedSystemInstruction = firstArg()
+            emptyFlow()
+        }
+
+        classifier.classifyAndExtractBatch(
+            notifications = listOf(notification(), notification()),
+            extractionTools = ExtractionToolFactory.createTools(listOf("finance", "work", "personal", "logistics"))
+        )
+
+        val prompt = capturedSystemInstruction.orEmpty()
+        assertTrue(prompt.contains("internally compare notifications across the whole batch"))
+        assertTrue(prompt.contains("Do not output reasoning"))
+        assertTrue(prompt.contains("distinct real-world events, not notification count"))
+        assertTrue(prompt.contains("call the extraction tool only once"))
+        assertTrue(prompt.contains("same rounded amount plus same direction"))
+        assertTrue(prompt.contains("prefer bank SMS"))
+        assertTrue(prompt.contains("collapse same sender plus same channel"))
+        assertTrue(prompt.contains("collapse same merchant/order flow"))
+        assertTrue(prompt.contains("collapse same sender plus same work entity/thread"))
+        assertTrue(prompt.contains("only when required fields are explicit"))
+        assertTrue(prompt.contains("Available extraction categories: finance, work, personal, logistics"))
+    }
+
+    @Test
     fun `classifyBatch returns pending for unclassified index`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
