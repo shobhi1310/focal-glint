@@ -5,15 +5,15 @@ import com.focal.data.db.entity.NotificationEntity
 object PromptBuilder {
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {
-        val message = notification.bigText ?: notification.content
-        return "Package: ${notification.packageName}\nApp: ${notification.appName}\nTitle: ${notification.title}\nContent: ${message.take(200)}"
+        val body = (notification.bigText ?: notification.content).replace('\n', ' ').take(200)
+        return "[1] Title: ${notification.title} · Content: $body"
     }
 
     fun buildBatchClassificationPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
         notifications.forEachIndexed { i, n ->
-            val body = (n.bigText ?: n.content).take(200)
-            sb.appendLine("[${i + 1}] Package: ${n.packageName} · App: ${n.appName} · Title: ${n.title} · Content: $body")
+            val body = (n.bigText ?: n.content).replace('\n', ' ').take(200)
+            sb.appendLine("[${i + 1}] Title: ${n.title} · Content: $body")
         }
         return sb.toString().trimEnd()
     }

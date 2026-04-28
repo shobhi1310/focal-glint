@@ -77,7 +77,7 @@ class TopicNarrativeProcessorTest {
         coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returnsMany listOf(listOf(topic), emptyList())
         coEvery { notificationRepo.getByIds(listOf("n1", "n2")) } returns listOf(first, second)
         every { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns ""
+        coEvery { inferenceProvider.generate(any(), any(), any()) } returns ""
 
         processor.processDirtyTopics()
 
@@ -109,12 +109,12 @@ class TopicNarrativeProcessorTest {
         )
         coEvery { notificationRepo.getByIds(listOf("n1", "n2")) } returns listOf(first, second)
         every { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
+        coEvery { inferenceProvider.generate(any(), any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
 
         val hasMore = processor.processDirtyTopics()
 
         org.junit.Assert.assertTrue(hasMore)
-        coVerify(exactly = 1) { inferenceProvider.generate(any(), any()) }
+        coVerify(exactly = 1) { inferenceProvider.generate(any(), any(), any()) }
         coVerify { topicRepo.markClean("t1") }
         coVerify(exactly = 0) { topicRepo.markClean("t2") }
     }
@@ -150,7 +150,7 @@ class TopicNarrativeProcessorTest {
         )
         coEvery { notificationRepo.getByIds(listOf("m1", "m2")) } returns listOf(first, second)
         every { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
+        coEvery { inferenceProvider.generate(any(), any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
 
         processor.processDirtyTopics()
 

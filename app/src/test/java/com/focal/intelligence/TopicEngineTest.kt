@@ -229,11 +229,11 @@ class TopicEngineTest {
         coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(topic)
         coEvery { notificationRepo.getByIds(listOf("n1", "n2")) } returns listOf(first, second)
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generate(any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
+        coEvery { inferenceProvider.generate(any(), any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
 
         engine.generateTopics()
 
-        coVerify(exactly = 0) { inferenceProvider.generate(any(), any()) }
+        coVerify(exactly = 0) { inferenceProvider.generate(any(), any(), any()) }
         coVerify(exactly = 0) { topicRepo.updateTopicHeadline(any(), any(), any(), any()) }
     }
 }

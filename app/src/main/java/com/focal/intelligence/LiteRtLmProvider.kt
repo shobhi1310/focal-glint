@@ -17,6 +17,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import javax.inject.Inject
@@ -30,8 +33,11 @@ class LiteRtLmProvider @Inject constructor(
     private var engine: Engine? = null
     private var activeConversation: AutoCloseable? = null
 
-    // Single thread ensures LiteRT's one-session-at-a-time constraint without locks.
-    // Callers suspend (not block) while waiting — UI stays responsive.
+    // Serializes inference. tryLock() lets UI callers fail fast when busy
+    // instead of stacking up behind a long-running background batch.
+    private val inferenceMutex = Mutex()
+
+    // Single thread ensures LiteRT's one-session-at-a-time constraint at the engine level.
     // Recreated on each initialize() so Stop → Start works correctly.
     private var llmDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
@@ -61,25 +67,35 @@ class LiteRtLmProvider @Inject constructor(
         initialize(modelPath, useGpu, maxContextTokens)
     }
 
-    override suspend fun generate(prompt: String, maxTokens: Int): String {
+    override suspend fun generate(prompt: String, maxTokens: Int, waitIfBusy: Boolean): String {
         val eng = engine
             ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
 
-        return withContext(llmDispatcher) {
-            // Close any session left open by generateWithTools before starting
-            activeConversation?.close()
-            activeConversation = null
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
 
-            val conversationConfig = ConversationConfig(
-                samplerConfig = SamplerConfig(
-                    topK = 64,
-                    topP = 0.95,
-                    temperature = 1.0,
+        return try {
+            withContext(llmDispatcher) {
+                activeConversation?.close()
+                activeConversation = null
+
+                val conversationConfig = ConversationConfig(
+                    samplerConfig = SamplerConfig(
+                        topK = 64,
+                        topP = 0.95,
+                        temperature = 1.0,
+                    )
                 )
-            )
-            eng.createConversation(conversationConfig).use { conversation ->
-                conversation.sendMessage(prompt).toString()
+                eng.createConversation(conversationConfig).use { conversation ->
+                    conversation.sendMessage(prompt).toString()
+                }
             }
+        } finally {
+            inferenceMutex.unlock()
         }
     }
 
@@ -87,31 +103,49 @@ class LiteRtLmProvider @Inject constructor(
     override suspend fun generateWithTools(
         systemInstruction: String,
         prompt: String,
-        tools: List<ToolSet>
+        tools: List<ToolSet>,
+        waitIfBusy: Boolean
     ): Flow<Message> {
         val eng = engine
             ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
 
-        return withContext(llmDispatcher) {
-            // Close any previous session (generate or generateWithTools) before starting
-            activeConversation?.close()
-            activeConversation = null
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
 
-            Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
-            val config = ConversationConfig(
-                systemInstruction = Contents.of(systemInstruction),
-                tools = tools.map { tool(it) },
-                automaticToolCalling = true,
-                channels = THINKING_CHANNELS
-            )
-            ExperimentalFlags.enableConversationConstrainedDecoding = true
-            val conv = try {
-                eng.createConversation(config)
+        return flow {
+            try {
+                withContext(llmDispatcher) {
+                    activeConversation?.close()
+                    activeConversation = null
+
+                    Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
+                    val config = ConversationConfig(
+                        systemInstruction = Contents.of(systemInstruction),
+                        tools = tools.map { tool(it) },
+                        automaticToolCalling = true,
+                        channels = THINKING_CHANNELS
+                    )
+                    ExperimentalFlags.enableConversationConstrainedDecoding = true
+                    val conv = try {
+                        eng.createConversation(config)
+                    } finally {
+                        ExperimentalFlags.enableConversationConstrainedDecoding = false
+                    }
+                    activeConversation = conv as? AutoCloseable
+                    try {
+                        conv.sendMessageAsync(prompt).collect { emit(it) }
+                    } finally {
+                        (conv as? AutoCloseable)?.close()
+                        activeConversation = null
+                    }
+                }
             } finally {
-                ExperimentalFlags.enableConversationConstrainedDecoding = false
+                inferenceMutex.unlock()
             }
-            activeConversation = conv as? AutoCloseable
-            conv.sendMessageAsync(prompt)
         }
     }
 

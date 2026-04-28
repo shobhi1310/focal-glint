@@ -17,10 +17,14 @@ import com.focal.intelligence.TopicEngine
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,6 +49,9 @@ class DigestViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val isProcessing = MutableStateFlow(false)
+
+    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val events: SharedFlow<String> = _events.asSharedFlow()
 
     @Suppress("UNCHECKED_CAST")
     val uiState: StateFlow<DigestUiState> = combine(
@@ -94,12 +101,21 @@ class DigestViewModel @Inject constructor(
 
     fun onRefresh() {
         viewModelScope.launch {
+            val workManager = WorkManager.getInstance(context)
+            val current = workManager
+                .getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
+                .first()
+            val alreadyBusy = current.any { !it.state.isFinished }
+            if (alreadyBusy) {
+                _events.tryEmit("Already curating your digest — try again in a few seconds.")
+                return@launch
+            }
+
             isProcessing.value = true
             TopicEngine.pendingFullRebuild.set(true)
             if (modelManager.isEngineEnabled()) {
                 engineWarmupCoordinator.warmUp()
             }
-            val workManager = WorkManager.getInstance(context)
             val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
             workManager.enqueueUniqueWork(
                 ClassificationWorker.WORK_NAME,

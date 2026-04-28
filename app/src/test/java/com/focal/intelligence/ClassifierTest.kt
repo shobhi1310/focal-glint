@@ -47,7 +47,7 @@ class ClassifierTest {
     @Test
     fun `returns matters when tool classifies as matters`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             val tools = thirdArg<List<ToolSet>>()
             tools.filterIsInstance<ClassifyNotificationTool>().first()
                 .classifyNotification("matters", "OTP from bank")
@@ -61,7 +61,7 @@ class ClassifierTest {
     @Test
     fun `returns noise when tool classifies as noise`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             val tools = thirdArg<List<ToolSet>>()
             tools.filterIsInstance<ClassifyNotificationTool>().first()
                 .classifyNotification("noise", "Promotional offer")
@@ -76,7 +76,7 @@ class ClassifierTest {
     fun `classify uses raw system prompt without thinking prefix`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         var capturedSystemInstruction: String? = null
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             capturedSystemInstruction = firstArg()
             val tools = thirdArg<List<ToolSet>>()
             tools.filterIsInstance<ClassifyNotificationTool>().first()
@@ -96,7 +96,7 @@ class ClassifierTest {
     @Test
     fun `returns uncategorized when tool not called`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } returns emptyFlow()
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } returns emptyFlow()
         val result = classifier.classify(notification())
         assertEquals(ClassificationResult.UNCATEGORIZED, result.category)
         assertEquals("llm", result.classifiedBy)
@@ -105,7 +105,7 @@ class ClassifierTest {
     @Test
     fun `returns uncategorized when LLM throws exception`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } throws RuntimeException("OOM")
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } throws RuntimeException("OOM")
         val result = classifier.classify(notification())
         assertEquals(ClassificationResult.UNCATEGORIZED, result.category)
         assertEquals("pending", result.classifiedBy)
@@ -126,7 +126,7 @@ class ClassifierTest {
     @Test
     fun `classifyBatch processes all notifications using BatchClassifyNotificationTool`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             val tools = thirdArg<List<ToolSet>>()
             val batchTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
             batchTool.classifyNotification(1, "noise", "promotional")
@@ -147,7 +147,7 @@ class ClassifierTest {
     fun `classifyBatch system prompt requires one classify tool call per index`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         var capturedSystemInstruction: String? = null
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             capturedSystemInstruction = firstArg()
             emptyFlow()
         }
@@ -166,7 +166,7 @@ class ClassifierTest {
     fun `classifyAndExtractBatch system prompt deduplicates extraction by real-world event`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         var capturedSystemInstruction: String? = null
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             capturedSystemInstruction = firstArg()
             emptyFlow()
         }
@@ -193,7 +193,7 @@ class ClassifierTest {
     @Test
     fun `classifyBatch returns pending for unclassified index`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any()) } answers {
+        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
             val tools = thirdArg<List<ToolSet>>()
             val batchTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
             batchTool.classifyNotification(1, "noise", "promo")

@@ -10,10 +10,16 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 
 private const val TAG = "Classifier"
-private const val CLASSIFICATION_SYSTEM =
-    "You classify one Android notification using tool calls only. Call classifyNotification exactly once. Use category exactly 'matters' for direct human messages/calls, OTP/security alerts, banking/payment confirmations, orders/deliveries, bookings/travel, meetings, work tasks, mentions, or assigned actions. Use category exactly 'noise' for ads, offers, engagement prompts, newsletters, feeds, news/weather, social posts/reels/reactions, job/course promos, vague status-only items, or media-only items. Use a short snake_case reason. No prose."
 private const val BATCH_CLASSIFICATION_SYSTEM =
-    "You classify Android notifications using tool calls only. For every [index], call classifyNotification exactly once with the same index. Use category exactly 'matters' for direct human messages/calls, OTP/security alerts, banking/payment confirmations, orders/deliveries, bookings/travel, meetings, work tasks, mentions, or assigned actions. Use category exactly 'noise' for ads, offers, engagement prompts, newsletters, feeds, news/weather, social posts/reels/reactions, job/course promos, vague status-only items, or media-only items. Use a short snake_case reason. No prose."
+    "You are a notification triage assistant. Your job is to decide whether each notification " +
+        "meaningfully adds value to the user's day or just demands their attention without giving " +
+        "anything back. For every [index] in the list, call classifyNotification exactly once with " +
+        "that same index. Mark it 'matters' if a thoughtful person would want to know about it now " +
+        "— something asks for their attention, response, awareness, or money. Mark it 'noise' if it " +
+        "exists to pull the user into an app, sell them something, surface algorithmic content, or " +
+        "repeat what they already know. Use a short snake_case reason. Output tool calls only — no " +
+        "prose."
+private const val CLASSIFICATION_SYSTEM = BATCH_CLASSIFICATION_SYSTEM
 private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
 
 internal fun isSyntheticToolEcho(text: String): Boolean {
@@ -167,16 +173,12 @@ class Classifier(
         allTools.addAll(extractionTools.values)
 
         val systemPrompt = BATCH_CLASSIFICATION_SYSTEM +
-            "\n\nAfter all classifications, internally compare notifications across the whole batch before choosing extraction calls. " +
-            "Do not output reasoning. Extraction calls represent distinct real-world events, not notification count. " +
-            "If multiple notifications describe the same event across SMS, Gmail, bank app, payment app, or other channels, call the extraction tool only once using the most authoritative notification index. " +
-            "For finance duplicates, same rounded amount plus same direction in one batch usually means one transaction; prefer bank SMS, then bank alert email, then receipt email, then app push. " +
-            "For personal duplicates, collapse same sender plus same channel into one extractPersonal call and set count to the number of collapsed messages. " +
-            "For logistics duplicates, collapse same merchant/order flow and keep the latest or most advanced status. " +
-            "For work duplicates, collapse same sender plus same work entity/thread. " +
-            "Call extraction tools only for 'matters' notifications and only when required fields are explicit. " +
-            "A single notification may call multiple extraction tools only when it truly contains multiple event types. " +
-            "Available extraction categories: $allToolCategories. No prose."
+            "\n\nFor every notification you marked 'matters', also call the appropriate extraction " +
+            "tool(s) so the user's widgets can show what happened. A single notification may trigger " +
+            "multiple extraction tools when it contains multiple distinct things. When the same " +
+            "real-world event appears across several notifications (echoed across SMS, email, or app " +
+            "pushes), call the extraction tool only once for the most authoritative source. Available " +
+            "extraction categories: $allToolCategories. Output tool calls only."
 
         return try {
             var messageCount = 0

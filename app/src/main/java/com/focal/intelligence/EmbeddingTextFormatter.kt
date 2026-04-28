@@ -12,13 +12,7 @@ data class EmbeddingRequest(
 object EmbeddingTextFormatter {
 
     fun buildRequest(notification: NotificationEntity): EmbeddingRequest? {
-        val channelId = notification.notificationKey?.split("|")?.getOrNull(2)
-            ?.takeIf { it.isNotBlank() && it != "null" }
-        val appPrefix = if (channelId != null) {
-            "${notification.appName}/$channelId"
-        } else {
-            notification.appName
-        }
+        val appPrefix = notification.appName
         val body = when {
             notification.extrasJson != null -> extractRecentThreadText(notification.extrasJson)
             notification.bigText != null -> buildEmailBody(notification.content, notification.bigText)
