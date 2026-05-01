@@ -37,7 +37,9 @@ internal fun shouldWarnAboutUnexpectedProse(finalText: String, toolExecuted: Boo
 
 class Classifier(
     private val inferenceProvider: InferenceProvider,
-    private val widgetRepository: WidgetRepository? = null
+    private val widgetRepository: WidgetRepository? = null,
+    private val cloudClassifier: CloudClassifier? = null,
+    private val modelManager: ModelManager? = null
 ) {
     suspend fun classify(notification: NotificationEntity): ClassificationResult {
         if (!inferenceProvider.isReady()) {
@@ -112,6 +114,11 @@ class Classifier(
     suspend fun classifyBatch(notifications: List<NotificationEntity>): List<Pair<NotificationEntity, ClassificationResult>> {
         if (notifications.isEmpty()) return emptyList()
 
+        if (modelManager?.isCloudEnabled() == true && cloudClassifier != null) {
+            Log.i(TAG, "classifyBatch: routing to cloud (${notifications.size} notifications)")
+            return cloudClassifier.classifyBatch(notifications)
+        }
+
         if (!inferenceProvider.isReady()) {
             return notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
         }
@@ -160,6 +167,13 @@ class Classifier(
         extractionTools: Map<String, ToolSet>
     ): List<Pair<NotificationEntity, ClassificationResult>> {
         if (notifications.isEmpty()) return emptyList()
+
+        if (modelManager?.isCloudEnabled() == true && cloudClassifier != null) {
+            val activeCategories = extractionTools.keys.toList()
+            Log.i(TAG, "classifyAndExtractBatch: routing to cloud (${notifications.size} notifications, categories=$activeCategories)")
+            return cloudClassifier.classifyAndExtractBatch(notifications, activeCategories)
+        }
+
         if (!inferenceProvider.isReady()) {
             return notifications.map { it to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending") }
         }
@@ -180,13 +194,20 @@ class Classifier(
             "pushes), call the extraction tool only once for the most authoritative source. Available " +
             "extraction categories: $allToolCategories. Output tool calls only."
 
+        Log.d(TAG, "classifyAndExtract systemPrompt: $systemPrompt")
+        Log.d(TAG, "classifyAndExtract userPrompt: $prompt")
+        Log.d(TAG, "classifyAndExtract tools: ${allTools.size} (${allTools.map { it.javaClass.simpleName }})")
+
         return try {
             var messageCount = 0
             inferenceProvider.generateWithTools(systemPrompt, prompt, allTools)
                 .catch { e -> Log.e(TAG, "extract batch error: ${e.message}", e); throw e }
                 .collect { message ->
-                    message.toolCalls?.forEachIndexed { i, call ->
-                        Log.i(TAG, "extract toolCall[$i]: name=${call.name}")
+                    val text = message.toString().take(500)
+                    val toolCalls = message.toolCalls
+                    Log.i(TAG, "extract msg[$messageCount]: toolCalls=${toolCalls?.size ?: 0} text=$text")
+                    toolCalls?.forEachIndexed { i, call ->
+                        Log.i(TAG, "extract toolCall[$i]: name=${call.name} args=${call.arguments}")
                     }
                     messageCount++
                 }

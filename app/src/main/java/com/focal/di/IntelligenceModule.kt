@@ -9,6 +9,7 @@ import com.focal.data.repository.RuleRepository
 import com.focal.data.repository.TopicRepository
 import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
+import com.focal.intelligence.CloudClassifier
 import com.focal.intelligence.EmbeddingProvider
 import com.focal.intelligence.SwitchableEmbeddingProvider
 import com.focal.intelligence.InferenceProvider
@@ -48,8 +49,19 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideClassifier(inferenceProvider: InferenceProvider, widgetRepository: WidgetRepository): Classifier {
-        return Classifier(inferenceProvider, widgetRepository)
+    fun provideCloudClassifier(modelManager: ModelManager, widgetRepository: WidgetRepository): CloudClassifier {
+        return CloudClassifier(modelManager, widgetRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideClassifier(
+        inferenceProvider: InferenceProvider,
+        widgetRepository: WidgetRepository,
+        cloudClassifier: CloudClassifier,
+        modelManager: ModelManager
+    ): Classifier {
+        return Classifier(inferenceProvider, widgetRepository, cloudClassifier, modelManager)
     }
 
     @Provides
