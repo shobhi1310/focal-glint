@@ -194,20 +194,14 @@ class Classifier(
             "pushes), call the extraction tool only once for the most authoritative source. Available " +
             "extraction categories: $allToolCategories. Output tool calls only."
 
-        Log.d(TAG, "classifyAndExtract systemPrompt: $systemPrompt")
-        Log.d(TAG, "classifyAndExtract userPrompt: $prompt")
-        Log.d(TAG, "classifyAndExtract tools: ${allTools.size} (${allTools.map { it.javaClass.simpleName }})")
 
         return try {
             var messageCount = 0
             inferenceProvider.generateWithTools(systemPrompt, prompt, allTools)
                 .catch { e -> Log.e(TAG, "extract batch error: ${e.message}", e); throw e }
                 .collect { message ->
-                    val text = message.toString().take(500)
-                    val toolCalls = message.toolCalls
-                    Log.i(TAG, "extract msg[$messageCount]: toolCalls=${toolCalls?.size ?: 0} text=$text")
-                    toolCalls?.forEachIndexed { i, call ->
-                        Log.i(TAG, "extract toolCall[$i]: name=${call.name} args=${call.arguments}")
+                    message.toolCalls?.forEachIndexed { i, call ->
+                        Log.i(TAG, "extract toolCall[$i]: name=${call.name}")
                     }
                     messageCount++
                 }
