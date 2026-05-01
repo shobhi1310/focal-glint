@@ -1,6 +1,7 @@
 package com.focal.ui.setup
 
 import android.content.Context
+import android.os.PowerManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -44,7 +45,10 @@ class SetupViewModelTest {
         workManager = mockk(relaxed = true)
         mockkStatic(NotificationManagerCompat::class)
         mockkStatic(WorkManager::class)
+        val powerManager = mockk<PowerManager>(relaxed = true)
         every { context.packageName } returns "com.focal"
+        every { context.getSystemService(Context.POWER_SERVICE) } returns powerManager
+        every { powerManager.isIgnoringBatteryOptimizations(any()) } returns false
         every { NotificationManagerCompat.getEnabledListenerPackages(context) } returns emptySet()
         every { WorkManager.getInstance(context) } returns workManager
         // cancelAndWait: emit empty list so the flow collector exits immediately
@@ -128,20 +132,20 @@ class SetupViewModelTest {
 
     @Test
     fun `onModelSelected same as active only updates selectedModel without side effects`() = runTest {
-        every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
-        every { modelManager.isModelAvailable(ModelVariant.GEMMA3_1B) } returns true
+        every { modelManager.activeVariant() } returns ModelVariant.GEMMA4_E2B
+        every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns true
         val vm = createViewModel()
         advanceUntilIdle()
-        vm.onModelSelected(ModelVariant.GEMMA3_1B)
+        vm.onModelSelected(ModelVariant.GEMMA4_E2B)
         advanceUntilIdle()
         verify(exactly = 0) { inferenceProvider.close() }
-        verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA3_1B) }
-        assertEquals(ModelVariant.GEMMA3_1B, vm.uiState.value.selectedModel)
+        verify { modelManager.saveSelectedVariant(ModelVariant.GEMMA4_E2B) }
+        assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.selectedModel)
     }
 
     @Test
-    fun `onModelSelected different persists selection and clears active`() = runTest {
-        every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
+    fun `onModelSelected clears activeModel when model not on device`() = runTest {
+        every { modelManager.activeVariant() } returns ModelVariant.GEMMA4_E2B
         every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns false
         val vm = createViewModel()
         advanceUntilIdle()
@@ -164,7 +168,7 @@ class SetupViewModelTest {
         vm.onDownload()
         advanceUntilIdle()
         assertNull(vm.uiState.value.downloadProgress)
-        assertEquals(ModelVariant.GEMMA3_1B, vm.uiState.value.activeModel)
+        assertEquals(ModelVariant.GEMMA4_E2B, vm.uiState.value.activeModel)
     }
 
     @Test

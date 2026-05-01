@@ -34,9 +34,7 @@ class EngineWarmupCoordinatorTest {
         every { modelManager.getSelectedVariant() } returns ModelVariant.GEMMA4_E2B
         every { modelManager.activeVariant() } returns null
         every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns true
-        every { modelManager.isModelAvailable(ModelVariant.GEMMA3_1B) } returns true
         every { modelManager.modelFileFor(ModelVariant.GEMMA4_E2B).absolutePath } returns "/models/gemma4.litertlm"
-        every { modelManager.modelFileFor(ModelVariant.GEMMA3_1B).absolutePath } returns "/models/gemma3.litertlm"
         every { modelManager.getBackendPreference() } returns true
         every { modelManager.isGemmaEmbeddingAvailable } returns true
         every { modelManager.gemmaEmbeddingModelFile.absolutePath } returns "/models/embedding.tflite"
@@ -122,16 +120,17 @@ class EngineWarmupCoordinatorTest {
     fun `warmUp falls back to active model when selected model is missing`() = runTest {
         every { modelManager.getSelectedVariant() } returns ModelVariant.GEMMA4_E2B
         every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns false
-        every { modelManager.activeVariant() } returns ModelVariant.GEMMA3_1B
+        every { modelManager.activeVariant() } returns ModelVariant.GEMMA4_E2B
+        every { modelManager.modelFileFor(ModelVariant.GEMMA4_E2B).absolutePath } returns "/models/gemma4.litertlm"
 
         val result = coordinator.warmUp()
 
         assertTrue(result)
         coVerify {
             inferenceProvider.initialize(
-                "/models/gemma3.litertlm",
+                "/models/gemma4.litertlm",
                 true,
-                ModelVariant.GEMMA3_1B.maxContextTokens
+                ModelVariant.GEMMA4_E2B.maxContextTokens
             )
         }
     }

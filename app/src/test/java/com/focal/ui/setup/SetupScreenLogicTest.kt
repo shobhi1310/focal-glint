@@ -8,10 +8,10 @@ import org.junit.Test
 class SetupScreenLogicTest {
 
     @Test
-    fun `stop button stays enabled while engine is running even when selected model differs`() {
+    fun `stop button stays enabled while engine is running`() {
         val state = SetupUiState(
             selectedModel = ModelVariant.GEMMA4_E2B,
-            activeModel = ModelVariant.GEMMA3_1B,
+            activeModel = ModelVariant.GEMMA4_E2B,
             engineRunning = true,
             engineStopping = false
         )
@@ -23,7 +23,7 @@ class SetupScreenLogicTest {
     fun `start button remains disabled when selected model is not available`() {
         val state = SetupUiState(
             selectedModel = ModelVariant.GEMMA4_E2B,
-            activeModel = ModelVariant.GEMMA3_1B,
+            activeModel = ModelVariant.GEMMA4_E2B,
             engineRunning = false,
             engineStopping = false
         )

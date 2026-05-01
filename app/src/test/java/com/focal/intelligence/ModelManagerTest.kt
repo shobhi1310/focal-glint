@@ -45,11 +45,6 @@ class ModelManagerTest {
     }
 
     @Test
-    fun `modelFileFor GEMMA3_1B returns correct filename`() {
-        assertEquals("gemma3-1b-it-int4.litertlm", modelManager.modelFileFor(ModelVariant.GEMMA3_1B).name)
-    }
-
-    @Test
     fun `modelFileFor GEMMA4_E2B returns correct filename`() {
         assertEquals("gemma-4-E2B-it.litertlm", modelManager.modelFileFor(ModelVariant.GEMMA4_E2B).name)
     }
@@ -61,23 +56,23 @@ class ModelManagerTest {
 
     @Test
     fun `isModelAvailable variant returns false when file missing`() {
-        assertFalse(modelManager.isModelAvailable(ModelVariant.GEMMA3_1B))
+        assertFalse(modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B))
     }
 
     @Test
     fun `isModelAvailable variant returns false when file too small`() {
-        val file = modelManager.modelFileFor(ModelVariant.GEMMA3_1B)
+        val file = modelManager.modelFileFor(ModelVariant.GEMMA4_E2B)
         file.parentFile?.mkdirs()
         file.writeBytes(ByteArray(1000))
-        assertFalse(modelManager.isModelAvailable(ModelVariant.GEMMA3_1B))
+        assertFalse(modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B))
     }
 
     @Test
     fun `isModelAvailable variant returns true when file large enough`() {
-        val file = modelManager.modelFileFor(ModelVariant.GEMMA3_1B)
+        val file = modelManager.modelFileFor(ModelVariant.GEMMA4_E2B)
         file.parentFile?.mkdirs()
         RandomAccessFile(file, "rw").use { it.setLength(ModelManager.MIN_MODEL_SIZE + 1) }
-        assertTrue(modelManager.isModelAvailable(ModelVariant.GEMMA3_1B))
+        assertTrue(modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B))
     }
 
     @Test
@@ -108,25 +103,25 @@ class ModelManagerTest {
     }
 
     @Test
-    fun `activeVariant returns GEMMA3_1B when that file is present`() {
-        val file = modelManager.modelFileFor(ModelVariant.GEMMA3_1B)
+    fun `activeVariant returns GEMMA4_E2B when that file is present`() {
+        val file = modelManager.modelFileFor(ModelVariant.GEMMA4_E2B)
         file.parentFile?.mkdirs()
         RandomAccessFile(file, "rw").use { it.setLength(ModelManager.MIN_MODEL_SIZE + 1) }
-        assertEquals(ModelVariant.GEMMA3_1B, modelManager.activeVariant())
+        assertEquals(ModelVariant.GEMMA4_E2B, modelManager.activeVariant())
     }
 
     @Test
     fun `deleteModel removes the file`() {
-        val file = modelManager.modelFileFor(ModelVariant.GEMMA3_1B)
+        val file = modelManager.modelFileFor(ModelVariant.GEMMA4_E2B)
         file.parentFile?.mkdirs()
         file.writeBytes(ByteArray(100))
-        modelManager.deleteModel(ModelVariant.GEMMA3_1B)
+        modelManager.deleteModel(ModelVariant.GEMMA4_E2B)
         assertFalse(file.exists())
     }
 
     @Test
     fun `deleteModel does not throw when file absent`() {
-        modelManager.deleteModel(ModelVariant.GEMMA3_1B)
+        modelManager.deleteModel(ModelVariant.GEMMA4_E2B)
     }
 
     @Test

@@ -55,6 +55,15 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    packaging {
+        jniLibs {
+            pickFirsts += listOf(
+                "**/libLiteRt.so",
+                "**/libLiteRtClGlAccelerator.so"
+            )
+        }
+    }
 }
 
 kotlin {
