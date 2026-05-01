@@ -135,6 +135,16 @@ class ModelManager(private val context: Context) {
             .edit().putBoolean("cloud_data_consent", enabled).apply()
     }
 
+    fun getCloudEndpoint(): String {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("cloud_endpoint", CloudClassifier.DEFAULT_BASE_URL) ?: CloudClassifier.DEFAULT_BASE_URL
+    }
+
+    fun setCloudEndpoint(url: String) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putString("cloud_endpoint", url.trimEnd('/')).apply()
+    }
+
     fun setPendingRebuild(pending: Boolean) {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("pending_topic_rebuild", pending).apply()

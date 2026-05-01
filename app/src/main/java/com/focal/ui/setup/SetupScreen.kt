@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -300,6 +301,29 @@ fun SetupScreen(
                             )
                         }
                     }
+                }
+            }
+
+            item {
+                StepCard(
+                    number = 9,
+                    title = "Cloud Endpoint",
+                    description = "Set the URL for the hosted inference server (for testing with Colab/ngrok)",
+                    isComplete = state.cloudEndpoint.isNotBlank()
+                ) {
+                    var endpoint by remember { mutableStateOf(state.cloudEndpoint) }
+                    OutlinedTextField(
+                        value = endpoint,
+                        onValueChange = { newUrl ->
+                            endpoint = newUrl
+                            viewModel.onSetCloudEndpoint(newUrl)
+                        },
+                        placeholder = { Text("https://abc123.ngrok-free.app") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }

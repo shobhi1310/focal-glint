@@ -129,8 +129,9 @@ class CloudClassifier(
                 val requestBody = json.encodeToString(chatRequest)
                 Log.d(TAG, "executeRequest: bodyLen=${requestBody.length}")
 
+                val baseUrl = modelManager.getCloudEndpoint()
                 val httpRequest = Request.Builder()
-                    .url("$BASE_URL$CHAT_COMPLETIONS_PATH")
+                    .url("$baseUrl$CHAT_COMPLETIONS_PATH")
                     .post(requestBody.toRequestBody("application/json".toMediaType()))
                     .addHeader("Content-Type", "application/json")
                     .addHeader("X-Focal-Consent", modelManager.isDataConsentEnabled().toString())
@@ -278,7 +279,7 @@ class CloudClassifier(
     }
 
     companion object {
-        const val BASE_URL = "http://10.0.2.2:8080"
+        const val DEFAULT_BASE_URL = "https://inference.focal.app"
         const val CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
         const val MODEL_NAME = "gemma-4-E2B-it"
         const val TIMEOUT_SECONDS = 60L
