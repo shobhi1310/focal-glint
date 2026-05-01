@@ -34,7 +34,7 @@ import javax.inject.Inject
 data class SetupUiState(
     val notificationAccessGranted: Boolean = false,
     val batteryOptimizationDisabled: Boolean = false,
-    val selectedModel: ModelVariant = ModelVariant.GEMMA3_1B,
+    val selectedModel: ModelVariant = ModelVariant.GEMMA4_E2B,
     val activeModel: ModelVariant? = null,
     val modelsOnDevice: Set<ModelVariant> = emptySet(),
     val downloadProgress: Int? = null,

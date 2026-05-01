@@ -16,13 +16,6 @@ enum class ModelVariant(
     val sizeLabel: String,
     val maxContextTokens: Int
 ) {
-    GEMMA3_1B(
-        fileName = "gemma3-1b-it-int4.litertlm",
-        url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.litertlm",
-        displayName = "Gemma 3 1B",
-        sizeLabel = "~500 MB",
-        maxContextTokens = 8192
-    ),
     GEMMA4_E2B(
         fileName = "gemma-4-E2B-it.litertlm",
         url = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
@@ -120,6 +113,26 @@ class ModelManager(private val context: Context) {
     fun saveBackendPreference(useGpu: Boolean) {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString("backend_preference", if (useGpu) "gpu" else "cpu").apply()
+    }
+
+    fun isCloudEnabled(): Boolean {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("cloud_inference_enabled", false)
+    }
+
+    fun setCloudEnabled(enabled: Boolean) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("cloud_inference_enabled", enabled).apply()
+    }
+
+    fun isDataConsentEnabled(): Boolean {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("cloud_data_consent", false)
+    }
+
+    fun setDataConsentEnabled(enabled: Boolean) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("cloud_data_consent", enabled).apply()
     }
 
     fun setPendingRebuild(pending: Boolean) {
