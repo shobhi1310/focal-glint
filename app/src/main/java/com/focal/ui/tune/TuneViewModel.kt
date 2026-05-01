@@ -8,6 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.ModelManager
 import com.focal.ui.components.AppIconCache
 import com.focal.worker.ClassificationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,13 +34,16 @@ data class TuneAppItem(
 
 data class TuneUiState(
     val apps: List<TuneAppItem> = emptyList(),
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val cloudEnabled: Boolean = false,
+    val dataConsentEnabled: Boolean = false
 )
 
 @HiltViewModel
 class TuneViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val notificationRepository: NotificationRepository,
+    private val modelManager: ModelManager,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -80,7 +84,11 @@ class TuneViewModel @Inject constructor(
                     )
                 }
 
-            _uiState.value = _uiState.value.copy(apps = apps)
+            _uiState.value = _uiState.value.copy(
+                apps = apps,
+                cloudEnabled = modelManager.isCloudEnabled(),
+                dataConsentEnabled = modelManager.isDataConsentEnabled()
+            )
 
             val packageNames = apps.map { it.packageName }
             viewModelScope.launch(Dispatchers.IO) {
@@ -107,6 +115,22 @@ class TuneViewModel @Inject constructor(
             delay(3000)
             persistChanges()
         }
+    }
+
+    fun onToggleCloud(enabled: Boolean) {
+        modelManager.setCloudEnabled(enabled)
+        _uiState.value = _uiState.value.copy(
+            cloudEnabled = enabled,
+            dataConsentEnabled = if (!enabled) false else _uiState.value.dataConsentEnabled
+        )
+        if (!enabled) {
+            modelManager.setDataConsentEnabled(false)
+        }
+    }
+
+    fun onToggleDataConsent(enabled: Boolean) {
+        modelManager.setDataConsentEnabled(enabled)
+        _uiState.value = _uiState.value.copy(dataConsentEnabled = enabled)
     }
 
     fun dismissSnackbar() {
