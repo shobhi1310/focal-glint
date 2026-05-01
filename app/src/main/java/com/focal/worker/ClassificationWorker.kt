@@ -75,12 +75,12 @@ class ClassificationWorker @AssistedInject constructor(
         }
 
         val pending = notificationRepository.getPendingForClassification()
+        val cloudEnabled = modelManager.isCloudEnabled()
         if (pending.isNotEmpty()) {
-            if (!inferenceProvider.isReady()) {
+            if (!cloudEnabled && !inferenceProvider.isReady()) {
                 if (!modelManager.isEngineEnabled()) {
-                    Log.d("ClassificationWorker", "Engine disabled — skipping LLM classification")
+                    Log.d("ClassificationWorker", "Engine disabled and cloud off — skipping classification")
                 } else {
-                    // Wait up to 45s for the LLM to finish loading before classifying
                     val deadline = System.currentTimeMillis() + 45_000
                     while (!inferenceProvider.isReady() && System.currentTimeMillis() < deadline) {
                         delay(500)
@@ -91,7 +91,7 @@ class ClassificationWorker @AssistedInject constructor(
                     }
                 }
             }
-            if (inferenceProvider.isReady()) {
+            if (cloudEnabled || inferenceProvider.isReady()) {
                 val activeCategories = widgetRepository.getActiveCategories()
                 val extractionTools = if (activeCategories.isNotEmpty()) {
                     ExtractionToolFactory.createTools(activeCategories)
