@@ -4,24 +4,36 @@ Test suite for Focal's hosted LLM inference endpoint.
 Tests connection, basic generation, classification tool calling, and extraction tool calling.
 
 Usage:
-    python3 scripts/test_cloud_inference.py <endpoint_url> [model_name]
+    python3 scripts/test_cloud_inference.py <endpoint_url> [model_name] [api_key]
+    FOCAL_API_KEY=<key> python3 scripts/test_cloud_inference.py <endpoint_url>
 
 Examples:
     python3 scripts/test_cloud_inference.py https://abc123.ngrok-free.app
-    python3 scripts/test_cloud_inference.py http://localhost:8080 gemma-4-finetuned
+    python3 scripts/test_cloud_inference.py https://abc123.ngrok-free.app gemma-4-finetuned sk-xxx
+    FOCAL_API_KEY=sk-xxx python3 scripts/test_cloud_inference.py https://abc123.ngrok-free.app
 """
 
 import sys
+import os
 import json
 import time
+import urllib3
 import requests
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 ENDPOINT = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else "http://localhost:8080"
 MODEL = sys.argv[2] if len(sys.argv) > 2 else "gemma-4-finetuned"
+API_KEY = os.environ.get("FOCAL_API_KEY", sys.argv[3] if len(sys.argv) > 3 else "")
 CHAT_URL = f"{ENDPOINT}/v1/chat/completions"
 TIMEOUT = 60
+VERIFY_SSL = False  # ngrok free tier uses self-signed certs
+
+HEADERS = {"Content-Type": "application/json"}
+if API_KEY:
+    HEADERS["Authorization"] = f"Bearer {API_KEY}"
 
 passed = 0
 failed = 0
@@ -46,12 +58,14 @@ print(f"\n{'='*60}")
 print(f"Focal Cloud Inference Test Suite")
 print(f"Endpoint: {ENDPOINT}")
 print(f"Model:    {MODEL}")
+print(f"API Key:  {'***' + API_KEY[-4:] if len(API_KEY) > 4 else ('(none)' if not API_KEY else '***')}")
+print(f"SSL:      {'verify' if VERIFY_SSL else 'skip verification'}")
 print(f"{'='*60}\n")
 
 print("1. Connectivity")
 try:
     # llama.cpp serves a simple page at root
-    r = requests.get(ENDPOINT, timeout=10)
+    r = requests.get(ENDPOINT, timeout=10, verify=VERIFY_SSL, headers=HEADERS)
     report("Server reachable", r.status_code < 500, f"HTTP {r.status_code}")
 except requests.ConnectionError as e:
     report("Server reachable", False, f"Connection refused: {e}")
@@ -60,7 +74,7 @@ except Exception as e:
 
 # Check /v1/models if available (OpenAI compat)
 try:
-    r = requests.get(f"{ENDPOINT}/v1/models", timeout=10)
+    r = requests.get(f"{ENDPOINT}/v1/models", timeout=10, verify=VERIFY_SSL, headers=HEADERS)
     if r.status_code == 200:
         models = r.json()
         model_ids = [m.get("id", "") for m in models.get("data", [])]
@@ -84,7 +98,7 @@ try:
         "temperature": 0.1
     }
     start = time.time()
-    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT)
+    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
     elapsed = time.time() - start
 
     report("Chat completions endpoint", r.status_code == 200, f"HTTP {r.status_code}, {elapsed:.1f}s")
@@ -153,7 +167,7 @@ try:
         "temperature": 0.1
     }
     start = time.time()
-    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT)
+    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
     elapsed = time.time() - start
 
     report("Tool calling request", r.status_code == 200, f"HTTP {r.status_code}, {elapsed:.1f}s")
@@ -258,7 +272,7 @@ try:
         "temperature": 0.1
     }
     start = time.time()
-    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT)
+    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
     elapsed = time.time() - start
 
     report("Multi-tool request", r.status_code == 200, f"HTTP {r.status_code}, {elapsed:.1f}s")
@@ -326,12 +340,14 @@ try:
         "messages": [{"role": "user", "content": "Say ok."}],
         "max_tokens": 10
     }
-    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT,
-                      headers={"X-Focal-Consent": "true"})
+    consent_headers = {**HEADERS, "X-Focal-Consent": "true"}
+    r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL,
+                      headers=consent_headers)
     report("Request with consent header", r.status_code == 200, f"HTTP {r.status_code}")
 
-    r2 = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT,
-                       headers={"X-Focal-Consent": "false"})
+    no_consent_headers = {**HEADERS, "X-Focal-Consent": "false"}
+    r2 = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL,
+                       headers=no_consent_headers)
     report("Request without consent", r2.status_code == 200, f"HTTP {r2.status_code}")
 except Exception as e:
     report("Consent header", False, str(e))
