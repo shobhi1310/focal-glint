@@ -48,7 +48,7 @@ class CloudClassifier(
         val systemPrompt = BATCH_CLASSIFICATION_SYSTEM_PROMPT
 
         val request = ChatCompletionRequest(
-            model = MODEL_NAME,
+            model = modelManager.getCloudModelName(),
             messages = listOf(
                 ChatMessage(role = "system", content = systemPrompt),
                 ChatMessage(role = "user", content = prompt)
@@ -97,7 +97,7 @@ class CloudClassifier(
         if ("logistics" in activeCategories) tools.add(buildExtractLogisticsToolDefinition())
 
         val request = ChatCompletionRequest(
-            model = MODEL_NAME,
+            model = modelManager.getCloudModelName(),
             messages = listOf(
                 ChatMessage(role = "system", content = systemPrompt),
                 ChatMessage(role = "user", content = prompt)
@@ -130,12 +130,16 @@ class CloudClassifier(
                 Log.d(TAG, "executeRequest: bodyLen=${requestBody.length}")
 
                 val baseUrl = modelManager.getCloudEndpoint()
-                val httpRequest = Request.Builder()
+                val apiKey = modelManager.getCloudApiKey()
+                val builder = Request.Builder()
                     .url("$baseUrl$CHAT_COMPLETIONS_PATH")
                     .post(requestBody.toRequestBody("application/json".toMediaType()))
                     .addHeader("Content-Type", "application/json")
                     .addHeader("X-Focal-Consent", modelManager.isDataConsentEnabled().toString())
-                    .build()
+                if (apiKey.isNotBlank()) {
+                    builder.addHeader("Authorization", "Bearer $apiKey")
+                }
+                val httpRequest = builder.build()
 
                 val response = client.newCall(httpRequest).execute()
                 response.use { resp ->
@@ -281,7 +285,7 @@ class CloudClassifier(
     companion object {
         const val DEFAULT_BASE_URL = "https://inference.focal.app"
         const val CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
-        const val MODEL_NAME = "gemma-4-E2B-it"
+        const val DEFAULT_MODEL_NAME = "gemma-4-it"
         const val TIMEOUT_SECONDS = 60L
 
         private const val BATCH_CLASSIFICATION_SYSTEM_PROMPT =

@@ -312,13 +312,35 @@ fun SetupScreen(
                     isComplete = state.cloudEndpoint.isNotBlank()
                 ) {
                     var endpoint by remember { mutableStateOf(state.cloudEndpoint) }
+                    var apiKey by remember { mutableStateOf(state.cloudApiKey) }
+                    var modelName by remember { mutableStateOf(state.cloudModelName) }
                     OutlinedTextField(
                         value = endpoint,
-                        onValueChange = { newUrl ->
-                            endpoint = newUrl
-                            viewModel.onSetCloudEndpoint(newUrl)
-                        },
+                        onValueChange = { endpoint = it; viewModel.onSetCloudEndpoint(it) },
                         placeholder = { Text("https://abc123.ngrok-free.app") },
+                        label = { Text("Endpoint URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it; viewModel.onSetCloudApiKey(it) },
+                        placeholder = { Text("Bearer token") },
+                        label = { Text("API Key") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = modelName,
+                        onValueChange = { modelName = it; viewModel.onSetCloudModelName(it) },
+                        placeholder = { Text("gemma-4-it") },
+                        label = { Text("Model Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium,

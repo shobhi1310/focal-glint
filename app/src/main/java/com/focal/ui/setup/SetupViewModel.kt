@@ -46,7 +46,9 @@ data class SetupUiState(
     val databaseMessage: String? = null,
     val errorMessage: String? = null,
     val embeddingModelAvailable: Boolean = false,
-    val cloudEndpoint: String = ""
+    val cloudEndpoint: String = "",
+    val cloudApiKey: String = "",
+    val cloudModelName: String = ""
 )
 
 @HiltViewModel
@@ -82,13 +84,25 @@ class SetupViewModel @Inject constructor(
             engineRunning = inferenceProvider.isReady(),
             useGpu = modelManager.getBackendPreference(),
             embeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable,
-            cloudEndpoint = modelManager.getCloudEndpoint()
+            cloudEndpoint = modelManager.getCloudEndpoint(),
+            cloudApiKey = modelManager.getCloudApiKey(),
+            cloudModelName = modelManager.getCloudModelName()
         )
     }
 
     fun onSetCloudEndpoint(url: String) {
         modelManager.setCloudEndpoint(url)
         _uiState.value = _uiState.value.copy(cloudEndpoint = url)
+    }
+
+    fun onSetCloudApiKey(key: String) {
+        modelManager.setCloudApiKey(key)
+        _uiState.value = _uiState.value.copy(cloudApiKey = key)
+    }
+
+    fun onSetCloudModelName(name: String) {
+        modelManager.setCloudModelName(name)
+        _uiState.value = _uiState.value.copy(cloudModelName = name)
     }
 
     fun onRequestBatteryOptimization() {

@@ -145,6 +145,26 @@ class ModelManager(private val context: Context) {
             .edit().putString("cloud_endpoint", url.trimEnd('/')).apply()
     }
 
+    fun getCloudApiKey(): String {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("cloud_api_key", "") ?: ""
+    }
+
+    fun setCloudApiKey(key: String) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putString("cloud_api_key", key.trim()).apply()
+    }
+
+    fun getCloudModelName(): String {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("cloud_model_name", CloudClassifier.DEFAULT_MODEL_NAME) ?: CloudClassifier.DEFAULT_MODEL_NAME
+    }
+
+    fun setCloudModelName(name: String) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putString("cloud_model_name", name.trim()).apply()
+    }
+
     fun setPendingRebuild(pending: Boolean) {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("pending_topic_rebuild", pending).apply()
