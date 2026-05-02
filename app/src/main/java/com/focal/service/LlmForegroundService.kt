@@ -16,7 +16,7 @@ import androidx.work.WorkManager
 import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.TopicEngine
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -58,9 +58,9 @@ class LlmForegroundService : Service() {
             modelManager.setPendingRebuild(false)
             TopicEngine.pendingFullRebuild.set(true)
             WorkManager.getInstance(this).enqueueUniqueWork(
-                ClassificationWorker.WORK_NAME,
+                InferenceWorker.WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
-                OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+                OneTimeWorkRequestBuilder<InferenceWorker>().build()
             )
             Log.d(TAG, "Triggered full topic rebuild with warm engine")
         }

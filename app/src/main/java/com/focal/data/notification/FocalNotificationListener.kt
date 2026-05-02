@@ -12,7 +12,7 @@ import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.RulesEngine
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -97,11 +97,11 @@ class FocalNotificationListener : NotificationListenerService() {
             Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy})")
 
             // Enqueue background classification/topic worker with 30s delay to batch rapid notifications
-            val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>()
+            val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>()
                 .setInitialDelay(30, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                ClassificationWorker.WORK_NAME,
+                InferenceWorker.WORK_NAME,
                 ExistingWorkPolicy.KEEP,
                 workRequest
             )

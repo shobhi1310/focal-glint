@@ -89,10 +89,11 @@ class WidgetComputeEngine(private val widgetRepository: WidgetRepository) {
             mapOf("label" to key, "value" to "₹${"%.0f".format(sum)}")
         }
 
+        val merchantCount = grouped.size
         return WidgetStateEntity(
             widgetId = config.id,
             headline = formatted,
-            subtitle = badge?.let { "+ $it just now" },
+            subtitle = if (merchantCount > 1) "Across $merchantCount merchants" else null,
             badge = badge,
             detailJson = Json.encodeToString(detailLines),
             sourceAppIcons = Json.encodeToString(sourceApps),

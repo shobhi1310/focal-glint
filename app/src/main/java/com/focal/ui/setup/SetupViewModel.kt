@@ -20,7 +20,7 @@ import com.focal.intelligence.InferenceProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.ModelBackendPolicy
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -203,9 +203,9 @@ class SetupViewModel @Inject constructor(
                 if (warmed) {
                     context.startForegroundService(Intent(context, LlmForegroundService::class.java))
                     WorkManager.getInstance(context).enqueueUniqueWork(
-                        ClassificationWorker.WORK_NAME,
+                        InferenceWorker.WORK_NAME,
                         ExistingWorkPolicy.REPLACE,
-                        OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+                        OneTimeWorkRequestBuilder<InferenceWorker>().build()
                     )
                 }
                 _uiState.value = _uiState.value.copy(engineRunning = warmed)
@@ -228,7 +228,7 @@ class SetupViewModel @Inject constructor(
     }
 
     private suspend fun cancelWorkerAndWait() {
-        ClassificationWorker.cancelAndWait(WorkManager.getInstance(context))
+        InferenceWorker.cancelAndWait(WorkManager.getInstance(context))
     }
 
     private suspend fun stopEngine(reason: String) {

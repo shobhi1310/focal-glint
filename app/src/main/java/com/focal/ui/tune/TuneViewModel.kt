@@ -10,7 +10,7 @@ import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.intelligence.ModelManager
 import com.focal.ui.components.AppIconCache
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -149,9 +149,9 @@ class TuneViewModel @Inject constructor(
             }
         }
 
-        val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+        val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            ClassificationWorker.WORK_NAME,
+            InferenceWorker.WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             workRequest
         )

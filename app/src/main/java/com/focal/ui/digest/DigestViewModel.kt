@@ -14,7 +14,7 @@ import com.focal.intelligence.ClassificationResult
 import com.focal.intelligence.EngineWarmupCoordinator
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.TopicEngine
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -103,7 +103,7 @@ class DigestViewModel @Inject constructor(
         viewModelScope.launch {
             val workManager = WorkManager.getInstance(context)
             val current = workManager
-                .getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
+                .getWorkInfosForUniqueWorkFlow(InferenceWorker.WORK_NAME)
                 .first()
             val alreadyBusy = current.any { !it.state.isFinished }
             if (alreadyBusy) {
@@ -116,13 +116,13 @@ class DigestViewModel @Inject constructor(
             if (modelManager.isEngineEnabled()) {
                 engineWarmupCoordinator.warmUp()
             }
-            val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+            val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>().build()
             workManager.enqueueUniqueWork(
-                ClassificationWorker.WORK_NAME,
+                InferenceWorker.WORK_NAME,
                 ExistingWorkPolicy.KEEP,
                 workRequest
             )
-            workManager.getWorkInfosForUniqueWorkFlow(ClassificationWorker.WORK_NAME)
+            workManager.getWorkInfosForUniqueWorkFlow(InferenceWorker.WORK_NAME)
                 .collect { workInfos ->
                     if (workInfos.isEmpty() || workInfos.all { it.state.isFinished }) {
                         isProcessing.value = false

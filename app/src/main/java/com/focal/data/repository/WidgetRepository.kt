@@ -48,6 +48,14 @@ class WidgetRepository(
         stateDao.deleteById(widgetId)
     }
 
+    suspend fun deleteExtractedRow(id: Long) {
+        extractedDataDao.deleteById(id)
+    }
+
+    suspend fun restoreExtractedRow(entity: ExtractedDataEntity) {
+        extractedDataDao.insert(entity)
+    }
+
     suspend fun saveExtractedData(data: List<ExtractedDataEntity>) {
         extractedDataDao.insertAll(data)
     }

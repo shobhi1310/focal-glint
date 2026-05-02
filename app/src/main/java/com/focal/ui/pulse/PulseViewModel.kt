@@ -9,7 +9,7 @@ import androidx.work.WorkManager
 import com.focal.data.db.entity.WidgetConfigEntity
 import com.focal.data.db.entity.WidgetStateEntity
 import com.focal.data.repository.WidgetRepository
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,9 +59,9 @@ class PulseViewModel @Inject constructor(
         viewModelScope.launch {
             isRefreshing.value = true
             WorkManager.getInstance(context).enqueueUniqueWork(
-                ClassificationWorker.WORK_NAME,
+                InferenceWorker.WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+                OneTimeWorkRequestBuilder<InferenceWorker>().build()
             )
             kotlinx.coroutines.delay(3000)
             isRefreshing.value = false

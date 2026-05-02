@@ -15,7 +15,7 @@ import com.focal.intelligence.ModelBackendPolicy
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.TopicEngine
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -124,7 +124,7 @@ class SettingsViewModel @Inject constructor(
             modelManager.saveBackendPreference(useGpu)
             if (modelManager.isEngineEnabled() && modelManager.isModelAvailable) {
                 try {
-                    ClassificationWorker.cancelAndWait(WorkManager.getInstance(context))
+                    InferenceWorker.cancelAndWait(WorkManager.getInstance(context))
                     val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
                     inferenceProvider.restart(modelManager.modelPath, useGpu, variant.maxContextTokens)
                     reinitializeEmbeddings(useGpu)
@@ -197,9 +197,9 @@ class SettingsViewModel @Inject constructor(
             }
         }
 
-        val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+        val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            ClassificationWorker.WORK_NAME,
+            InferenceWorker.WORK_NAME,
             ExistingWorkPolicy.KEEP,
             workRequest
         )

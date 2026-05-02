@@ -16,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import com.focal.worker.ClassificationWorker
+import com.focal.worker.InferenceWorker
 import com.focal.worker.DailyResetWorker
 import javax.inject.Inject
 
@@ -35,6 +35,7 @@ class FocalApplication : Application(), Configuration.Provider {
         super.onCreate()
         ThemePreference.initialize(this)
         DebugLogger.init(this)
+        cancelOrphanedWork()
         seedDefaultRules()
         migrateTopicClusteringIfNeeded()
         scheduleDailyReset()
@@ -79,15 +80,21 @@ class FocalApplication : Application(), Configuration.Provider {
         )
     }
 
+    private fun cancelOrphanedWork() {
+        val wm = WorkManager.getInstance(this)
+        wm.cancelUniqueWork("focal_classification")
+        wm.cancelUniqueWork("focal_topic_narratives")
+    }
+
     private fun migrateTopicClusteringIfNeeded() {
         val prefs = getSharedPreferences("focal_prefs", MODE_PRIVATE)
         val storedVersion = prefs.getInt("topic_clustering_config_version", 0)
         if (!TopicClusteringPolicy.needsFullRebuild(storedVersion)) return
 
         TopicEngine.pendingFullRebuild.set(true)
-        val request = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+        val request = OneTimeWorkRequestBuilder<InferenceWorker>().build()
         WorkManager.getInstance(this).enqueueUniqueWork(
-            ClassificationWorker.WORK_NAME,
+            InferenceWorker.WORK_NAME,
             ExistingWorkPolicy.KEEP,
             request
         )
