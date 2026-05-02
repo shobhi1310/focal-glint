@@ -34,4 +34,13 @@ interface ExtractedDataDao {
 
     @Query("DELETE FROM extracted_data")
     suspend fun deleteAll()
+
+    @Query("SELECT * FROM extracted_data WHERE category = 'finance' AND matched_transaction_id IS NULL")
+    suspend fun getUnmatchedFinance(): List<ExtractedDataEntity>
+
+    @Query("UPDATE extracted_data SET matched_transaction_id = :transactionId WHERE id = :id")
+    suspend fun setMatchedTransaction(id: Long, transactionId: Long)
+
+    @Query("SELECT * FROM extracted_data WHERE notification_id = :notificationId AND category = :category")
+    suspend fun getByNotificationIdAndCategory(notificationId: String, category: String): List<ExtractedDataEntity>
 }
