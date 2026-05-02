@@ -9,6 +9,7 @@ import com.focal.data.db.dao.ExtractedDataDao
 import com.focal.data.db.dao.NotificationDao
 import com.focal.data.db.dao.RuleDao
 import com.focal.data.db.dao.TopicDao
+import com.focal.data.db.dao.TransactionDao
 import com.focal.data.db.dao.WidgetConfigDao
 import com.focal.data.db.dao.WidgetStateDao
 import dagger.Module
@@ -57,4 +58,7 @@ object DatabaseModule {
 
     @Provides
     fun provideWidgetStateDao(db: FocalDatabase): WidgetStateDao = db.widgetStateDao()
+
+    @Provides
+    fun provideTransactionDao(db: FocalDatabase): TransactionDao = db.transactionDao()
 }

@@ -2,11 +2,13 @@ package com.focal.di
 
 import android.content.Context
 import com.focal.data.db.dao.ExtractedDataDao
+import com.focal.data.db.dao.TransactionDao
 import com.focal.data.db.dao.WidgetConfigDao
 import com.focal.data.db.dao.WidgetStateDao
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
 import com.focal.data.repository.TopicRepository
+import com.focal.data.repository.TransactionRepository
 import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.CloudClassifier
@@ -17,6 +19,7 @@ import com.focal.intelligence.LiteRtLmProvider
 import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
+import com.focal.intelligence.TransactionCorrelator
 import com.focal.intelligence.WidgetComputeEngine
 import dagger.Module
 import dagger.Provides
@@ -98,7 +101,28 @@ object IntelligenceModule {
 
     @Provides
     @Singleton
-    fun provideWidgetComputeEngine(widgetRepository: WidgetRepository): WidgetComputeEngine {
-        return WidgetComputeEngine(widgetRepository)
+    fun provideTransactionRepository(
+        transactionDao: TransactionDao,
+        extractedDataDao: ExtractedDataDao
+    ): TransactionRepository {
+        return TransactionRepository(transactionDao, extractedDataDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTransactionCorrelator(
+        transactionRepository: TransactionRepository,
+        widgetRepository: WidgetRepository
+    ): TransactionCorrelator {
+        return TransactionCorrelator(transactionRepository, widgetRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideWidgetComputeEngine(
+        widgetRepository: WidgetRepository,
+        transactionRepository: TransactionRepository
+    ): WidgetComputeEngine {
+        return WidgetComputeEngine(widgetRepository, transactionRepository)
     }
 }
