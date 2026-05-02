@@ -90,6 +90,7 @@ class CloudClassifier(
         if ("work" in activeCategories) tools.add(buildExtractWorkToolDefinition())
         if ("personal" in activeCategories) tools.add(buildExtractPersonalToolDefinition())
         if ("logistics" in activeCategories) tools.add(buildExtractLogisticsToolDefinition())
+        if ("bank_transaction" in activeCategories) tools.add(buildExtractBankTransactionToolDefinition())
 
         val request = ChatCompletionRequest(
             model = modelManager.getCloudModelName(),
@@ -207,6 +208,7 @@ class CloudClassifier(
                 "extractWork" -> "work"
                 "extractPersonal" -> "personal"
                 "extractLogistics" -> "logistics"
+                "extractBankTransaction" -> "bank_transaction"
                 else -> continue
             }
 
@@ -270,6 +272,16 @@ class CloudClassifier(
                     merchant = args["merchant"]?.jsonPrimitive?.content ?: "",
                     status = args["status"]?.jsonPrimitive?.content ?: "ordered",
                     etaMinutes = args["etaMinutes"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 }
+                )
+                Json.encodeToString(data)
+            }
+            "bank_transaction" -> {
+                val data = BankTransactionData(
+                    amount = args["amount"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                    direction = args["direction"]?.jsonPrimitive?.content ?: "debit",
+                    account = args["account"]?.jsonPrimitive?.content ?: "",
+                    bank = args["bank"]?.jsonPrimitive?.content ?: "",
+                    merchant = args["merchant"]?.jsonPrimitive?.content ?: ""
                 )
                 Json.encodeToString(data)
             }
@@ -383,6 +395,28 @@ private fun buildExtractLogisticsToolDefinition(): ToolDefinition {
                     "etaMinutes" to PropertyDefinition(type = "integer", description = "Estimated arrival time in minutes, or -1 if unknown")
                 ),
                 required = listOf("index", "item", "merchant", "status", "etaMinutes")
+            )
+        )
+    )
+}
+
+private fun buildExtractBankTransactionToolDefinition(): ToolDefinition {
+    return ToolDefinition(
+        type = "function",
+        function = FunctionDefinition(
+            name = "extractBankTransaction",
+            description = "Extract transaction details from a bank SMS about money debited or credited",
+            parameters = FunctionParameters(
+                type = "object",
+                properties = mapOf(
+                    "index" to PropertyDefinition(type = "integer", description = "1-based index of the notification"),
+                    "amount" to PropertyDefinition(type = "number", description = "Transaction amount as a number"),
+                    "direction" to PropertyDefinition(type = "string", description = "Transaction direction: debit or credit", enum = listOf("debit", "credit")),
+                    "account" to PropertyDefinition(type = "string", description = "Masked bank account number e.g. *3371 or XX023"),
+                    "bank" to PropertyDefinition(type = "string", description = "Bank name e.g. HDFC Bank, ICICI Bank"),
+                    "merchant" to PropertyDefinition(type = "string", description = "Merchant or payee name from SMS, empty if not present")
+                ),
+                required = listOf("index", "amount", "direction", "account", "bank", "merchant")
             )
         )
     )

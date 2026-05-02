@@ -22,6 +22,15 @@ data class PersonalData(val sender: String, val channel: String, val count: Int,
 @Serializable
 data class LogisticsData(val item: String, val merchant: String, val status: String, val etaMinutes: Int? = null)
 
+@Serializable
+data class BankTransactionData(
+    val amount: Double,
+    val direction: String,
+    val account: String,
+    val bank: String,
+    val merchant: String
+)
+
 data class ExtractionResult(val notificationIndex: Int, val category: String, val dataJson: String)
 
 class ExtractFinanceTool : ToolSet {
@@ -96,6 +105,26 @@ class ExtractLogisticsTool : ToolSet {
     }
 }
 
+class ExtractBankTransactionTool : ToolSet {
+    private val _results = mutableListOf<ExtractionResult>()
+    val results: List<ExtractionResult> get() = _results
+
+    @Tool("Extract transaction details from a bank SMS about money debited or credited")
+    fun extractBankTransaction(
+        @ToolParam("1-based index of the notification") index: Int,
+        @ToolParam("Transaction amount as a number") amount: Double,
+        @ToolParam("Transaction direction: debit or credit") direction: String,
+        @ToolParam("Masked bank account number e.g. *3371 or XX023") account: String,
+        @ToolParam("Bank name e.g. HDFC Bank, ICICI Bank") bank: String,
+        @ToolParam("Merchant or payee name from SMS, empty if not present") merchant: String
+    ): Map<String, Any> {
+        Log.i(TAG, "bankTransaction: index=$index amount=$amount direction=$direction account=$account bank=$bank")
+        val data = BankTransactionData(amount, direction, account, bank, merchant)
+        _results.add(ExtractionResult(index, "bank_transaction", Json.encodeToString(data)))
+        return mapOf("status" to "ok")
+    }
+}
+
 object ExtractionToolFactory {
     fun createTools(activeCategories: List<String>): Map<String, ToolSet> {
         val tools = mutableMapOf<String, ToolSet>()
@@ -103,6 +132,7 @@ object ExtractionToolFactory {
         if ("work" in activeCategories) tools["work"] = ExtractWorkTool()
         if ("personal" in activeCategories) tools["personal"] = ExtractPersonalTool()
         if ("logistics" in activeCategories) tools["logistics"] = ExtractLogisticsTool()
+        if ("bank_transaction" in activeCategories) tools["bank_transaction"] = ExtractBankTransactionTool()
         return tools
     }
 
@@ -113,6 +143,7 @@ object ExtractionToolFactory {
                 is ExtractWorkTool -> tool.results
                 is ExtractPersonalTool -> tool.results
                 is ExtractLogisticsTool -> tool.results
+                is ExtractBankTransactionTool -> tool.results
                 else -> emptyList()
             }
         }
