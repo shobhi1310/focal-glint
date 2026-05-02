@@ -4,6 +4,7 @@ import android.util.Log
 import com.focal.data.db.entity.ExtractedDataEntity
 import com.focal.data.db.entity.WidgetConfigEntity
 import com.focal.data.db.entity.WidgetStateEntity
+import com.focal.data.repository.TransactionRepository
 import com.focal.data.repository.WidgetRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -18,7 +19,10 @@ import kotlinx.serialization.encodeToString
 
 private const val TAG = "WidgetCompute"
 
-class WidgetComputeEngine(private val widgetRepository: WidgetRepository) {
+class WidgetComputeEngine(
+    private val widgetRepository: WidgetRepository,
+    private val transactionRepository: TransactionRepository
+) {
 
     suspend fun computeAll() {
         val configs = widgetRepository.getAllConfigs()
@@ -30,6 +34,10 @@ class WidgetComputeEngine(private val widgetRepository: WidgetRepository) {
     }
 
     private suspend fun computeWidget(config: WidgetConfigEntity): WidgetStateEntity {
+        if (config.category == "finance") {
+            return computeFinanceFromTransactions(config)
+        }
+
         val filterApps = config.filterApps?.let {
             try { Json.decodeFromString<List<String>>(it) } catch (_: Exception) { null }
         }
@@ -58,6 +66,58 @@ class WidgetComputeEngine(private val widgetRepository: WidgetRepository) {
             "STATUS" -> computeStatus(config, data, sourceApps)
             else -> WidgetStateEntity(widgetId = config.id, headline = "Unknown operation")
         }
+    }
+
+    private suspend fun computeFinanceFromTransactions(config: WidgetConfigEntity): WidgetStateEntity {
+        val transactions = transactionRepository.getAll()
+        if (transactions.isEmpty()) {
+            return WidgetStateEntity(
+                widgetId = config.id,
+                headline = "₹0",
+                itemCount = 0
+            )
+        }
+
+        val debits = transactions.filter { it.direction == "debit" }
+        val totalSpent = debits.sumOf { it.amount }
+        val formatted = "₹${"%.0f".format(totalSpent)}"
+
+        val latest = transactions.maxByOrNull { it.postedAt }
+        val latestPrefix = if (latest?.direction == "credit") "+" else "-"
+        val latestMerchant = latest?.matchedMerchant?.takeIf { it.isNotBlank() }
+            ?: latest?.rawMerchant?.takeIf { it.isNotBlank() }
+            ?: "Unassigned"
+        val badge = "${latestPrefix}₹${"%.0f".format(latest?.amount ?: 0.0)} $latestMerchant"
+
+        val grouped = transactions.groupBy {
+            it.matchedMerchant?.takeIf { m -> m.isNotBlank() }
+                ?: it.rawMerchant?.takeIf { m -> m.isNotBlank() }
+                ?: "Unassigned"
+        }
+        val detailLines = grouped.map { (key, txns) ->
+            val sum = txns.sumOf { if (it.direction == "debit") -it.amount else it.amount }
+            val prefix = if (sum >= 0) "+" else ""
+            mapOf("label" to key, "value" to "${prefix}₹${"%.0f".format(kotlin.math.abs(sum))}")
+        }.sortedByDescending { it["value"]?.removePrefix("+")?.removePrefix("-")?.removePrefix("₹")?.toDoubleOrNull() ?: 0.0 }
+
+        val merchantCount = grouped.size
+        val unassignedCount = transactions.count { it.matchedNotificationId == null }
+        val subtitle = buildString {
+            append("Across $merchantCount merchants")
+            if (unassignedCount > 0) append(" · $unassignedCount unassigned")
+        }
+
+        val sourceApps = transactions.mapNotNull { it.matchedApp }.distinct()
+
+        return WidgetStateEntity(
+            widgetId = config.id,
+            headline = formatted,
+            subtitle = subtitle,
+            badge = badge,
+            detailJson = Json.encodeToString(detailLines),
+            sourceAppIcons = Json.encodeToString(sourceApps),
+            itemCount = transactions.size
+        )
     }
 
     private fun emptyHeadline(config: WidgetConfigEntity): String {
