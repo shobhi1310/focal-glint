@@ -71,4 +71,12 @@ class WidgetRepository(
     suspend fun saveWidgetStates(states: List<WidgetStateEntity>) {
         stateDao.upsertAll(states)
     }
+
+    suspend fun getUnmatchedFinanceExtractions(): List<ExtractedDataEntity> {
+        return extractedDataDao.getUnmatchedFinance()
+    }
+
+    suspend fun getExtractedDataForNotification(notificationId: String, category: String): List<ExtractedDataEntity> {
+        return extractedDataDao.getByNotificationIdAndCategory(notificationId, category)
+    }
 }
