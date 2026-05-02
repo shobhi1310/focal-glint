@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.focal.data.db.entity.ExtractedDataEntity
+import com.focal.data.db.entity.TransactionEntity
 import com.focal.data.db.entity.WidgetConfigEntity
 import com.focal.data.db.entity.WidgetStateEntity
+import com.focal.data.repository.TransactionRepository
 import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.WidgetComputeEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +26,7 @@ data class PulseDetailUiState(
     val config: WidgetConfigEntity? = null,
     val state: WidgetStateEntity? = null,
     val rows: List<ExtractedDataEntity> = emptyList(),
+    val transactions: List<TransactionEntity> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -35,7 +38,8 @@ sealed class PulseDetailEvent {
 class PulseDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val widgetRepository: WidgetRepository,
-    private val widgetComputeEngine: WidgetComputeEngine
+    private val widgetComputeEngine: WidgetComputeEngine,
+    private val transactionRepository: TransactionRepository
 ) : ViewModel() {
     private val widgetId: String = savedStateHandle.get<String>("widgetId") ?: ""
     private val _uiState = MutableStateFlow(PulseDetailUiState())
@@ -45,6 +49,7 @@ class PulseDetailViewModel @Inject constructor(
     val events: SharedFlow<PulseDetailEvent> = _events.asSharedFlow()
 
     private var pendingDelete: ExtractedDataEntity? = null
+    private var pendingDeleteTransaction: TransactionEntity? = null
     private var deleteJob: Job? = null
 
     init {
@@ -55,10 +60,18 @@ class PulseDetailViewModel @Inject constructor(
     private fun loadWidget() {
         viewModelScope.launch {
             val config = widgetRepository.getConfig(widgetId)
-            val rows = if (config != null) {
+            val rows = if (config != null && config.category != "finance") {
                 widgetRepository.getExtractedData(config.category)
             } else emptyList()
-            _uiState.value = _uiState.value.copy(config = config, rows = rows, isLoading = false)
+            val transactions = if (config != null && config.category == "finance") {
+                transactionRepository.getAll()
+            } else emptyList()
+            _uiState.value = _uiState.value.copy(
+                config = config,
+                rows = rows,
+                transactions = transactions,
+                isLoading = false
+            )
         }
     }
 
@@ -94,21 +107,59 @@ class PulseDetailViewModel @Inject constructor(
         )
     }
 
+    fun onDismissTransaction(txn: TransactionEntity) {
+        commitPendingDelete()
+        pendingDeleteTransaction = txn
+        _uiState.value = _uiState.value.copy(
+            transactions = _uiState.value.transactions.filter { it.id != txn.id }
+        )
+        _events.tryEmit(PulseDetailEvent.ShowUndo("Removed"))
+        deleteJob = viewModelScope.launch {
+            delay(3000)
+            commitPendingDelete()
+        }
+    }
+
+    fun onUndoTransaction() {
+        deleteJob?.cancel()
+        val restored = pendingDeleteTransaction ?: return
+        pendingDeleteTransaction = null
+        _uiState.value = _uiState.value.copy(
+            transactions = (_uiState.value.transactions + restored).sortedByDescending { it.postedAt }
+        )
+    }
+
     private fun commitPendingDelete() {
+        pendingDeleteTransaction?.let { txn ->
+            pendingDeleteTransaction = null
+            deleteJob?.cancel()
+            viewModelScope.launch {
+                transactionRepository.deleteById(txn.id)
+                widgetComputeEngine.computeAll()
+                reloadData()
+            }
+            return
+        }
+
         val toDelete = pendingDelete ?: return
         pendingDelete = null
         deleteJob?.cancel()
         viewModelScope.launch {
             widgetRepository.deleteExtractedRow(toDelete.id)
             widgetComputeEngine.computeAll()
-            reloadRows()
+            reloadData()
         }
     }
 
-    private suspend fun reloadRows() {
+    private suspend fun reloadData() {
         val config = _uiState.value.config ?: return
-        val rows = widgetRepository.getExtractedData(config.category)
-        _uiState.value = _uiState.value.copy(rows = rows)
+        if (config.category == "finance") {
+            val transactions = transactionRepository.getAll()
+            _uiState.value = _uiState.value.copy(transactions = transactions)
+        } else {
+            val rows = widgetRepository.getExtractedData(config.category)
+            _uiState.value = _uiState.value.copy(rows = rows)
+        }
     }
 
     fun onDelete() {
