@@ -7,7 +7,10 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.focal.data.db.entity.NotificationEntity
+import com.focal.data.db.entity.TransactionEntity
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.TransactionRepository
 import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EngineWarmupCoordinator
@@ -17,6 +20,7 @@ import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import com.focal.intelligence.TopicNarrativeProcessor
+import com.focal.intelligence.TransactionCorrelator
 import com.focal.intelligence.WidgetComputeEngine
 import com.focal.service.LlmForegroundService
 import dagger.assisted.Assisted
@@ -24,6 +28,10 @@ import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 @HiltWorker
 class InferenceWorker @AssistedInject constructor(
@@ -39,6 +47,8 @@ class InferenceWorker @AssistedInject constructor(
     private val widgetRepository: WidgetRepository,
     private val widgetComputeEngine: WidgetComputeEngine,
     private val topicNarrativeProcessor: TopicNarrativeProcessor,
+    private val transactionCorrelator: TransactionCorrelator,
+    private val transactionRepository: TransactionRepository,
     private val workQueue: InferenceWorkQueue
 ) : CoroutineWorker(appContext, workerParams) {
 
@@ -154,8 +164,39 @@ class InferenceWorker @AssistedInject constructor(
             Log.d(TAG, "Classified $classified/${pending.size}")
         }
 
+        saveBankTransactions(pending)
         runTopicGeneration()
         return true
+    }
+
+    private suspend fun saveBankTransactions(notifications: List<NotificationEntity>) {
+        val bankNotifs = notifications.filter { it.isBankTransaction }
+        if (bankNotifs.isEmpty()) return
+
+        for (notif in bankNotifs) {
+            val existing = transactionRepository.getByNotificationId(notif.id)
+            if (existing != null) continue
+
+            val extractions = widgetRepository.getExtractedDataForNotification(notif.id, "bank_transaction")
+            for (extraction in extractions) {
+                try {
+                    val data = Json.parseToJsonElement(extraction.data).jsonObject
+                    val txn = TransactionEntity(
+                        notificationId = notif.id,
+                        amount = data["amount"]?.jsonPrimitive?.doubleOrNull ?: continue,
+                        direction = data["direction"]?.jsonPrimitive?.content ?: continue,
+                        account = data["account"]?.jsonPrimitive?.content ?: "",
+                        bank = data["bank"]?.jsonPrimitive?.content ?: "",
+                        rawMerchant = data["merchant"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+                        postedAt = notif.postedAt
+                    )
+                    transactionRepository.insert(txn)
+                    Log.d(TAG, "Created transaction: ₹${txn.amount} ${txn.direction} via ${txn.bank} ${txn.account}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to create transaction from ${notif.id}", e)
+                }
+            }
+        }
     }
 
     private suspend fun runTopicGeneration() {
@@ -167,6 +208,12 @@ class InferenceWorker @AssistedInject constructor(
             Log.d(TAG, "Topic generation complete, narratives enqueued")
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { Log.e(TAG, "Topic generation failed", e) }
+
+        try {
+            transactionCorrelator.correlate()
+            Log.d(TAG, "Transaction correlation complete")
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { Log.e(TAG, "Transaction correlation failed", e) }
 
         try {
             widgetComputeEngine.computeAll()
