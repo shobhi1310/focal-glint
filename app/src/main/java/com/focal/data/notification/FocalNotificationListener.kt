@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import com.focal.data.db.FocalDatabase
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.BankSmsDetector
 import com.focal.intelligence.RulesEngine
 import com.focal.worker.InferenceWorker
 import kotlinx.coroutines.CoroutineScope
@@ -81,20 +82,25 @@ class FocalNotificationListener : NotificationListenerService() {
 
             Log.d("FocalListener", "Captured: ${entity.appName} - ${entity.title}: ${entity.content}")
 
+            val isBankTxn = BankSmsDetector.isBankTransaction(
+                entity.packageName, entity.title, entity.content
+            )
+
             val ruleResult = rulesEngine.classify(entity)
             val classified = if (ruleResult != null) {
                 entity.copy(
                     category = ruleResult.category,
                     classifiedBy = ruleResult.classifiedBy,
                     ruleId = ruleResult.ruleId,
-                    processedAt = System.currentTimeMillis()
+                    processedAt = System.currentTimeMillis(),
+                    isBankTransaction = isBankTxn
                 )
             } else {
-                entity
+                entity.copy(isBankTransaction = isBankTxn)
             }
 
             repository.upsertNotification(classified)
-            Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy})")
+            Log.d("FocalListener", "Saved: ${classified.title} -> ${classified.category} (${classified.classifiedBy}) bankTxn=$isBankTxn")
 
             // Enqueue background classification/topic worker with 30s delay to batch rapid notifications
             val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>()
