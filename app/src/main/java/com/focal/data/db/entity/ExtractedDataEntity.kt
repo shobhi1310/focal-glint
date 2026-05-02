@@ -15,5 +15,6 @@ data class ExtractedDataEntity(
     val category: String,
     val data: String,
     @ColumnInfo(name = "app_package") val appPackage: String,
-    @ColumnInfo(name = "extracted_at") val extractedAt: Long = System.currentTimeMillis()
+    @ColumnInfo(name = "extracted_at") val extractedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "matched_transaction_id") val matchedTransactionId: Long? = null
 )

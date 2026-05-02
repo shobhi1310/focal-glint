@@ -78,6 +78,9 @@ data class NotificationEntity(
     @ColumnInfo(name = "content_hash")
     val contentHash: String? = null,
 
+    @ColumnInfo(name = "is_bank_transaction")
+    val isBankTransaction: Boolean = false,
+
     @ColumnInfo(name = "extracted_categories")
     val extractedCategories: String? = null
 ) {

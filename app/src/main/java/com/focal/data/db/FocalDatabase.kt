@@ -19,6 +19,8 @@ import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.RuleEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.db.entity.WidgetConfigEntity
+import com.focal.data.db.dao.TransactionDao
+import com.focal.data.db.entity.TransactionEntity
 import com.focal.data.db.entity.WidgetStateEntity
 
 @Database(
@@ -30,9 +32,10 @@ import com.focal.data.db.entity.WidgetStateEntity
         TopicEntity::class,
         WidgetConfigEntity::class,
         ExtractedDataEntity::class,
-        WidgetStateEntity::class
+        WidgetStateEntity::class,
+        TransactionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class FocalDatabase : RoomDatabase() {
@@ -44,6 +47,7 @@ abstract class FocalDatabase : RoomDatabase() {
     abstract fun widgetConfigDao(): WidgetConfigDao
     abstract fun extractedDataDao(): ExtractedDataDao
     abstract fun widgetStateDao(): WidgetStateDao
+    abstract fun transactionDao(): TransactionDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -156,6 +160,30 @@ abstract class FocalDatabase : RoomDatabase() {
                         last_updated_at INTEGER NOT NULL
                     )"""
                 )
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notifications ADD COLUMN is_bank_transaction INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        notification_id TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        direction TEXT NOT NULL,
+                        account TEXT NOT NULL,
+                        bank TEXT NOT NULL,
+                        raw_merchant TEXT,
+                        matched_notification_id TEXT,
+                        matched_app TEXT,
+                        matched_merchant TEXT,
+                        category TEXT,
+                        posted_at INTEGER NOT NULL,
+                        matched_at INTEGER
+                    )
+                """.trimIndent())
+                db.execSQL("ALTER TABLE extracted_data ADD COLUMN matched_transaction_id INTEGER")
             }
         }
     }
