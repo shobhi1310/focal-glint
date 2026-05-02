@@ -103,7 +103,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // LiteRT-LM for on-device LLM inference
-    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
     implementation("com.google.ai.edge.litert:litert:latest.release")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
