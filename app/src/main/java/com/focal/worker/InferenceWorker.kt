@@ -107,13 +107,17 @@ class InferenceWorker @AssistedInject constructor(
         }
         if (reclassified > 0) Log.d(TAG, "Reclassified $reclassified notifications with updated rules")
 
-        val pending = notificationRepository.getPendingForClassification()
+        val pendingClassification = notificationRepository.getPendingForClassification()
+        val bankNeedingExtraction = notificationRepository.getBankTransactionsWithoutExtraction()
+        val pending = (pendingClassification + bankNeedingExtraction).distinctBy { it.id }
+
         if (pending.isEmpty()) {
             Log.d(TAG, "No pending notifications to classify")
-            // Still run topic generation + widget compute
             runTopicGeneration()
             return true
         }
+
+        Log.d(TAG, "Pending: ${pendingClassification.size} classification + ${bankNeedingExtraction.size} bank extraction")
 
         val cloudEnabled = modelManager.isCloudEnabled()
         if (!cloudEnabled && !inferenceProvider.isReady()) {

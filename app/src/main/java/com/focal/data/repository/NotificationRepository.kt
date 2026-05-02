@@ -38,6 +38,10 @@ class NotificationRepository(
         return notificationDao.getPending()
     }
 
+    suspend fun getBankTransactionsWithoutExtraction(): List<NotificationEntity> {
+        return notificationDao.getBankTransactionsWithoutExtraction()
+    }
+
     suspend fun saveNotification(notification: NotificationEntity) {
         notificationDao.insert(notification)
         appProfileDao.insertIfNew(

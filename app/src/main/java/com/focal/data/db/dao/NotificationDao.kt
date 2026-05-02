@@ -25,6 +25,9 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE processed_at IS NULL ORDER BY posted_at ASC")
     suspend fun getPending(): List<NotificationEntity>
 
+    @Query("SELECT * FROM notifications WHERE is_bank_transaction = 1 AND id NOT IN (SELECT notification_id FROM transactions) ORDER BY posted_at ASC")
+    suspend fun getBankTransactionsWithoutExtraction(): List<NotificationEntity>
+
     @Query("SELECT * FROM notifications WHERE package_name = :packageName AND posted_at > :since ORDER BY posted_at DESC")
     suspend fun getByPackage(packageName: String, since: Long): List<NotificationEntity>
 
