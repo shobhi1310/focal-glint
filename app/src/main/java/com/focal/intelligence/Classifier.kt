@@ -178,8 +178,19 @@ class Classifier(
         val allTools = mutableListOf<ToolSet>(classifyTool)
         allTools.addAll(extractionTools.values)
 
+        val bankIndices = notifications.mapIndexedNotNull { i, n ->
+            if (n.isBankTransaction) i + 1 else null
+        }
+        var effectiveExtractionTools = extractionTools
+        if (bankIndices.isNotEmpty() && "bank_transaction" !in extractionTools) {
+            val bankTools = ExtractionToolFactory.createTools(listOf("bank_transaction"))
+            allTools.addAll(bankTools.values)
+            effectiveExtractionTools = extractionTools + bankTools
+        }
+
         val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus()) +
-            PromptBuilder.buildExtractionAugment(extractionTools.keys.toList())
+            PromptBuilder.buildExtractionAugment(extractionTools.keys.toList()) +
+            PromptBuilder.buildBankTransactionAugment(bankIndices)
 
 
         return try {
@@ -193,7 +204,7 @@ class Classifier(
                     messageCount++
                 }
 
-            val extractionResults = ExtractionToolFactory.collectResults(extractionTools)
+            val extractionResults = ExtractionToolFactory.collectResults(effectiveExtractionTools)
             Log.i(TAG, "extract done: messages=$messageCount classified=${classifyTool.resultCount()}/${notifications.size} extracted=${extractionResults.size}")
 
             if (extractionResults.isNotEmpty() && widgetRepository != null) {

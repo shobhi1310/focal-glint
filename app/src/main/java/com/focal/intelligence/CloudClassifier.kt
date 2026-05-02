@@ -79,18 +79,25 @@ class CloudClassifier(
         if (notifications.isEmpty()) return emptyList()
 
         val prompt = PromptBuilder.buildBatchClassificationPrompt(notifications)
-        val categoriesStr = activeCategories.joinToString(", ")
-        Log.i(TAG, "classifyAndExtractBatch: count=${notifications.size} categories=[$categoriesStr] promptLen=${prompt.length}")
+        val hasBankSms = notifications.any { it.isBankTransaction }
+        val effectiveCategories = if (hasBankSms) {
+            (activeCategories + "bank_transaction").distinct()
+        } else activeCategories
+        Log.i(TAG, "classifyAndExtractBatch: count=${notifications.size} categories=[${effectiveCategories.joinToString(", ")}] promptLen=${prompt.length}")
 
+        val bankIndices = notifications.mapIndexedNotNull { i, n ->
+            if (n.isBankTransaction) i + 1 else null
+        }
         val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager.getUserFocus()) +
-            PromptBuilder.buildExtractionAugment(activeCategories)
+            PromptBuilder.buildExtractionAugment(effectiveCategories) +
+            PromptBuilder.buildBankTransactionAugment(bankIndices)
 
         val tools = mutableListOf(buildClassifyToolDefinition())
-        if ("finance" in activeCategories) tools.add(buildExtractFinanceToolDefinition())
-        if ("work" in activeCategories) tools.add(buildExtractWorkToolDefinition())
-        if ("personal" in activeCategories) tools.add(buildExtractPersonalToolDefinition())
-        if ("logistics" in activeCategories) tools.add(buildExtractLogisticsToolDefinition())
-        if ("bank_transaction" in activeCategories) tools.add(buildExtractBankTransactionToolDefinition())
+        if ("finance" in effectiveCategories) tools.add(buildExtractFinanceToolDefinition())
+        if ("work" in effectiveCategories) tools.add(buildExtractWorkToolDefinition())
+        if ("personal" in effectiveCategories) tools.add(buildExtractPersonalToolDefinition())
+        if ("logistics" in effectiveCategories) tools.add(buildExtractLogisticsToolDefinition())
+        if ("bank_transaction" in effectiveCategories) tools.add(buildExtractBankTransactionToolDefinition())
 
         val request = ChatCompletionRequest(
             model = modelManager.getCloudModelName(),

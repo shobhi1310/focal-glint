@@ -43,6 +43,14 @@ object PromptBuilder {
         return "[1] App: ${notification.appName} · Title: ${notification.title} · Content: $body"
     }
 
+    fun buildBankTransactionAugment(bankFlaggedIndices: List<Int>): String {
+        if (bankFlaggedIndices.isEmpty()) return ""
+        val indices = bankFlaggedIndices.joinToString(", ") { "[$it]" }
+        return "\n\nNotifications at indices $indices are bank transaction SMS. " +
+            "You MUST call extractBankTransaction for each of them to extract the " +
+            "amount, direction (debit/credit), account number, bank name, and merchant."
+    }
+
     fun buildBatchClassificationPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
         notifications.forEachIndexed { i, n ->
