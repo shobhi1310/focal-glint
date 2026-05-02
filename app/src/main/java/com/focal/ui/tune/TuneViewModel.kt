@@ -100,17 +100,24 @@ class TuneViewModel @Inject constructor(
     }
 
     fun onToggle(packageName: String, newState: String?) {
+        val app = _uiState.value.apps.firstOrNull { it.packageName == packageName }
+        val hasSystemDefault = app?.systemDefault != null
+        // If user taps A on an app with a system default, they want LLM to decide.
+        // We store "auto" as an explicit user override to suppress the system rule.
+        val effectiveState = if (newState == null && hasSystemDefault) "auto" else newState
+        val isUserSet = effectiveState != null
+
         _uiState.value = _uiState.value.copy(
-            apps = _uiState.value.apps.map { app ->
-                if (app.packageName == packageName) app.copy(
-                    userOverride = newState,
-                    isUserSet = newState != null
+            apps = _uiState.value.apps.map { a ->
+                if (a.packageName == packageName) a.copy(
+                    userOverride = effectiveState,
+                    isUserSet = isUserSet
                 )
-                else app
+                else a
             }
         )
 
-        pendingChanges[packageName] = newState
+        pendingChanges[packageName] = effectiveState
 
         debounceJob?.cancel()
         debounceJob = viewModelScope.launch {

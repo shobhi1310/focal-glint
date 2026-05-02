@@ -432,7 +432,12 @@ private fun TuneAppRow(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (app.isUserSet) "Set by you" else "system default",
+                text = when {
+                    app.userOverride == "auto" -> "Set to auto (was: ${app.systemDefault})"
+                    app.isUserSet -> "Set by you"
+                    app.systemDefault != null -> "Default: ${app.systemDefault}"
+                    else -> "${app.notificationCount} notifications"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -440,12 +445,18 @@ private fun TuneAppRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // M/A/N pill toggle
+        // M/A/N pill: if user has explicitly set, show their choice.
+        // If no user override, show system default. Tapping A clears user override.
         MaNPill(
             selected = when (app.userOverride) {
                 "matters" -> 0
                 "noise" -> 2
-                else -> 1
+                "auto" -> 1
+                else -> when (app.systemDefault) {
+                    "matters" -> 0
+                    "noise" -> 2
+                    else -> 1
+                }
             },
             isUserSet = app.isUserSet,
             onSelect = { index ->
