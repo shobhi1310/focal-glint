@@ -51,11 +51,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.focal.ui.components.AppIcon
 import com.focal.ui.components.SectionHeader
 import com.focal.ui.components.UserPreference
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import com.focal.ui.theme.ThemeMode
 import com.focal.ui.theme.ThemePreference
 
@@ -212,6 +219,73 @@ fun TuneScreen(
                         )
                     }
                 }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // User focus
+            item {
+                SectionHeader(title = "YOUR FOCUS")
+            }
+            item {
+                Text(
+                    text = "Tell Focal what you care about. This shapes how notifications are triaged.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            item {
+                var focus by remember(state.userFocus) { mutableStateOf(state.userFocus) }
+                val speechLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == Activity.RESULT_OK) {
+                        val spoken = result.data
+                            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                            ?.firstOrNull() ?: return@rememberLauncherForActivityResult
+                        val updated = if (focus.isBlank()) spoken else "$focus $spoken"
+                        focus = updated
+                        viewModel.onUserFocusChanged(updated)
+                    }
+                }
+                OutlinedTextField(
+                    value = focus,
+                    onValueChange = { focus = it; viewModel.onUserFocusChanged(it) },
+                    placeholder = {
+                        Text(
+                            "e.g. Track my UPI spends from GPay and PhonePe. " +
+                                "Show me when Shruti or Amma messages. " +
+                                "Flag HDFC and ICICI bank alerts. " +
+                                "Ignore all news and YouTube.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "What do you want Focal to focus on?")
+                            }
+                            speechLauncher.launch(intent)
+                        }) {
+                            Icon(
+                                Icons.Outlined.Mic,
+                                contentDescription = "Speak",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    )
+                )
             }
 
             item { Spacer(modifier = Modifier.height(8.dp)) }

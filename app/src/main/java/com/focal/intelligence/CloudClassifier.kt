@@ -45,7 +45,7 @@ class CloudClassifier(
         val prompt = PromptBuilder.buildBatchClassificationPrompt(notifications)
         Log.i(TAG, "classifyBatch: count=${notifications.size} promptLen=${prompt.length}")
 
-        val systemPrompt = BATCH_CLASSIFICATION_SYSTEM_PROMPT
+        val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager.getUserFocus())
 
         val request = ChatCompletionRequest(
             model = modelManager.getCloudModelName(),
@@ -82,13 +82,8 @@ class CloudClassifier(
         val categoriesStr = activeCategories.joinToString(", ")
         Log.i(TAG, "classifyAndExtractBatch: count=${notifications.size} categories=[$categoriesStr] promptLen=${prompt.length}")
 
-        val systemPrompt = BATCH_CLASSIFICATION_SYSTEM_PROMPT +
-            "\n\nFor every notification you marked 'matters', also call the appropriate extraction " +
-            "tool(s) so the user's widgets can show what happened. A single notification may trigger " +
-            "multiple extraction tools when it contains multiple distinct things. When the same " +
-            "real-world event appears across several notifications (echoed across SMS, email, or app " +
-            "pushes), call the extraction tool only once for the most authoritative source. Available " +
-            "extraction categories: $categoriesStr. Output tool calls only."
+        val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager.getUserFocus()) +
+            PromptBuilder.buildExtractionAugment(activeCategories)
 
         val tools = mutableListOf(buildClassifyToolDefinition())
         if ("finance" in activeCategories) tools.add(buildExtractFinanceToolDefinition())
@@ -287,16 +282,6 @@ class CloudClassifier(
         const val CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
         const val DEFAULT_MODEL_NAME = "gemma-4-it"
         const val TIMEOUT_SECONDS = 60L
-
-        private const val BATCH_CLASSIFICATION_SYSTEM_PROMPT =
-            "You are a notification triage assistant. Your job is to decide whether each notification " +
-                "meaningfully adds value to the user's day or just demands their attention without giving " +
-                "anything back. For every [index] in the list, call classifyNotification exactly once with " +
-                "that same index. Mark it 'matters' if a thoughtful person would want to know about it now " +
-                "— something asks for their attention, response, awareness, or money. Mark it 'noise' if it " +
-                "exists to pull the user into an app, sell them something, surface algorithmic content, or " +
-                "repeat what they already know. Use a short snake_case reason. Output tool calls only — no " +
-                "prose."
     }
 }
 

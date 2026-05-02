@@ -10,16 +10,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 
 private const val TAG = "Classifier"
-private const val BATCH_CLASSIFICATION_SYSTEM =
-    "You are a notification triage assistant. Your job is to decide whether each notification " +
-        "meaningfully adds value to the user's day or just demands their attention without giving " +
-        "anything back. For every [index] in the list, call classifyNotification exactly once with " +
-        "that same index. Mark it 'matters' if a thoughtful person would want to know about it now " +
-        "— something asks for their attention, response, awareness, or money. Mark it 'noise' if it " +
-        "exists to pull the user into an app, sell them something, surface algorithmic content, or " +
-        "repeat what they already know. Use a short snake_case reason. Output tool calls only — no " +
-        "prose."
-private const val CLASSIFICATION_SYSTEM = BATCH_CLASSIFICATION_SYSTEM
 private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
 
 internal fun isSyntheticToolEcho(text: String): Boolean {
@@ -59,7 +49,8 @@ class Classifier(
             var messageCount = 0
             var toolCallCount = 0
 
-            inferenceProvider.generateWithTools(CLASSIFICATION_SYSTEM, prompt, listOf(tool))
+            val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus())
+            inferenceProvider.generateWithTools(systemPrompt, prompt, listOf(tool))
                 .catch { e ->
                     Log.e(TAG, "stream error: ${e.message}", e)
                     throw e
@@ -132,7 +123,8 @@ class Classifier(
             var messageCount = 0
             var toolCallCount = 0
 
-            inferenceProvider.generateWithTools(BATCH_CLASSIFICATION_SYSTEM, prompt, listOf(tool))
+            val classifySystemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus())
+            inferenceProvider.generateWithTools(classifySystemPrompt, prompt, listOf(tool))
                 .catch { e -> Log.e(TAG, "batch stream error: ${e.message}", e); throw e }
                 .collect { message ->
                     message.toolCalls?.forEachIndexed { i, call ->
@@ -186,13 +178,8 @@ class Classifier(
         val allTools = mutableListOf<ToolSet>(classifyTool)
         allTools.addAll(extractionTools.values)
 
-        val systemPrompt = BATCH_CLASSIFICATION_SYSTEM +
-            "\n\nFor every notification you marked 'matters', also call the appropriate extraction " +
-            "tool(s) so the user's widgets can show what happened. A single notification may trigger " +
-            "multiple extraction tools when it contains multiple distinct things. When the same " +
-            "real-world event appears across several notifications (echoed across SMS, email, or app " +
-            "pushes), call the extraction tool only once for the most authoritative source. Available " +
-            "extraction categories: $allToolCategories. Output tool calls only."
+        val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus()) +
+            PromptBuilder.buildExtractionAugment(extractionTools.keys.toList())
 
 
         return try {

@@ -36,7 +36,8 @@ data class TuneUiState(
     val apps: List<TuneAppItem> = emptyList(),
     val snackbarMessage: String? = null,
     val cloudEnabled: Boolean = false,
-    val dataConsentEnabled: Boolean = false
+    val dataConsentEnabled: Boolean = false,
+    val userFocus: String = ""
 )
 
 @HiltViewModel
@@ -87,7 +88,8 @@ class TuneViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 apps = apps,
                 cloudEnabled = modelManager.isCloudEnabled(),
-                dataConsentEnabled = modelManager.isDataConsentEnabled()
+                dataConsentEnabled = modelManager.isDataConsentEnabled(),
+                userFocus = modelManager.getUserFocus()
             )
 
             val packageNames = apps.map { it.packageName }
@@ -115,6 +117,11 @@ class TuneViewModel @Inject constructor(
             delay(3000)
             persistChanges()
         }
+    }
+
+    fun onUserFocusChanged(focus: String) {
+        _uiState.value = _uiState.value.copy(userFocus = focus)
+        modelManager.setUserFocus(focus)
     }
 
     fun onToggleCloud(enabled: Boolean) {

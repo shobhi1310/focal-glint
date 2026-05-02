@@ -165,6 +165,16 @@ class ModelManager(private val context: Context) {
             .edit().putString("cloud_model_name", name.trim()).apply()
     }
 
+    fun getUserFocus(): String {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("user_focus", "") ?: ""
+    }
+
+    fun setUserFocus(focus: String) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putString("user_focus", focus.trim()).apply()
+    }
+
     fun setPendingRebuild(pending: Boolean) {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("pending_topic_rebuild", pending).apply()

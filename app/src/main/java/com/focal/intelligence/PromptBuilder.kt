@@ -4,6 +4,40 @@ import com.focal.data.db.entity.NotificationEntity
 
 object PromptBuilder {
 
+    private const val TASK_INSTRUCTION =
+        "You are a notification triage assistant. For every [index] in the list, call " +
+            "classifyNotification exactly once with that same index. Use a short snake_case " +
+            "reason. Output tool calls only — no prose."
+
+    private const val DEFAULT_CRITERIA =
+        "Mark it 'matters' if a thoughtful person would want to know about it now — something " +
+            "asks for their attention, response, awareness, or money. Mark it 'noise' if it " +
+            "exists to pull the user into an app, sell them something, surface algorithmic " +
+            "content, or repeat what they already know."
+
+    fun buildClassificationSystemPrompt(userFocus: String?): String {
+        val criteria = if (userFocus.isNullOrBlank()) {
+            DEFAULT_CRITERIA
+        } else {
+            "The user has described what they care about:\n\"$userFocus\"\n\n" +
+                "Mark 'matters' if the notification serves their stated interests or requires " +
+                "their attention. Mark 'noise' if it doesn't align with what they described or " +
+                "is clearly unwanted. For notifications not covered by their stated interests, " +
+                "use your best judgment — personal communication and urgent alerts still matter."
+        }
+        return "$TASK_INSTRUCTION\n\n$criteria"
+    }
+
+    fun buildExtractionAugment(activeCategories: List<String>): String {
+        val categoriesStr = activeCategories.joinToString(", ")
+        return "\n\nFor every notification you marked 'matters', also call the appropriate extraction " +
+            "tool(s) so the user's widgets can show what happened. A single notification may trigger " +
+            "multiple extraction tools when it contains multiple distinct things. When the same " +
+            "real-world event appears across several notifications (echoed across SMS, email, or app " +
+            "pushes), call the extraction tool only once for the most authoritative source. Available " +
+            "extraction categories: $categoriesStr. Output tool calls only."
+    }
+
     fun buildClassificationPrompt(notification: NotificationEntity): String {
         val body = (notification.bigText ?: notification.content).replace('\n', ' ').take(200)
         return "[1] App: ${notification.appName} · Title: ${notification.title} · Content: $body"
