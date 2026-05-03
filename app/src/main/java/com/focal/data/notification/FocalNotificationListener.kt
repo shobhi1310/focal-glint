@@ -1,5 +1,9 @@
 package com.focal.data.notification
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -32,6 +36,18 @@ class FocalNotificationListener : NotificationListenerService() {
     // Keyed by notificationKey+title+content; values are timestamps. Main-thread only — no lock needed.
     private val recentlySeen = HashMap<String, Long>()
 
+    // Notification keys of redacted SMS that need re-extraction on unlock
+    private val redactedSmsKeys = mutableSetOf<String>()
+
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_USER_PRESENT && redactedSmsKeys.isNotEmpty()) {
+                Log.d("FocalListener", "Phone unlocked — re-extracting ${redactedSmsKeys.size} redacted SMS")
+                reExtractRedactedNotifications()
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
@@ -49,6 +65,8 @@ class FocalNotificationListener : NotificationListenerService() {
         repository = NotificationRepository(db.notificationDao(), db.appProfileDao())
         val ruleRepository = RuleRepository(db.ruleDao(), db.correctionDao())
         rulesEngine = RulesEngine(ruleRepository)
+
+        registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -81,6 +99,12 @@ class FocalNotificationListener : NotificationListenerService() {
             }
 
             Log.d("FocalListener", "Captured: ${entity.appName} - ${entity.title}: ${entity.content}")
+
+            if (entity.packageName == "com.google.android.apps.messaging"
+                && entity.content.contains("Sensitive notification content hidden")) {
+                redactedSmsKeys.add(sbn.key)
+                Log.d("FocalListener", "Redacted SMS detected, queued for re-extraction: ${sbn.key}")
+            }
 
             val isBankTxn = BankSmsDetector.isBankTransaction(
                 entity.packageName, entity.title, entity.content
@@ -115,11 +139,72 @@ class FocalNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // No action needed for v1
+        sbn ?: return
+        redactedSmsKeys.remove(sbn.key)
+    }
+
+    private fun reExtractRedactedNotifications() {
+        val keysToProcess = redactedSmsKeys.toSet()
+        redactedSmsKeys.clear()
+
+        val activeNotifications = try {
+            getActiveNotifications() ?: emptyArray()
+        } catch (e: Exception) {
+            Log.w("FocalListener", "Failed to get active notifications", e)
+            return
+        }
+
+        var reExtracted = 0
+        for (sbn in activeNotifications) {
+            if (sbn.key !in keysToProcess) continue
+
+            serviceScope.launch {
+                val entity = extractor.extract(sbn) ?: return@launch
+                if (entity.content.contains("Sensitive notification content hidden")) {
+                    Log.d("FocalListener", "Still redacted after unlock: ${sbn.key}")
+                    return@launch
+                }
+
+                Log.d("FocalListener", "Re-extracted: ${entity.appName} - ${entity.title}: ${entity.content}")
+
+                val isBankTxn = BankSmsDetector.isBankTransaction(
+                    entity.packageName, entity.title, entity.content
+                )
+
+                val ruleResult = rulesEngine.classify(entity)
+                val classified = if (ruleResult != null) {
+                    entity.copy(
+                        category = ruleResult.category,
+                        classifiedBy = ruleResult.classifiedBy,
+                        ruleId = ruleResult.ruleId,
+                        processedAt = System.currentTimeMillis(),
+                        isBankTransaction = isBankTxn
+                    )
+                } else {
+                    entity.copy(isBankTransaction = isBankTxn)
+                }
+
+                repository.upsertNotification(classified)
+                Log.d("FocalListener", "Re-saved: ${classified.title} -> ${classified.category} bankTxn=$isBankTxn")
+            }
+            reExtracted++
+        }
+
+        if (reExtracted > 0) {
+            val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>()
+                .setInitialDelay(5, TimeUnit.SECONDS)
+                .build()
+            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                InferenceWorker.WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                workRequest
+            )
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        try { unregisterReceiver(unlockReceiver) } catch (_: Exception) { }
         if (wakeLock.isHeld) wakeLock.release()
         serviceScope.cancel()
     }
