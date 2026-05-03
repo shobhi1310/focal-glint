@@ -78,9 +78,11 @@ class WidgetComputeEngine(
             )
         }
 
-        val debits = transactions.filter { it.direction == "debit" }
-        val totalSpent = debits.sumOf { it.amount }
-        val formatted = "₹${"%.0f".format(totalSpent)}"
+        val totalSent = transactions.filter { it.direction == "debit" }.sumOf { it.amount }
+        val totalReceived = transactions.filter { it.direction == "credit" }.sumOf { it.amount }
+        val net = totalReceived - totalSent
+        val netPrefix = if (net >= 0) "+" else "-"
+        val formatted = "${netPrefix}₹${"%.0f".format(kotlin.math.abs(net))}"
 
         val latest = transactions.maxByOrNull { it.postedAt }
         val latestPrefix = if (latest?.direction == "credit") "+" else "-"
@@ -100,12 +102,7 @@ class WidgetComputeEngine(
             mapOf("label" to key, "value" to "${prefix}₹${"%.0f".format(kotlin.math.abs(sum))}")
         }.sortedByDescending { it["value"]?.removePrefix("+")?.removePrefix("-")?.removePrefix("₹")?.toDoubleOrNull() ?: 0.0 }
 
-        val merchantCount = grouped.size
-        val unassignedCount = transactions.count { it.matchedNotificationId == null }
-        val subtitle = buildString {
-            append("Across $merchantCount merchants")
-            if (unassignedCount > 0) append(" · $unassignedCount unassigned")
-        }
+        val subtitle = "₹${"%.0f".format(totalSent)} sent · ₹${"%.0f".format(totalReceived)} received"
 
         val sourceApps = transactions.mapNotNull { it.matchedApp }.distinct()
 
