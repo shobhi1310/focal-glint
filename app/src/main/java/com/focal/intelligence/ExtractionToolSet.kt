@@ -55,13 +55,13 @@ class ExtractWorkTool : ToolSet {
     private val _results = mutableListOf<ExtractionResult>()
     val results: List<ExtractionResult> get() = _results
 
-    @Tool("Extract work item data from a notification about PRs, issues, code reviews, or work tasks")
+    @Tool("Call only for software or project workflow events that reference a concrete trackable item — a pull request, code review, issue, or automated build result with an ID or name. The notification must be about an action on that item (opened, merged, assigned, failed, review requested). Skip professional social network activity, chat messages between colleagues, meeting invites, and anything without a specific item reference to act on.")
     fun extractWork(
         @ToolParam("1-based index of the notification") index: Int,
-        @ToolParam("Work entity identifier like PR #482, Issue FOCAL-31, or thread name") entity: String,
-        @ToolParam("Person who sent or triggered this") sender: String,
-        @ToolParam("Action type: review_requested, merged, commented, assigned, mentioned, or other") action: String,
-        @ToolParam("Repository or project name if mentioned") repo: String
+        @ToolParam("The specific item being acted on: PR number, issue ID, build name, or ticket reference") entity: String,
+        @ToolParam("Person who triggered the event") sender: String,
+        @ToolParam("Action type: review_requested, merged, commented, assigned, build_failed, build_passed, or mentioned") action: String,
+        @ToolParam("Repository or project name if present, otherwise empty") repo: String
     ): Map<String, Any> {
         Log.i(TAG, "work: index=$index entity=$entity sender=$sender action=$action")
         _results.add(ExtractionResult(index, "work", Json.encodeToString(WorkData(entity, sender, action, repo.takeIf { it.isNotBlank() }))))
@@ -73,13 +73,13 @@ class ExtractPersonalTool : ToolSet {
     private val _results = mutableListOf<ExtractionResult>()
     val results: List<ExtractionResult> get() = _results
 
-    @Tool("Extract personal contact data from a notification about calls, messages, or personal communication")
+    @Tool("Call only when a real named person directly sent the user a 1-on-1 message or placed a call — the communication is intentionally addressed to this specific user. Skip: broadcast or channel posts sent to many people at once, meeting reminders and calendar alerts, automated system messages, social activity notifications (reactions, follows, story posts, likes), professional network alerts, and any notification where an app or service is the sender rather than a real individual.")
     fun extractPersonal(
         @ToolParam("1-based index of the notification") index: Int,
-        @ToolParam("Name of the person who reached out") sender: String,
-        @ToolParam("Communication channel: call, message, email, or other") channel: String,
-        @ToolParam("Number of attempts or messages, default 1") count: Int,
-        @ToolParam("Brief content snippet if available") snippet: String
+        @ToolParam("Full name of the real person who sent the message or call — not an app, channel, or automated sender") sender: String,
+        @ToolParam("How they reached out: call, message, email, or dm") channel: String,
+        @ToolParam("Number of messages or call attempts, default 1") count: Int,
+        @ToolParam("Brief snippet of what they said, if visible") snippet: String
     ): Map<String, Any> {
         Log.i(TAG, "personal: index=$index sender=$sender channel=$channel count=$count")
         _results.add(ExtractionResult(index, "personal", Json.encodeToString(PersonalData(sender, channel, count, snippet.takeIf { it.isNotBlank() }))))
@@ -91,13 +91,13 @@ class ExtractLogisticsTool : ToolSet {
     private val _results = mutableListOf<ExtractionResult>()
     val results: List<ExtractionResult> get() = _results
 
-    @Tool("Extract delivery or logistics data from a notification about orders, shipments, or tracking")
+    @Tool("Call only when an order the user placed is actively moving through delivery — the notification reports a real status change: shipped, out for delivery, delivered, delayed, or delivery failed. Skip promotional offers, cart or wishlist reminders, deals and discounts, food or restaurant discovery, and any notification not about a specific order currently in transit.")
     fun extractLogistics(
         @ToolParam("1-based index of the notification") index: Int,
-        @ToolParam("Item or order description") item: String,
-        @ToolParam("Merchant or delivery service name") merchant: String,
-        @ToolParam("Delivery status: ordered, shipped, out_for_delivery, delivered, or cancelled") status: String,
-        @ToolParam("Estimated arrival time in minutes, or -1 if unknown") etaMinutes: Int
+        @ToolParam("What is being delivered — item name or order description") item: String,
+        @ToolParam("The seller or delivery service handling the shipment") merchant: String,
+        @ToolParam("Current delivery status: shipped, out_for_delivery, delivered, delayed, or cancelled") status: String,
+        @ToolParam("Estimated minutes until arrival, or -1 if not stated") etaMinutes: Int
     ): Map<String, Any> {
         Log.i(TAG, "logistics: index=$index item=$item merchant=$merchant status=$status")
         _results.add(ExtractionResult(index, "logistics", Json.encodeToString(LogisticsData(item, merchant, status, etaMinutes.takeIf { it >= 0 }))))

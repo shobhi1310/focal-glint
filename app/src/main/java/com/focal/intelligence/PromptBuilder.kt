@@ -30,12 +30,12 @@ object PromptBuilder {
 
     fun buildExtractionAugment(activeCategories: List<String>): String {
         val categoriesStr = activeCategories.joinToString(", ")
-        return "\n\nFor every notification you marked 'matters', also call the appropriate extraction " +
-            "tool(s) so the user's widgets can show what happened. A single notification may trigger " +
-            "multiple extraction tools when it contains multiple distinct things. When the same " +
-            "real-world event appears across several notifications (echoed across SMS, email, or app " +
-            "pushes), call the extraction tool only once for the most authoritative source. Available " +
-            "extraction categories: $categoriesStr. Output tool calls only."
+        return "\n\nFor notifications you marked 'matters', also call an extraction tool if — and only if — " +
+            "the notification is a clear, confident match for that tool's stated criteria. Read each tool's " +
+            "description carefully before calling it. If the notification loosely relates to a category but " +
+            "does not meet the criteria, do not call that tool. When the same real-world event appears across " +
+            "several notifications, call the extraction tool once for the most informative source only. " +
+            "Available extraction categories: $categoriesStr. Output tool calls only."
     }
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {

@@ -3,6 +3,7 @@ package com.focal.intelligence
 import android.util.Log
 import com.google.ai.edge.litert.Accelerator
 import com.google.ai.edge.litert.CompiledModel
+import com.google.ai.edge.litert.TensorBuffer
 import java.io.Closeable
 
 /**
@@ -28,26 +29,32 @@ class EmbeddingGemmaLiteRtEmbedder(
 
     @Volatile private var model: CompiledModel? = null
     @Volatile private var tokenizer: SentencePieceTokenizer? = null
+    // Pre-allocated once at initialize() and reused across all embed() calls.
+    // Avoids 200 GPU buffer alloc/free cycles per 100-notification rebuild.
+    private var cachedInputs: List<TensorBuffer>? = null
+    private var cachedOutputs: List<TensorBuffer>? = null
 
     fun initialize(tokenizerPath: String) {
         val m = CompiledModel.create(modelPath, buildModelOptions(useGpu))
-        logModelInfo(m)
+        cachedInputs = m.createInputBuffers()
+        cachedOutputs = m.createOutputBuffers()
+        logModelInfo()
         model = m
         tokenizer = SentencePieceTokenizer(tokenizerPath).also { it.initialize() }
     }
 
     fun embed(text: String): FloatArray {
-        val m   = model     ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
-        val tok = tokenizer ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
+        val m      = model         ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
+        val tok    = tokenizer     ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
+        val inputs = cachedInputs  ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
+        val outputs = cachedOutputs ?: error("EmbeddingGemmaLiteRtEmbedder not initialized")
 
         val ids  = buildInputIds(tok.encode(text))
         val mask = IntArray(MAX_SEQ_LEN) { i -> if (ids[i] != PAD_TOKEN_ID) 1 else 0 }
 
-        val inputs  = m.createInputBuffers()
         inputs[0].writeInt(ids)
         if (inputs.size > 1) inputs[1].writeInt(mask)
 
-        val outputs = m.createOutputBuffers()
         m.run(inputs, outputs)
 
         return VectorMath.l2Normalize(outputs[0].readFloat())
@@ -81,10 +88,10 @@ class EmbeddingGemmaLiteRtEmbedder(
         }
     }
 
-    private fun logModelInfo(m: CompiledModel) {
+    private fun logModelInfo() {
         try {
-            val ins  = m.createInputBuffers()
-            val outs = m.createOutputBuffers()
+            val ins  = cachedInputs  ?: return
+            val outs = cachedOutputs ?: return
             Log.d(TAG, "Model loaded — inputs: ${ins.size}, outputs: ${outs.size}")
             Log.d(TAG, "Output[0] size: ${outs[0].readFloat().size}")
             Log.d(TAG, "Embedding backend requested: ${if (useGpu) "GPU" else "CPU"}")
@@ -96,6 +103,8 @@ class EmbeddingGemmaLiteRtEmbedder(
     override fun close() {
         tokenizer?.close()
         tokenizer = null
+        cachedInputs = null
+        cachedOutputs = null
         model?.close()
         model = null
     }

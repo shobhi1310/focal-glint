@@ -11,8 +11,12 @@ import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolManager
 import com.google.ai.edge.litertlm.ToolSet
 import com.google.ai.edge.litertlm.tool
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -123,10 +127,12 @@ class LiteRtLmProvider @Inject constructor(
                     activeConversation = null
 
                     Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
+                    val toolProviders = tools.map { tool(it) }
+                    val toolManager = ToolManager(toolProviders)
                     val config = ConversationConfig(
                         systemInstruction = Contents.of(systemInstruction),
-                        tools = tools.map { tool(it) },
-                        automaticToolCalling = true,
+                        tools = toolProviders,
+                        automaticToolCalling = false,
                         channels = THINKING_CHANNELS
                     )
                     ExperimentalFlags.enableConversationConstrainedDecoding = true
@@ -137,7 +143,12 @@ class LiteRtLmProvider @Inject constructor(
                     }
                     activeConversation = conv as? AutoCloseable
                     try {
-                        conv.sendMessageAsync(prompt).collect { emit(it) }
+                        conv.sendMessageAsync(prompt).collect { message ->
+                            message.toolCalls.forEach { call ->
+                                toolManager.execute(call.name, call.arguments.toJsonObject())
+                            }
+                            emit(message)
+                        }
                     } finally {
                         (conv as? AutoCloseable)?.close()
                         activeConversation = null
@@ -166,3 +177,9 @@ class LiteRtLmProvider @Inject constructor(
         private const val TAG = "LiteRtLmProvider"
     }
 }
+
+// ToolCall.arguments values are JsonElement instances from Gson's JsonObject.toMap().
+private fun Map<String, Any?>.toJsonObject(): JsonObject =
+    JsonObject().also { obj ->
+        forEach { (k, v) -> obj.add(k, (v as? JsonElement) ?: JsonPrimitive(v?.toString() ?: "")) }
+    }
