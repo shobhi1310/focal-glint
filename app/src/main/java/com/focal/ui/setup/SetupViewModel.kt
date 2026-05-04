@@ -130,6 +130,9 @@ class SetupViewModel @Inject constructor(
             activeModel = if (alreadyOnDevice) variant else null
         )
         if (inferenceProvider.isReady()) {
+            // Model changed — full rebuild needed on next start so embeddings and
+            // classifications are regenerated with the new model.
+            modelManager.setPendingRebuild(true)
             _uiState.value = _uiState.value.copy(engineStopping = true)
             viewModelScope.launch {
                 stopEngine("model switch to ${variant.name}")
@@ -195,11 +198,10 @@ class SetupViewModel @Inject constructor(
     fun onStartEngine() {
         if (_uiState.value.engineStopping) return
         modelManager.setEngineEnabled(true)
-        modelManager.setPendingRebuild(true)
         _uiState.value = _uiState.value.copy(errorMessage = null)
         viewModelScope.launch {
             try {
-                val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = true)
+                val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = false)
                 if (warmed) {
                     context.startForegroundService(Intent(context, LlmForegroundService::class.java))
                     WorkManager.getInstance(context).enqueueUniqueWork(
