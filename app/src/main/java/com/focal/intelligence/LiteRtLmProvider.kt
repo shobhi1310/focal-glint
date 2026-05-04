@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
@@ -21,6 +22,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +37,7 @@ class LiteRtLmProvider @Inject constructor(
 ) : InferenceProvider {
 
     private var engine: Engine? = null
-    private var activeConversation: AutoCloseable? = null
+    private var activeConversation: Conversation? = null
 
     // Serializes inference. tryLock() lets UI callers fail fast when busy
     // instead of stacking up behind a long-running background batch.
@@ -84,7 +86,7 @@ class LiteRtLmProvider @Inject constructor(
 
         return try {
             withContext(llmDispatcher) {
-                activeConversation?.close()
+                activeConversation?.let { if (it.isAlive) it.close() }
                 activeConversation = null
 
                 val conversationConfig = ConversationConfig(
@@ -120,10 +122,10 @@ class LiteRtLmProvider @Inject constructor(
         }
         if (!acquired) throw InferenceBusyException()
 
-        return flow {
+        return channelFlow {
             try {
                 withContext(llmDispatcher) {
-                    activeConversation?.close()
+                    activeConversation?.let { if (it.isAlive) it.close() }
                     activeConversation = null
 
                     Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
@@ -141,16 +143,16 @@ class LiteRtLmProvider @Inject constructor(
                     } finally {
                         ExperimentalFlags.enableConversationConstrainedDecoding = false
                     }
-                    activeConversation = conv as? AutoCloseable
+                    activeConversation = conv
                     try {
                         conv.sendMessageAsync(prompt).collect { message ->
                             message.toolCalls.forEach { call ->
                                 toolManager.execute(call.name, call.arguments.toJsonObject())
                             }
-                            emit(message)
+                            send(message)
                         }
                     } finally {
-                        (conv as? AutoCloseable)?.close()
+                        if (conv.isAlive) conv.close()
                         activeConversation = null
                     }
                 }
@@ -164,7 +166,12 @@ class LiteRtLmProvider @Inject constructor(
 
     override fun close() {
         Log.i(TAG, "Closing engine. Active conversation will be dropped immediately if present.")
-        activeConversation?.close()
+        // Cancel any ongoing decode first so the JNI worker thread stops before we tear down
+        // the engine. Without this, engine?.close() races with RunDecodeAsync → SIGSEGV.
+        activeConversation?.let {
+            try { it.cancelProcess() } catch (_: Exception) {}
+            try { if (it.isAlive) it.close() } catch (_: Exception) {}
+        }
         activeConversation = null
         engine?.close()
         engine = null
