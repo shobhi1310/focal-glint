@@ -16,6 +16,7 @@ import com.google.ai.edge.litertlm.ToolManager
 import com.google.ai.edge.litertlm.ToolSet
 import com.google.ai.edge.litertlm.tool
 import com.google.gson.JsonElement
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -185,8 +186,19 @@ class LiteRtLmProvider @Inject constructor(
     }
 }
 
-// ToolCall.arguments values are JsonElement instances from Gson's JsonObject.toMap().
+// ToolCall.arguments values come from LiteRT-LM's JsonObject.toMap() which converts
+// JsonPrimitive(number) → Number, JsonPrimitive(string) → String, etc. We must
+// reconstruct proper JsonElement types so ReflectionTool's isNumber/isString checks pass.
 private fun Map<String, Any?>.toJsonObject(): JsonObject =
     JsonObject().also { obj ->
-        forEach { (k, v) -> obj.add(k, (v as? JsonElement) ?: JsonPrimitive(v?.toString() ?: "")) }
+        forEach { (k, v) -> obj.add(k, v.toJsonElement()) }
     }
+
+private fun Any?.toJsonElement(): JsonElement = when (this) {
+    null -> JsonNull.INSTANCE
+    is JsonElement -> this
+    is Number -> JsonPrimitive(this)
+    is Boolean -> JsonPrimitive(this)
+    is String -> JsonPrimitive(this)
+    else -> JsonPrimitive(this.toString())
+}
