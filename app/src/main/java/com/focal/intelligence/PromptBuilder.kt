@@ -5,9 +5,9 @@ import com.focal.data.db.entity.NotificationEntity
 object PromptBuilder {
 
     private const val TASK_INSTRUCTION =
-        "You are a notification triage assistant. For every [index] in the list, call " +
-            "classifyNotification exactly once with that same index. Use a short snake_case " +
-            "reason. Output tool calls only — no prose."
+        "You are a notification triage assistant. You MUST call classifyNotification exactly " +
+            "once for EVERY [index] in the list — no index may be skipped. Use a short " +
+            "snake_case reason. Output tool calls only — no prose."
 
     private const val DEFAULT_CRITERIA =
         "Mark it 'matters' if a thoughtful person would want to know about it now — something " +
@@ -30,11 +30,11 @@ object PromptBuilder {
 
     fun buildExtractionAugment(activeCategories: List<String>): String {
         val categoriesStr = activeCategories.joinToString(", ")
-        return "\n\nFor notifications you marked 'matters', also call an extraction tool if — and only if — " +
-            "the notification is a clear, confident match for that tool's stated criteria. Read each tool's " +
-            "description carefully before calling it. If the notification loosely relates to a category but " +
-            "does not meet the criteria, do not call that tool. When the same real-world event appears across " +
-            "several notifications, call the extraction tool once for the most informative source only. " +
+        return "\n\nFor every notification you marked 'matters', you MUST also call exactly one of: " +
+            "an extraction tool if the notification is a clear, confident match for that tool's stated criteria, " +
+            "OR noExtraction if none of the extraction tools apply. Read each tool's description carefully. " +
+            "When the same real-world event appears across several notifications, call the extraction tool " +
+            "once for the most informative source only and noExtraction for the rest. " +
             "Available extraction categories: $categoriesStr. Output tool calls only."
     }
 

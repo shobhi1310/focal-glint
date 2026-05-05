@@ -125,6 +125,23 @@ class ExtractBankTransactionTool : ToolSet {
     }
 }
 
+class NoExtractionTool : ToolSet {
+    private val _calledIndices = mutableSetOf<Int>()
+    val calledIndices: Set<Int> get() = _calledIndices
+
+    @Tool("Call for every 'matters' notification when none of the other extraction tools apply to it. Do not call for 'noise' notifications.")
+    fun noExtraction(
+        @ToolParam("1-based index of the notification") index: Int,
+        @ToolParam("Short snake_case reason why no extraction category applies, e.g. none_matched, general_update, reminder, not_transactional") reason: String
+    ): Map<String, Any> {
+        Log.i(TAG, "noExtraction: index=$index reason=$reason")
+        _calledIndices.add(index)
+        return mapOf("status" to "ok")
+    }
+
+    companion object { private const val TAG = "NoExtractionTool" }
+}
+
 object ExtractionToolFactory {
     fun createTools(activeCategories: List<String>): Map<String, ToolSet> {
         val tools = mutableMapOf<String, ToolSet>()
@@ -133,6 +150,8 @@ object ExtractionToolFactory {
         if ("personal" in activeCategories) tools["personal"] = ExtractPersonalTool()
         if ("logistics" in activeCategories) tools["logistics"] = ExtractLogisticsTool()
         if ("bank_transaction" in activeCategories) tools["bank_transaction"] = ExtractBankTransactionTool()
+        // Always included when any extraction category is active
+        if (tools.isNotEmpty()) tools["none"] = NoExtractionTool()
         return tools
     }
 
