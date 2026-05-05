@@ -163,6 +163,67 @@ class LiteRtLmProvider @Inject constructor(
         }
     }
 
+    @OptIn(ExperimentalApi::class)
+    override suspend fun startConversation(
+        systemInstruction: String,
+        tools: List<ToolSet>,
+        waitIfBusy: Boolean
+    ): ConversationSession {
+        val eng = engine
+            ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
+
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
+
+        return withContext(llmDispatcher) {
+            activeConversation?.let { if (it.isAlive) it.close() }
+            activeConversation = null
+
+            val toolProviders = tools.map { tool(it) }
+            val toolManager = ToolManager(toolProviders)
+            val config = ConversationConfig(
+                systemInstruction = Contents.of(systemInstruction),
+                tools = toolProviders,
+                automaticToolCalling = false,
+                channels = THINKING_CHANNELS
+            )
+            ExperimentalFlags.enableConversationConstrainedDecoding = true
+            val conv = try {
+                eng.createConversation(config)
+            } finally {
+                ExperimentalFlags.enableConversationConstrainedDecoding = false
+            }
+            activeConversation = conv
+            Log.i(TAG, "startConversation: tools=${tools.size}")
+
+            object : ConversationSession {
+                override fun send(prompt: String): Flow<Message> = channelFlow {
+                    withContext(llmDispatcher) {
+                        Log.i(TAG, "conversation.send: promptLen=${prompt.length}")
+                        conv.sendMessageAsync(prompt).collect { message ->
+                            message.toolCalls.forEach { call ->
+                                toolManager.execute(call.name, call.arguments.toJsonObject())
+                            }
+                            send(message)
+                        }
+                    }
+                }
+
+                override fun close() {
+                    try { conv.cancelProcess() } catch (_: Exception) {}
+                    try { if (conv.isAlive) conv.close() } catch (_: Exception) {}
+                    activeConversation = null
+                    inferenceMutex.unlock()
+                    Log.i(TAG, "ConversationSession closed")
+                }
+            }
+        }
+    }
+
     override fun isReady(): Boolean = engine != null
 
     override fun close() {

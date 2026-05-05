@@ -8,6 +8,10 @@ class InferenceBusyException(
     message: String = "Inference engine is busy. Please retry shortly."
 ) : Exception(message)
 
+interface ConversationSession : java.io.Closeable {
+    fun send(prompt: String): Flow<Message>
+}
+
 interface InferenceProvider {
     suspend fun initialize(modelPath: String, useGpu: Boolean = true, maxContextTokens: Int = 8192)
     suspend fun restart(modelPath: String, useGpu: Boolean, maxContextTokens: Int = 8192)
@@ -18,6 +22,11 @@ interface InferenceProvider {
         tools: List<ToolSet>,
         waitIfBusy: Boolean = true
     ): Flow<Message>
+    suspend fun startConversation(
+        systemInstruction: String,
+        tools: List<ToolSet>,
+        waitIfBusy: Boolean = true
+    ): ConversationSession
     fun isReady(): Boolean
     fun close()
 }

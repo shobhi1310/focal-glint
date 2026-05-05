@@ -60,6 +60,20 @@ object PromptBuilder {
         return sb.toString().trimEnd()
     }
 
+    fun buildExtractionPassPrompt(mattersIndices: List<Int>, bankIndices: List<Int>): String {
+        val indicesStr = mattersIndices.joinToString(", ") { "[$it]" }
+        val sb = StringBuilder(
+            "Notifications at indices $indicesStr were marked 'matters'. " +
+            "For each one call exactly one extraction tool if it clearly matches, " +
+            "or call noExtraction if none apply."
+        )
+        if (bankIndices.isNotEmpty()) {
+            val bankStr = bankIndices.joinToString(", ") { "[$it]" }
+            sb.append(" Notifications $bankStr are bank SMS — you MUST call extractBankTransaction for those.")
+        }
+        return sb.toString()
+    }
+
     fun buildTopicPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
         sb.appendLine("You are generating a topic card for a notification digest app.")

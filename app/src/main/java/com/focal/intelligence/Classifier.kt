@@ -211,95 +211,63 @@ class Classifier(
         effectiveExtractionTools: Map<String, ToolSet>,
         notifications: List<NotificationEntity>
     ): List<Pair<NotificationEntity, ClassificationResult>> {
-        var messageCount = 0
-        inferenceProvider.generateWithTools(systemPrompt, prompt, allTools)
-            .catch { e -> Log.e(TAG, "extract batch error: ${e.message}", e); throw e }
-            .collect { message ->
-                message.toolCalls?.forEach { call -> Log.i(TAG, "toolCall: name=${call.name}") }
-                messageCount++
+        val session = inferenceProvider.startConversation(systemPrompt, allTools)
+        return session.use {
+            // Pass 1 — classification only
+            session.send(prompt)
+                .catch { e -> Log.e(TAG, "pass1 error: ${e.message}", e); throw e }
+                .collect { message ->
+                    message.toolCalls?.forEach { call -> Log.i(TAG, "pass1 toolCall: name=${call.name}") }
+                }
+
+            Log.i(TAG, "pass1 done: classified=${classifyTool.resultCount()}/${notifications.size}")
+
+            val results = notifications.mapIndexed { i, notification ->
+                val (category, reason) = classifyTool.getResult(i + 1)
+                    ?: return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                val resolved = when (category.lowercase().trim()) {
+                    "matters" -> ClassificationResult.MATTERS
+                    "noise" -> ClassificationResult.NOISE
+                    else -> return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
+                }
+                notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
             }
 
-        val extractionResults = ExtractionToolFactory.collectResults(effectiveExtractionTools)
-        val noExtractionTool = effectiveExtractionTools["none"] as? NoExtractionTool
-        Log.i(TAG, "extract done: messages=$messageCount classified=${classifyTool.resultCount()}/${notifications.size} extracted=${extractionResults.size} noExtraction=${noExtractionTool?.calledIndices?.size ?: 0}")
-
-        if (extractionResults.isNotEmpty() && widgetRepository != null) {
-            val entities = extractionResults.mapNotNull { result ->
-                val notif = notifications.getOrNull(result.notificationIndex - 1) ?: return@mapNotNull null
-                ExtractedDataEntity(
-                    notificationId = notif.id,
-                    category = result.category,
-                    data = result.dataJson,
-                    appPackage = notif.packageName
-                )
-            }
-            widgetRepository.saveExtractedData(entities)
-            Log.i(TAG, "Saved ${entities.size} extracted data rows")
-        }
-
-        val results = notifications.mapIndexed { i, notification ->
-            val (category, reason) = classifyTool.getResult(i + 1)
-                ?: return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
-            val resolved = when (category.lowercase().trim()) {
-                "matters" -> ClassificationResult.MATTERS
-                "noise" -> ClassificationResult.NOISE
-                else -> return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
-            }
-            notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
-        }
-
-        // Check 1: indices where classify_notification was never called
-        val missedClassifyIndices = results.mapIndexedNotNull { i, (_, r) ->
-            if (r.classifiedBy == "pending") i + 1 else null
-        }
-
-        // Check 2: 'matters' indices where no extraction tool AND no noExtraction was called
-        val coveredExtractionIndices = extractionResults.map { it.notificationIndex }.toSet() +
-            (noExtractionTool?.calledIndices ?: emptySet())
-        val missedExtractionIndices = results.mapIndexedNotNull { i, (_, r) ->
-            val idx = i + 1
-            if (r.category == ClassificationResult.MATTERS && idx !in coveredExtractionIndices) idx else null
-        }
-
-        val allMissedIndices = (missedClassifyIndices + missedExtractionIndices).distinct().sorted()
-        if (allMissedIndices.isEmpty()) return results
-
-        Log.w(TAG, "feedback pass needed — missedClassify=$missedClassifyIndices missedExtraction=$missedExtractionIndices")
-        val feedbackNotifs = allMissedIndices.map { notifications[it - 1] }
-        val feedbackPrompt = PromptBuilder.buildBatchClassificationPrompt(feedbackNotifs)
-        val feedbackClassifyTool = BatchClassifyNotificationTool()
-        val feedbackExtractionTools = ExtractionToolFactory.createTools(effectiveExtractionTools.keys.filter { it != "none" }.toList())
-        val feedbackTools = mutableListOf<ToolSet>(feedbackClassifyTool)
-        feedbackTools.addAll(feedbackExtractionTools.values)
-
-        inferenceProvider.generateWithTools(systemPrompt, feedbackPrompt, feedbackTools)
-            .catch { e -> Log.w(TAG, "feedback pass error: ${e.message}", e) }
-            .collect { message ->
-                message.toolCalls?.forEach { call -> Log.i(TAG, "feedback toolCall: name=${call.name}") }
+            // Pass 2 — extraction for all matters in same conversation
+            val mattersIndices = results.mapIndexedNotNull { i, (_, r) ->
+                if (r.category == ClassificationResult.MATTERS) i + 1 else null
             }
 
-        val feedbackExtractionResults = ExtractionToolFactory.collectResults(feedbackExtractionTools)
-        if (feedbackExtractionResults.isNotEmpty() && widgetRepository != null) {
-            val entities = feedbackExtractionResults.mapNotNull { result ->
-                val notif = feedbackNotifs.getOrNull(result.notificationIndex - 1) ?: return@mapNotNull null
-                ExtractedDataEntity(notificationId = notif.id, category = result.category, data = result.dataJson, appPackage = notif.packageName)
-            }
-            widgetRepository.saveExtractedData(entities)
-        }
-        Log.i(TAG, "feedback pass done: classified=${feedbackClassifyTool.resultCount()}/${feedbackNotifs.size} extracted=${feedbackExtractionResults.size}")
+            if (mattersIndices.isNotEmpty()) {
+                val bankIndices = mattersIndices.filter { notifications[it - 1].isBankTransaction }
+                val extractionPrompt = PromptBuilder.buildExtractionPassPrompt(mattersIndices, bankIndices)
 
-        return results.mapIndexed { i, (notif, result) ->
-            val originalIndex = i + 1
-            if (originalIndex !in allMissedIndices) return@mapIndexed notif to result
-            val feedbackIndex = allMissedIndices.indexOf(originalIndex) + 1
-            val (category, reason) = feedbackClassifyTool.getResult(feedbackIndex)
-                ?: return@mapIndexed notif to result
-            val resolved = when (category.lowercase().trim()) {
-                "matters" -> ClassificationResult.MATTERS
-                "noise" -> ClassificationResult.NOISE
-                else -> return@mapIndexed notif to result
+                session.send(extractionPrompt)
+                    .catch { e -> Log.w(TAG, "pass2 error: ${e.message}", e) }
+                    .collect { message ->
+                        message.toolCalls?.forEach { call -> Log.i(TAG, "pass2 toolCall: name=${call.name}") }
+                    }
+
+                val extractionResults = ExtractionToolFactory.collectResults(effectiveExtractionTools)
+                val noExtractionTool = effectiveExtractionTools["none"] as? NoExtractionTool
+                Log.i(TAG, "pass2 done: extracted=${extractionResults.size} noExtraction=${noExtractionTool?.calledIndices?.size ?: 0}")
+
+                if (extractionResults.isNotEmpty() && widgetRepository != null) {
+                    val entities = extractionResults.mapNotNull { result ->
+                        val notif = notifications.getOrNull(result.notificationIndex - 1) ?: return@mapNotNull null
+                        ExtractedDataEntity(
+                            notificationId = notif.id,
+                            category = result.category,
+                            data = result.dataJson,
+                            appPackage = notif.packageName
+                        )
+                    }
+                    widgetRepository.saveExtractedData(entities)
+                    Log.i(TAG, "Saved ${entities.size} extracted data rows")
+                }
             }
-            notif to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
+
+            results
         }
     }
 }
