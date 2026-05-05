@@ -1,7 +1,6 @@
 package com.focal.intelligence
 
 import android.util.Log
-import com.focal.DebugLogger
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import com.focal.data.db.entity.NotificationEntity
@@ -102,7 +101,6 @@ class TopicEngine(
     ) {
         val assignThreshold = TopicClusteringPolicy.ASSIGN_THRESHOLD
         val activeTopics = topicRepository.getActiveTopicsInWindow(dayStart, dayEnd)
-        val embeddingText = EmbeddingTextFormatter.buildRequest(notif)?.combinedText ?: ""
 
         if (activeTopics.isEmpty()) {
             createNewTopic(notif)
@@ -136,16 +134,6 @@ class TopicEngine(
                 if (s > topicBest) topicBest = s
             }
 
-            DebugLogger.logEmbeddingScore(
-                notifId = notif.id,
-                notifTitle = notif.title,
-                embeddingText = embeddingText,
-                topicId = topic.id,
-                score = topicBest,
-                threshold = assignThreshold,
-                assigned = false
-            )
-
             if (topicBest > bestScore) {
                 bestScore = topicBest
                 bestTopicId = topic.id
@@ -153,18 +141,6 @@ class TopicEngine(
         }
 
         val assigned = bestScore >= assignThreshold && bestTopicId != null
-        if (bestTopicId != null) {
-            DebugLogger.logEmbeddingScore(
-                notifId = notif.id,
-                notifTitle = notif.title,
-                embeddingText = embeddingText,
-                topicId = "BEST=$bestTopicId",
-                score = bestScore,
-                threshold = assignThreshold,
-                assigned = assigned
-            )
-        }
-
         if (assigned) {
             appendToTopic(bestTopicId!!, notif)
             topicRepository.markDirty(bestTopicId)

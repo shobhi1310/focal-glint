@@ -16,22 +16,19 @@ object DebugLogger {
     private val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     private const val NOTIF_FILE = "focal_notifications_debug.txt"
-    private const val EMBED_FILE = "focal_embeddings_debug.txt"
 
     fun init(context: Context) {
         ctx = context.applicationContext
-        Log.d("DebugLogger", "Logging to Downloads/$NOTIF_FILE and Downloads/$EMBED_FILE")
+        Log.d("DebugLogger", "Logging to Downloads/$NOTIF_FILE")
     }
 
     fun logNotification(n: NotificationEntity) {
         append(NOTIF_FILE, buildString {
             append("[${fmt.format(Date())}] id=${n.id}\n")
-            // Same order as buildEmbeddingText: appName — title: (bigText ?: content)
             append("  app=${n.appName}\n")
             append("  title=${n.title}\n")
             append("  bigText=${n.bigText}\n")
             append("  content=${n.content}\n")
-            // Remaining fields
             append("  conversation=${n.conversation}\n")
             append("  extrasJson=${n.extrasJson}\n")
             append("  pkg=${n.packageName}\n")
@@ -40,22 +37,6 @@ object DebugLogger {
             append("  notificationKey=${n.notificationKey}\n")
             append("  postedAt=${n.postedAt}  capturedAt=${n.capturedAt}\n")
             append("---\n")
-        })
-    }
-
-    fun logEmbeddingScore(
-        notifId: String,
-        notifTitle: String,
-        embeddingText: String,
-        topicId: String,
-        score: Float,
-        threshold: Float,
-        assigned: Boolean
-    ) {
-        append(EMBED_FILE, buildString {
-            append("[${fmt.format(Date())}] notifId=$notifId  title=$notifTitle\n")
-            append("  embeddingText=$embeddingText\n")
-            append("  topicId=$topicId  score=${"%.4f".format(score)}  threshold=${"%.4f".format(threshold)}  assigned=$assigned\n")
         })
     }
 
