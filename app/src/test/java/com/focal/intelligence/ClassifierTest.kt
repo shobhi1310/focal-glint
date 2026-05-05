@@ -1,8 +1,10 @@
 package com.focal.intelligence
 
 import com.focal.data.db.entity.NotificationEntity
+import com.focal.data.repository.WidgetRepository
 import com.google.ai.edge.litertlm.ToolSet
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
@@ -27,13 +29,15 @@ class ClassifierTest {
     private fun notification(
         title: String = "Test",
         content: String = "test content",
-        packageName: String = "com.test"
+        packageName: String = "com.test",
+        isBankTransaction: Boolean = false
     ) = NotificationEntity(
         packageName = packageName,
         appName = "Test App",
         title = title,
         content = content,
-        postedAt = System.currentTimeMillis()
+        postedAt = System.currentTimeMillis(),
+        isBankTransaction = isBankTransaction
     )
 
     @Test
@@ -156,20 +160,24 @@ class ClassifierTest {
 
         val prompt = capturedSystemInstruction.orEmpty()
         assertTrue(prompt.contains("tool calls only"))
-        assertTrue(prompt.contains("For every [index], call classifyNotification exactly once"))
-        assertTrue(prompt.contains("Use category exactly 'matters'"))
-        assertTrue(prompt.contains("Use category exactly 'noise'"))
-        assertTrue(prompt.contains("No prose"))
+        assertTrue(prompt.contains("MUST call classifyNotification exactly once for EVERY [index]"))
+        assertTrue(prompt.contains("no index may be skipped"))
+        assertTrue(prompt.contains("Mark it 'matters'"))
+        assertTrue(prompt.contains("Mark it 'noise'"))
+        assertTrue(prompt.contains("Output tool calls only"))
     }
 
     @Test
     fun `classifyAndExtractBatch system prompt deduplicates extraction by real-world event`() = runTest {
         coEvery { inferenceProvider.isReady() } returns true
         var capturedSystemInstruction: String? = null
-        coEvery { inferenceProvider.generateWithTools(any(), any(), any(), any()) } answers {
+        val session = mockk<ConversationSession>()
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } answers {
             capturedSystemInstruction = firstArg()
-            emptyFlow()
+            session
         }
+        every { session.send(any()) } returns emptyFlow()
+        every { session.close() } returns Unit
 
         classifier.classifyAndExtractBatch(
             notifications = listOf(notification(), notification()),
@@ -177,17 +185,166 @@ class ClassifierTest {
         )
 
         val prompt = capturedSystemInstruction.orEmpty()
-        assertTrue(prompt.contains("internally compare notifications across the whole batch"))
-        assertTrue(prompt.contains("Do not output reasoning"))
-        assertTrue(prompt.contains("distinct real-world events, not notification count"))
-        assertTrue(prompt.contains("call the extraction tool only once"))
-        assertTrue(prompt.contains("same rounded amount plus same direction"))
-        assertTrue(prompt.contains("prefer bank SMS"))
-        assertTrue(prompt.contains("collapse same sender plus same channel"))
-        assertTrue(prompt.contains("collapse same merchant/order flow"))
-        assertTrue(prompt.contains("collapse same sender plus same work entity/thread"))
-        assertTrue(prompt.contains("only when required fields are explicit"))
+        assertTrue(prompt.contains("MUST call classifyNotification exactly once for EVERY [index]"))
+        assertTrue(prompt.contains("For every notification you marked 'matters'"))
+        assertTrue(prompt.contains("at least one of"))
+        assertTrue(prompt.contains("one or more extraction tools if the notification clearly matches"))
+        assertTrue(prompt.contains("OR noExtraction if none of the extraction tools apply"))
+        assertTrue(prompt.contains("When the same real-world event appears across several notifications"))
+        assertTrue(prompt.contains("call the extraction tool once for the most informative source only"))
         assertTrue(prompt.contains("Available extraction categories: finance, work, personal, logistics"))
+        assertFalse(prompt.contains("Available extraction categories: finance, work, personal, logistics, none"))
+    }
+
+    @Test
+    fun `classifyAndExtractBatch system prompt lists bank transaction when bank tool is injected`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        var capturedSystemInstruction: String? = null
+        val session = mockk<ConversationSession>()
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } answers {
+            capturedSystemInstruction = firstArg()
+            session
+        }
+        every { session.send(any()) } returns emptyFlow()
+        every { session.close() } returns Unit
+
+        classifier.classifyAndExtractBatch(
+            notifications = listOf(notification(isBankTransaction = true)),
+            extractionTools = ExtractionToolFactory.createTools(listOf("finance"))
+        )
+
+        val prompt = capturedSystemInstruction.orEmpty()
+        assertTrue(prompt.contains("Available extraction categories: finance, bank_transaction"))
+        assertFalse(prompt.contains("Available extraction categories: finance, none"))
+    }
+
+    @Test
+    fun `classifyAndExtractBatch first turn is classification only`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        val session = mockk<ConversationSession>()
+        val sentPrompts = mutableListOf<String>()
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } returns session
+        every { session.send(any()) } answers {
+            sentPrompts.add(firstArg())
+            emptyFlow()
+        }
+        every { session.close() } returns Unit
+
+        classifier.classifyAndExtractBatch(
+            notifications = listOf(notification(), notification()),
+            extractionTools = ExtractionToolFactory.createTools(listOf("personal"))
+        )
+
+        assertTrue(sentPrompts.first().contains("Classify only"))
+        assertTrue(sentPrompts.first().contains("Do not call extraction tools"))
+    }
+
+    @Test
+    fun `classifyAndExtractBatch retries missing pass1 indices in same conversation`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        val session = mockk<ConversationSession>()
+        var classifyTool: BatchClassifyNotificationTool? = null
+        val sentPrompts = mutableListOf<String>()
+
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } answers {
+            val tools = secondArg<List<ToolSet>>()
+            classifyTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
+            session
+        }
+        every { session.send(any()) } answers {
+            val prompt = firstArg<String>()
+            sentPrompts.add(prompt)
+            when {
+                sentPrompts.size == 1 -> classifyTool!!.classifyNotification(1, "matters", "personal_message")
+                "Classify" in prompt && "[2]" in prompt ->
+                    classifyTool!!.classifyNotification(2, "noise", "commercial_app_marketing")
+            }
+            emptyFlow()
+        }
+        every { session.close() } returns Unit
+
+        val notifications = listOf(
+            notification(title = "Alice", content = "Can you call me?"),
+            notification(title = "Shop", content = "Sale starts now")
+        )
+
+        val results = classifier.classifyAndExtractBatch(
+            notifications = notifications,
+            extractionTools = ExtractionToolFactory.createTools(listOf("personal"))
+        )
+
+        assertEquals(ClassificationResult.MATTERS, results[0].second.category)
+        assertEquals(ClassificationResult.NOISE, results[1].second.category)
+        assertEquals("llm", results[1].second.classifiedBy)
+        assertTrue(sentPrompts.any { "Classify" in it && "[2]" in it })
+    }
+
+    @Test
+    fun `classifyAndExtractBatch skips extraction when pass1 remains incomplete`() = runTest {
+        coEvery { inferenceProvider.isReady() } returns true
+        val session = mockk<ConversationSession>()
+        var classifyTool: BatchClassifyNotificationTool? = null
+        val sentPrompts = mutableListOf<String>()
+
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } answers {
+            val tools = secondArg<List<ToolSet>>()
+            classifyTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
+            session
+        }
+        every { session.send(any()) } answers {
+            sentPrompts.add(firstArg())
+            if (sentPrompts.size == 1) {
+                classifyTool!!.classifyNotification(1, "matters", "personal_message")
+            }
+            emptyFlow()
+        }
+        every { session.close() } returns Unit
+
+        val results = classifier.classifyAndExtractBatch(
+            notifications = listOf(notification(), notification()),
+            extractionTools = ExtractionToolFactory.createTools(listOf("personal"))
+        )
+
+        assertEquals(ClassificationResult.MATTERS, results[0].second.category)
+        assertEquals("pending", results[1].second.classifiedBy)
+        assertFalse(sentPrompts.any { "were marked 'matters'" in it })
+    }
+
+    @Test
+    fun `classifyAndExtractBatch keeps classification results when extraction save fails`() = runTest {
+        val widgetRepository = mockk<WidgetRepository>()
+        classifier = Classifier(inferenceProvider, widgetRepository = widgetRepository)
+        coEvery { inferenceProvider.isReady() } returns true
+        coEvery { widgetRepository.saveExtractedData(any()) } throws RuntimeException("db write failed")
+
+        val session = mockk<ConversationSession>()
+        var classifyTool: BatchClassifyNotificationTool? = null
+        var personalTool: ExtractPersonalTool? = null
+        var sendCount = 0
+        coEvery { inferenceProvider.startConversation(any(), any(), any()) } answers {
+            val tools = secondArg<List<ToolSet>>()
+            classifyTool = tools.filterIsInstance<BatchClassifyNotificationTool>().first()
+            personalTool = tools.filterIsInstance<ExtractPersonalTool>().first()
+            session
+        }
+        every { session.send(any()) } answers {
+            sendCount++
+            if (sendCount == 1) {
+                classifyTool!!.classifyNotification(1, "matters", "personal_message")
+            } else {
+                personalTool!!.extractPersonal(1, "Alice", "message", 1, "Can you call me?")
+            }
+            emptyFlow()
+        }
+        every { session.close() } returns Unit
+
+        val results = classifier.classifyAndExtractBatch(
+            notifications = listOf(notification(title = "Alice", content = "Can you call me?")),
+            extractionTools = ExtractionToolFactory.createTools(listOf("personal"))
+        )
+
+        assertEquals(ClassificationResult.MATTERS, results[0].second.category)
+        assertEquals("llm", results[0].second.classifiedBy)
     }
 
     @Test

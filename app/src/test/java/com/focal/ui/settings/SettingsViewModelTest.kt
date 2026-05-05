@@ -12,8 +12,6 @@ import com.focal.intelligence.ModelVariant
 import com.focal.intelligence.TopicEngine
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.work.ExistingWorkPolicy
-import com.focal.worker.ClassificationWorker
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

@@ -190,7 +190,7 @@ class SetupViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value.engineRunning)
         verify { modelManager.setEngineEnabled(true) }
-        coVerify { engineWarmupCoordinator.warmUp(recreateEmbeddings = true) }
+        coVerify { engineWarmupCoordinator.warmUp(recreateEmbeddings = false) }
     }
 
     @Test

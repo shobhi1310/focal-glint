@@ -21,9 +21,10 @@ class ExtractionToolSetTest {
     @Test
     fun `ExtractionToolFactory creates only requested categories`() {
         val tools = ExtractionToolFactory.createTools(listOf("finance", "logistics"))
-        assertEquals(2, tools.size)
+        assertEquals(3, tools.size)
         assertTrue(tools.containsKey("finance"))
         assertTrue(tools.containsKey("logistics"))
+        assertTrue(tools.containsKey("none"))
         assertFalse(tools.containsKey("work"))
     }
 

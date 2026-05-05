@@ -74,7 +74,7 @@ class EngineWarmupCoordinatorTest {
             embeddingProvider.initialize(
                 "/models/embedding.tflite",
                 "/models/tokenizer.model",
-                true
+                false
             )
         }
     }
@@ -88,7 +88,7 @@ class EngineWarmupCoordinatorTest {
             embeddingProvider.initialize(
                 "/models/embedding.tflite",
                 "/models/tokenizer.model",
-                true
+                false
             )
         }
     }
@@ -101,7 +101,7 @@ class EngineWarmupCoordinatorTest {
 
         assertTrue(result)
         coVerify(exactly = 0) { inferenceProvider.initialize(any(), any(), any()) }
-        coVerify { embeddingProvider.initialize("/models/embedding.tflite", "/models/tokenizer.model", true) }
+        coVerify { embeddingProvider.initialize("/models/embedding.tflite", "/models/tokenizer.model", false) }
     }
 
     @Test

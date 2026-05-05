@@ -65,14 +65,14 @@ class DigestViewModelTest {
     )
 
     @Test
-    fun `refresh enqueues inference work without warming engine on ui refresh`() = runTest {
+    fun `refresh enqueues inference work and requests full rebuild`() = runTest {
         val vm = createViewModel()
         TopicEngine.pendingFullRebuild.set(false)
 
         vm.onRefresh()
         advanceUntilIdle()
 
-        assert(!TopicEngine.pendingFullRebuild.get())
+        assert(TopicEngine.pendingFullRebuild.get())
         verify {
             workManager.enqueueUniqueWork(
                 eq(InferenceWorker.WORK_NAME),

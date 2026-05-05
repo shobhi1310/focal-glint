@@ -30,12 +30,19 @@ object PromptBuilder {
 
     fun buildExtractionAugment(activeCategories: List<String>): String {
         val categoriesStr = activeCategories.joinToString(", ")
-        return "\n\nFor every notification you marked 'matters', you MUST also call exactly one of: " +
-            "an extraction tool if the notification is a clear, confident match for that tool's stated criteria, " +
-            "OR noExtraction if none of the extraction tools apply. Read each tool's description carefully. " +
+        return "\n\nExtraction happens only after classification is complete and you are asked for an extraction pass. " +
+            "For every notification you marked 'matters', you MUST then call at least one of: " +
+            "one or more extraction tools if the notification clearly matches their stated criteria, " +
+            "OR noExtraction if none of the extraction tools apply. Do not call noExtraction when any extraction tool applies. " +
+            "Read each tool's description carefully. " +
             "When the same real-world event appears across several notifications, call the extraction tool " +
             "once for the most informative source only and noExtraction for the rest. " +
             "Available extraction categories: $categoriesStr. Output tool calls only."
+    }
+
+    fun buildClassificationPassPrompt(batchPrompt: String): String {
+        return "Classify only in this turn. Call classifyNotification exactly once for every index. " +
+            "Do not call extraction tools or noExtraction in this turn.\n\n$batchPrompt"
     }
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {
@@ -64,8 +71,8 @@ object PromptBuilder {
         val indicesStr = mattersIndices.joinToString(", ") { "[$it]" }
         val sb = StringBuilder(
             "Notifications at indices $indicesStr were marked 'matters'. " +
-            "For each one call exactly one extraction tool if it clearly matches, " +
-            "or call noExtraction if none apply."
+            "For each one call at least one tool: one or more extraction tools if it clearly matches, " +
+            "or noExtraction only if none apply."
         )
         if (bankIndices.isNotEmpty()) {
             val bankStr = bankIndices.joinToString(", ") { "[$it]" }

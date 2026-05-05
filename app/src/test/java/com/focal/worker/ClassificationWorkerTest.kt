@@ -1,11 +1,9 @@
 package com.focal.worker
 
 import android.content.Context
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkerParameters
-import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.TransactionRepository
 import com.focal.data.repository.WidgetRepository
 import com.focal.intelligence.Classifier
 import com.focal.intelligence.EngineWarmupCoordinator
@@ -14,14 +12,14 @@ import com.focal.intelligence.ModelManager
 import com.focal.intelligence.RulesEngine
 import com.focal.intelligence.TopicEngine
 import com.focal.intelligence.TopicNarrativeProcessor
+import com.focal.intelligence.TransactionCorrelator
 import com.focal.intelligence.WidgetComputeEngine
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
-class ClassificationWorkerTest {
+class InferenceWorkerTest {
 
     private lateinit var context: Context
     private lateinit var workerParams: WorkerParameters
@@ -34,7 +32,10 @@ class ClassificationWorkerTest {
     private lateinit var engineWarmupCoordinator: EngineWarmupCoordinator
     private lateinit var widgetRepository: WidgetRepository
     private lateinit var widgetComputeEngine: WidgetComputeEngine
-    private lateinit var workManager: WorkManager
+    private lateinit var topicNarrativeProcessor: TopicNarrativeProcessor
+    private lateinit var transactionCorrelator: TransactionCorrelator
+    private lateinit var transactionRepository: TransactionRepository
+    private lateinit var workQueue: InferenceWorkQueue
 
     @Before
     fun setup() {
@@ -49,25 +50,26 @@ class ClassificationWorkerTest {
         engineWarmupCoordinator = mockk(relaxed = true)
         widgetRepository = mockk(relaxed = true)
         widgetComputeEngine = mockk(relaxed = true)
-        workManager = mockk(relaxed = true)
+        topicNarrativeProcessor = mockk(relaxed = true)
+        transactionCorrelator = mockk(relaxed = true)
+        transactionRepository = mockk(relaxed = true)
+        workQueue = InferenceWorkQueue()
 
         every { modelManager.isEngineEnabled() } returns false
+        every { modelManager.isCloudEnabled() } returns false
         every { inferenceProvider.isReady() } returns false
         coEvery { notificationRepository.getRecentNotificationsSnapshot() } returns emptyList()
         coEvery { notificationRepository.getPendingForClassification() } returns emptyList()
+        coEvery { notificationRepository.getBankTransactionsWithoutExtraction() } returns emptyList()
+        coEvery { widgetRepository.getActiveCategories() } returns emptyList()
         coEvery { topicEngine.generateTopics() } returns Unit
         coEvery { engineWarmupCoordinator.warmEmbeddings() } returns Unit
-
-        mockkStatic(WorkManager::class)
-        every { WorkManager.getInstance(any()) } returns workManager
+        coEvery { topicNarrativeProcessor.processDirtyTopics() } returns false
+        coEvery { transactionCorrelator.correlate() } returns Unit
+        coEvery { widgetComputeEngine.computeAll() } returns Unit
     }
 
-    @After
-    fun tearDown() {
-        unmockkStatic(WorkManager::class)
-    }
-
-    private fun createWorker() = ClassificationWorker(
+    private fun createWorker() = InferenceWorker(
         appContext = context,
         workerParams = workerParams,
         notificationRepository = notificationRepository,
@@ -78,20 +80,21 @@ class ClassificationWorkerTest {
         modelManager = modelManager,
         engineWarmupCoordinator = engineWarmupCoordinator,
         widgetRepository = widgetRepository,
-        widgetComputeEngine = widgetComputeEngine
+        widgetComputeEngine = widgetComputeEngine,
+        topicNarrativeProcessor = topicNarrativeProcessor,
+        transactionCorrelator = transactionCorrelator,
+        transactionRepository = transactionRepository,
+        workQueue = workQueue
     )
 
     @Test
-    fun `enqueues topic narrative worker after topic assignment`() = runTest {
+    fun `processes narrative generation after topic assignment when llm is ready`() = runTest {
+        every { inferenceProvider.isReady() } returns true
+
         createWorker().doWork()
 
-        verify {
-            workManager.enqueueUniqueWork(
-                eq(TopicNarrativeWorker.WORK_NAME),
-                eq(ExistingWorkPolicy.KEEP),
-                any<OneTimeWorkRequest>()
-            )
-        }
+        coVerify { topicEngine.generateTopics() }
+        coVerify { topicNarrativeProcessor.processDirtyTopics() }
     }
 
     @Test
@@ -103,59 +106,5 @@ class ClassificationWorkerTest {
         coVerify(exactly = 0) { classifier.classifyBatch(any()) }
         coVerify { engineWarmupCoordinator.warmEmbeddings() }
         coVerify { topicEngine.generateTopics() }
-    }
-}
-
-class TopicNarrativeWorkerTest {
-
-    private lateinit var context: Context
-    private lateinit var workerParams: WorkerParameters
-    private lateinit var modelManager: ModelManager
-    private lateinit var inferenceProvider: InferenceProvider
-    private lateinit var topicNarrativeProcessor: TopicNarrativeProcessor
-    private lateinit var workManager: WorkManager
-
-    @Before
-    fun setup() {
-        context = mockk(relaxed = true)
-        workerParams = mockk(relaxed = true)
-        modelManager = mockk(relaxed = true)
-        inferenceProvider = mockk(relaxed = true)
-        topicNarrativeProcessor = mockk(relaxed = true)
-        workManager = mockk(relaxed = true)
-
-        every { modelManager.isEngineEnabled() } returns true
-        every { inferenceProvider.isReady() } returns true
-        coEvery { topicNarrativeProcessor.processDirtyTopics() } returns true
-
-        mockkStatic(WorkManager::class)
-        every { WorkManager.getInstance(any()) } returns workManager
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(WorkManager::class)
-    }
-
-    private fun createWorker() = TopicNarrativeWorker(
-        appContext = context,
-        workerParams = workerParams,
-        modelManager = modelManager,
-        inferenceProvider = inferenceProvider,
-        topicNarrativeProcessor = topicNarrativeProcessor
-    )
-
-    @Test
-    fun `enqueues continuation work and succeeds when more dirty topics remain`() = runTest {
-        val result = createWorker().doWork()
-
-        org.junit.Assert.assertEquals(androidx.work.ListenableWorker.Result.success(), result)
-        verify {
-            workManager.enqueueUniqueWork(
-                eq(TopicNarrativeWorker.WORK_NAME),
-                eq(ExistingWorkPolicy.APPEND_OR_REPLACE),
-                any<OneTimeWorkRequest>()
-            )
-        }
     }
 }
