@@ -49,14 +49,16 @@ android {
             abiFilters += "arm64-v8a"
         }
 
+        externalNativeBuild {
+            cmake {
+                arguments("-DLITERT_LIB_DIR=${layout.buildDirectory.get().asFile.absolutePath}/litert_link")
+            }
+        }
     }
 
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            arguments(
-                "-DLITERT_LIB_DIR=${layout.buildDirectory.get().asFile.absolutePath}/litert_link"
-            )
         }
     }
 
