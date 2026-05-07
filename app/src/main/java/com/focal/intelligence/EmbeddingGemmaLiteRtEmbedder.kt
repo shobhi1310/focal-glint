@@ -18,7 +18,7 @@ class EmbeddingGemmaLiteRtEmbedder(
 
     fun initialize(tokenizerPath: String) {
         val handle = LiteRtEmbedderJni.nativeCreate(modelPath)
-        check(handle != 0L) { "LiteRt embedding model failed to load: $modelPath" }
+        if (handle == 0L) error("LiteRt embedding model failed to load: $modelPath (see logcat LiteRtEmbedJNI)")
         nativeHandle = handle
         tokenizer = SentencePieceTokenizer(tokenizerPath).also { it.initialize() }
         Log.d(TAG, "initialized (cpu-only via JNI)")
@@ -50,11 +50,12 @@ class EmbeddingGemmaLiteRtEmbedder(
         }
     }
 
+    @Synchronized
     override fun close() {
         val handle = nativeHandle
         if (handle != 0L) {
-            LiteRtEmbedderJni.nativeClose(handle)
             nativeHandle = 0L
+            LiteRtEmbedderJni.nativeClose(handle)
         }
         tokenizer?.close()
         tokenizer = null

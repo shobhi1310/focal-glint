@@ -16,30 +16,32 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-#define CHECK(s, msg, ret)                                           \
-    do {                                                              \
-        if ((s) != kLiteRtStatusOk) {                                 \
-            LOGE(msg ": status=%d", static_cast<int>(s));             \
-            return (ret);                                             \
-        }                                                             \
+#define CHECK(s, msg, ret)                                               \
+    do {                                                                  \
+        if ((s) != kLiteRtStatusOk) {                                     \
+            LOGE(msg ": status=%d", static_cast<int>(s));                 \
+            return (ret);                                                 \
+        }                                                                 \
     } while (0)
 
 struct EmbedHandle {
-    LiteRtEnvironment   env        = nullptr;
-    LiteRtModel         model      = nullptr;
-    LiteRtCompiledModel compiled   = nullptr;
-    LiteRtTensorBuffer  in_ids     = nullptr;
-    LiteRtTensorBuffer  in_mask    = nullptr;  // null when model has only 1 input
-    LiteRtTensorBuffer  output     = nullptr;
+    LiteRtEnvironment   env      = nullptr;
+    LiteRtModel         model    = nullptr;
+    LiteRtCompiledModel compiled = nullptr;
+    LiteRtTensorBuffer  in_ids   = nullptr;
+    LiteRtTensorBuffer  in_mask  = nullptr;  // null when model has only 1 input
+    LiteRtTensorBuffer  output   = nullptr;
 
     int    num_inputs    = 0;
     int    max_seq_len   = 0;
     int    embedding_dim = 0;
-    size_t input_bytes   = 0;
+    size_t input_bytes   = 0;   // bytes for input[0] (input_ids)
+    size_t mask_bytes    = 0;   // bytes for input[1] (attention_mask)
     size_t output_bytes  = 0;
 
-    LiteRtRankedTensorType in_type  {};
-    LiteRtRankedTensorType out_type {};
+    LiteRtRankedTensorType in_type   {};  // type of input[0]
+    LiteRtRankedTensorType mask_type {};  // type of input[1], if present
+    LiteRtRankedTensorType out_type  {};
 };
 
 static size_t totalElements(const LiteRtLayout& l) {
@@ -53,7 +55,9 @@ static size_t elemBytes(LiteRtElementType et) {
         case kLiteRtElementTypeInt32:   return 4;
         case kLiteRtElementTypeFloat32: return 4;
         case kLiteRtElementTypeInt64:   return 8;
-        default:                        return 4;
+        default:
+            LOGE("elemBytes: unknown element type %d, defaulting to 4", static_cast<int>(et));
+            return 4;
     }
 }
 
@@ -81,35 +85,52 @@ static bool initHandle(EmbedHandle* h, const char* model_path) {
     LiteRtDestroyOptions(opts);
     CHECK(s, "LiteRtCreateCompiledModel", false);
 
-    // Inspect the main subgraph to discover input/output shapes
+    // Discover input/output shapes from the main subgraph
     LiteRtParamIndex main_idx = 0;
-    LiteRtGetMainModelSubgraphIndex(h->model, &main_idx);
+    s = LiteRtGetMainModelSubgraphIndex(h->model, &main_idx);
+    if (s != kLiteRtStatusOk) {
+        LOGE("LiteRtGetMainModelSubgraphIndex: %d, using 0", static_cast<int>(s));
+        main_idx = 0;
+    }
 
     LiteRtSubgraph sg = nullptr;
     s = LiteRtGetModelSubgraph(h->model, main_idx, &sg);
     CHECK(s, "LiteRtGetModelSubgraph", false);
 
     LiteRtParamIndex n_in = 0, n_out = 0;
-    LiteRtGetNumSubgraphInputs(sg, &n_in);
-    LiteRtGetNumSubgraphOutputs(sg, &n_out);
+    s = LiteRtGetNumSubgraphInputs(sg, &n_in);
+    CHECK(s, "LiteRtGetNumSubgraphInputs", false);
+    s = LiteRtGetNumSubgraphOutputs(sg, &n_out);
+    CHECK(s, "LiteRtGetNumSubgraphOutputs", false);
     h->num_inputs = static_cast<int>(n_in);
 
+    // input[0]: input_ids (int32, shape [1, max_seq_len])
     LiteRtTensor in0 = nullptr;
     s = LiteRtGetSubgraphInput(sg, 0, &in0);
     CHECK(s, "LiteRtGetSubgraphInput[0]", false);
     s = LiteRtGetRankedTensorType(in0, &h->in_type);
-    CHECK(s, "LiteRtGetRankedTensorType[in]", false);
+    CHECK(s, "LiteRtGetRankedTensorType[in0]", false);
+    size_t in_elems = totalElements(h->in_type.layout);
+    h->max_seq_len  = h->in_type.layout.dimensions[h->in_type.layout.rank - 1];
+    h->input_bytes  = in_elems * elemBytes(h->in_type.element_type);
 
-    size_t in_elems  = totalElements(h->in_type.layout);
-    h->max_seq_len   = h->in_type.layout.dimensions[h->in_type.layout.rank - 1];
-    h->input_bytes   = in_elems * elemBytes(h->in_type.element_type);
+    // input[1] (optional): attention_mask — query its type independently
+    if (h->num_inputs >= 2) {
+        LiteRtTensor in1 = nullptr;
+        s = LiteRtGetSubgraphInput(sg, 1, &in1);
+        CHECK(s, "LiteRtGetSubgraphInput[1]", false);
+        s = LiteRtGetRankedTensorType(in1, &h->mask_type);
+        CHECK(s, "LiteRtGetRankedTensorType[in1]", false);
+        size_t mask_elems = totalElements(h->mask_type.layout);
+        h->mask_bytes = mask_elems * elemBytes(h->mask_type.element_type);
+    }
 
+    // output[0]: embedding vector (float32, shape [1, embedding_dim])
     LiteRtTensor out0 = nullptr;
     s = LiteRtGetSubgraphOutput(sg, 0, &out0);
     CHECK(s, "LiteRtGetSubgraphOutput[0]", false);
     s = LiteRtGetRankedTensorType(out0, &h->out_type);
-    CHECK(s, "LiteRtGetRankedTensorType[out]", false);
-
+    CHECK(s, "LiteRtGetRankedTensorType[out0]", false);
     size_t out_elems = totalElements(h->out_type.layout);
     h->embedding_dim = static_cast<int>(out_elems);
     h->output_bytes  = out_elems * elemBytes(h->out_type.element_type);
@@ -124,7 +145,7 @@ static bool initHandle(EmbedHandle* h, const char* model_path) {
 
     if (h->num_inputs >= 2) {
         s = LiteRtCreateManagedTensorBuffer(h->env, kLiteRtTensorBufferTypeHostMemory,
-                                            &h->in_type, h->input_bytes, &h->in_mask);
+                                            &h->mask_type, h->mask_bytes, &h->in_mask);
         CHECK(s, "CreateManagedTensorBuffer[in_mask]", false);
     }
 
@@ -146,8 +167,8 @@ Java_com_focal_intelligence_LiteRtEmbedderJni_nativeCreate(
     jenv->ReleaseStringUTFChars(model_path_j, path);
     if (!ok) {
         delete h;
-        jclass ex = jenv->FindClass("java/lang/RuntimeException");
-        jenv->ThrowNew(ex, "LiteRt embedding model failed to initialize");
+        // Kotlin caller checks for 0 and throws with the model path in the message.
+        // Detailed C-level errors are already logged via LOGE above.
         return 0L;
     }
     return reinterpret_cast<jlong>(h);
@@ -160,25 +181,27 @@ Java_com_focal_intelligence_LiteRtEmbedderJni_nativeEmbed(
     auto* h = reinterpret_cast<EmbedHandle*>(handle);
     if (!h || !h->compiled) return nullptr;
 
-    auto n_ints = static_cast<jsize>(h->input_bytes / 4);
-    void* ptr   = nullptr;
+    void* ptr = nullptr;
     LiteRtStatus s;
 
-    // Fill input_ids buffer
+    // Write input_ids into pre-allocated buffer
     s = LiteRtLockTensorBuffer(h->in_ids, &ptr, kLiteRtTensorBufferLockModeWrite);
     CHECK(s, "Lock[in_ids]", nullptr);
-    jenv->GetIntArrayRegion(input_ids_j, 0, n_ints, reinterpret_cast<jint*>(ptr));
+    jenv->GetIntArrayRegion(input_ids_j, 0,
+                            static_cast<jsize>(h->input_bytes / 4),
+                            reinterpret_cast<jint*>(ptr));
     LiteRtUnlockTensorBuffer(h->in_ids);
 
-    // Fill attention_mask buffer if model has a second input
+    // Write attention_mask if model has a second input
     if (h->in_mask && input_mask_j) {
         s = LiteRtLockTensorBuffer(h->in_mask, &ptr, kLiteRtTensorBufferLockModeWrite);
         CHECK(s, "Lock[in_mask]", nullptr);
-        jenv->GetIntArrayRegion(input_mask_j, 0, n_ints, reinterpret_cast<jint*>(ptr));
+        jenv->GetIntArrayRegion(input_mask_j, 0,
+                                static_cast<jsize>(h->mask_bytes / 4),
+                                reinterpret_cast<jint*>(ptr));
         LiteRtUnlockTensorBuffer(h->in_mask);
     }
 
-    // Build input array and run
     LiteRtTensorBuffer in_bufs[2];
     in_bufs[0] = h->in_ids;
     size_t n_in = 1;
@@ -187,16 +210,20 @@ Java_com_focal_intelligence_LiteRtEmbedderJni_nativeEmbed(
         n_in = static_cast<size_t>(h->num_inputs);
     }
 
-    s = LiteRtRunCompiledModel(h->compiled, 0, n_in, in_bufs, 1u, &h->output);
+    // Use a local copy so the runtime cannot mutate h->output (it may swap the
+    // buffer handle internally on some platforms; keeping h->output stable
+    // ensures nativeClose always destroys the correct handle).
+    LiteRtTensorBuffer out_buf = h->output;
+    s = LiteRtRunCompiledModel(h->compiled, 0, n_in, in_bufs, 1u, &out_buf);
     CHECK(s, "LiteRtRunCompiledModel", nullptr);
 
-    // Read embedding vector
-    s = LiteRtLockTensorBuffer(h->output, &ptr, kLiteRtTensorBufferLockModeRead);
+    // Read the embedding vector from the local out_buf
+    s = LiteRtLockTensorBuffer(out_buf, &ptr, kLiteRtTensorBufferLockModeRead);
     CHECK(s, "Lock[output]", nullptr);
     jfloatArray result = jenv->NewFloatArray(h->embedding_dim);
     jenv->SetFloatArrayRegion(result, 0, h->embedding_dim,
                               reinterpret_cast<const jfloat*>(ptr));
-    LiteRtUnlockTensorBuffer(h->output);
+    LiteRtUnlockTensorBuffer(out_buf);
     return result;
 }
 

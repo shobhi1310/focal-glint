@@ -19,10 +19,12 @@ val stageLiteRtSo by tasks.registering {
             dependencies.create("com.google.ai.edge.litertlm:litertlm-android:$litertlmVersion@aar")
         ).resolve().single()
         val dest = outDir.get().asFile.also { it.mkdirs() }
-        project.zipTree(aar)
+        val soFile = project.zipTree(aar)
             .matching { include("jni/arm64-v8a/libLiteRt.so") }
-            .singleFile
-            .copyTo(File(dest, "libLiteRt.so"), overwrite = true)
+            .files
+            .firstOrNull()
+            ?: error("libLiteRt.so not found in litertlm-android:$litertlmVersion at jni/arm64-v8a/")
+        soFile.copyTo(File(dest, "libLiteRt.so"), overwrite = true)
         logger.lifecycle("Staged libLiteRt.so from litertlm-android:$litertlmVersion")
     }
 }
@@ -47,19 +49,14 @@ android {
             abiFilters += "arm64-v8a"
         }
 
-        externalNativeBuild {
-            cmake {
-                arguments(
-                    "-DLITERT_HEADERS_DIR=${file("../../LiteRT").absolutePath}",
-                    "-DLITERT_LIB_DIR=${layout.buildDirectory.get().asFile.absolutePath}/litert_link"
-                )
-            }
-        }
     }
 
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
+            arguments(
+                "-DLITERT_LIB_DIR=${layout.buildDirectory.get().asFile.absolutePath}/litert_link"
+            )
         }
     }
 
@@ -85,12 +82,6 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
-    }
-
-    packaging {
-        jniLibs {
-            // libLiteRt.so is now provided solely by litertlm-android; no conflict.
-        }
     }
 }
 
