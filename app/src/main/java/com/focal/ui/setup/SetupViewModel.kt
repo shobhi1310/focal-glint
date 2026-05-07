@@ -48,7 +48,8 @@ data class SetupUiState(
     val embeddingModelAvailable: Boolean = false,
     val cloudEndpoint: String = "",
     val cloudApiKey: String = "",
-    val cloudModelName: String = ""
+    val cloudModelName: String = "",
+    val contextWindowMultiplier: Int = 8
 )
 
 @HiltViewModel
@@ -86,7 +87,8 @@ class SetupViewModel @Inject constructor(
             embeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable,
             cloudEndpoint = modelManager.getCloudEndpoint(),
             cloudApiKey = modelManager.getCloudApiKey(),
-            cloudModelName = modelManager.getCloudModelName()
+            cloudModelName = modelManager.getCloudModelName(),
+            contextWindowMultiplier = modelManager.getContextWindowMultiplier()
         )
     }
 
@@ -103,6 +105,30 @@ class SetupViewModel @Inject constructor(
     fun onSetCloudModelName(name: String) {
         modelManager.setCloudModelName(name)
         _uiState.value = _uiState.value.copy(cloudModelName = name)
+    }
+
+    fun onContextWindowChange(multiplier: Int) {
+        if (_uiState.value.backendSwitching) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(backendSwitching = true, contextWindowMultiplier = multiplier)
+            modelManager.saveContextWindowMultiplier(multiplier)
+            if (inferenceProvider.isReady()) {
+                try {
+                    val variant = _uiState.value.selectedModel
+                    val useGpu = modelManager.getBackendPreference()
+                    inferenceProvider.restart(
+                        modelManager.modelFileFor(variant).absolutePath,
+                        useGpu,
+                        modelManager.getContextTokens()
+                    )
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = "Context window change failed: ${e.message}"
+                    )
+                }
+            }
+            _uiState.value = _uiState.value.copy(backendSwitching = false)
+        }
     }
 
     fun onRequestBatteryOptimization() {
@@ -273,7 +299,7 @@ class SetupViewModel @Inject constructor(
                     inferenceProvider.restart(
                         modelManager.modelFileFor(variant).absolutePath,
                         useGpu,
-                        variant.maxContextTokens
+                        modelManager.getContextTokens()
                     )
                     reinitializeEmbeddings(useGpu)
                 } catch (e: Exception) {

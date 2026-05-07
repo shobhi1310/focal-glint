@@ -21,7 +21,7 @@ enum class ModelVariant(
         url = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
         displayName = "Gemma 4 E2B",
         sizeLabel = "2.58 GB",
-        maxContextTokens = 8192
+        maxContextTokens = 8 * 1024
     )
 }
 
@@ -104,6 +104,18 @@ class ModelManager(private val context: Context) {
     fun deleteModel(variant: ModelVariant) {
         modelFileFor(variant).delete()
     }
+
+    fun getContextWindowMultiplier(): Int {
+        val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+        return prefs.getInt("context_window_multiplier", 8).coerceIn(4, 8)
+    }
+
+    fun saveContextWindowMultiplier(multiplier: Int) {
+        context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
+            .edit().putInt("context_window_multiplier", multiplier.coerceIn(4, 8)).apply()
+    }
+
+    fun getContextTokens(): Int = getContextWindowMultiplier() * 1024
 
     fun getBackendPreference(): Boolean {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)

@@ -1,7 +1,9 @@
 package com.focal.ui.setup
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -345,6 +347,45 @@ fun SetupScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium,
                         textStyle = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            item {
+                StepCard(
+                    number = 10,
+                    title = "Context Window",
+                    description = "LLM context size in tokens. Smaller = less GPU RAM, larger = more context for long batches. Restarts engine automatically if running.",
+                    isComplete = true
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        listOf(4, 5, 6, 7, 8).forEach { multiplier ->
+                            val selected = state.contextWindowMultiplier == multiplier
+                            Button(
+                                onClick = { viewModel.onContextWindowChange(multiplier) },
+                                enabled = !selected && !state.backendSwitching,
+                                colors = if (selected)
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                else
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                            ) {
+                                Text("${multiplier}K")
+                            }
+                        }
+                    }
+                    Text(
+                        text = "${state.contextWindowMultiplier * 1024} tokens",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

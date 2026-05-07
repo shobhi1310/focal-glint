@@ -31,12 +31,12 @@ class EngineWarmupCoordinator @Inject constructor(
             val modelFile = modelManager.modelFileFor(variant)
             val useGpu = modelManager.getBackendPreference()
             try {
-                inferenceProvider.initialize(modelFile.absolutePath, useGpu, variant.maxContextTokens)
+                inferenceProvider.initialize(modelFile.absolutePath, useGpu, modelManager.getContextTokens())
                 Log.d(TAG, "LLM warmed: ${variant.displayName} gpu=$useGpu")
             } catch (e: Exception) {
                 Log.e(TAG, "LLM warm-up failed (${e.javaClass.simpleName}): ${e.message}")
                 if (useGpu) {
-                    inferenceProvider.initialize(modelFile.absolutePath, false, variant.maxContextTokens)
+                    inferenceProvider.initialize(modelFile.absolutePath, false, modelManager.getContextTokens())
                     Log.d(TAG, "LLM warmed with CPU fallback")
                 } else {
                     throw e

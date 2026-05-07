@@ -126,7 +126,7 @@ class SettingsViewModel @Inject constructor(
                 try {
                     InferenceWorker.cancelAndWait(WorkManager.getInstance(context))
                     val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
-                    inferenceProvider.restart(modelManager.modelPath, useGpu, variant.maxContextTokens)
+                    inferenceProvider.restart(modelManager.modelPath, useGpu, modelManager.getContextTokens())
                     reinitializeEmbeddings(useGpu)
                 } catch (e: Exception) {
                     val fallback = !useGpu
