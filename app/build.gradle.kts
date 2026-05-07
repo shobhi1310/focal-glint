@@ -7,6 +7,28 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// Extract libLiteRt.so from the litertlm AAR so CMake can link against it at build time.
+// The extracted file is in build/ and is NOT packaged into the APK — litertlm-android
+// already packages the real libLiteRt.so. This is purely a link-time stub.
+val stageLiteRtSo by tasks.registering {
+    val litertlmVersion = "0.11.0"
+    val outDir = layout.buildDirectory.dir("litert_link/arm64-v8a")
+    outputs.dir(outDir)
+    doLast {
+        val aar = configurations.detachedConfiguration(
+            dependencies.create("com.google.ai.edge.litertlm:litertlm-android:$litertlmVersion@aar")
+        ).resolve().single()
+        val dest = outDir.get().asFile.also { it.mkdirs() }
+        project.zipTree(aar)
+            .matching { include("jni/arm64-v8a/libLiteRt.so") }
+            .singleFile
+            .copyTo(File(dest, "libLiteRt.so"), overwrite = true)
+        logger.lifecycle("Staged libLiteRt.so from litertlm-android:$litertlmVersion")
+    }
+}
+
+tasks.named("preBuild") { dependsOn(stageLiteRtSo) }
+
 android {
     namespace = "com.focal"
     compileSdk = 35
@@ -23,6 +45,15 @@ android {
 
         ndk {
             abiFilters += "arm64-v8a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments(
+                    "-DLITERT_HEADERS_DIR=${file("../../LiteRT").absolutePath}",
+                    "-DLITERT_LIB_DIR=${layout.buildDirectory.get().asFile.absolutePath}/litert_link"
+                )
+            }
         }
     }
 
@@ -58,10 +89,7 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += listOf(
-                "**/libLiteRt.so",
-                "**/libLiteRtClGlAccelerator.so"
-            )
+            // libLiteRt.so is now provided solely by litertlm-android; no conflict.
         }
     }
 }
@@ -102,9 +130,8 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
-    // LiteRT-LM for on-device LLM inference
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
-    implementation("com.google.ai.edge.litert:litert:latest.release")
+    // LiteRT-LM for on-device LLM inference (also supplies libLiteRt.so for embeddings)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.11.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")

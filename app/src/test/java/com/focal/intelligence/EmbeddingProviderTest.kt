@@ -2,7 +2,6 @@ package com.focal.intelligence
 
 import android.content.Context
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
@@ -32,18 +31,6 @@ class EmbeddingProviderTest {
         assertEquals(1024, ids.size)
         assertEquals(2, ids.first())
         assertEquals(1032, ids.last())
-    }
-
-    @Test
-    fun `buildModelOptions selects gpu accelerator when requested`() {
-        val options = EmbeddingGemmaLiteRtEmbedder("unused", useGpu = true).buildModelOptions(true)
-        assertTrue(options.gpuOptions != null)
-    }
-
-    @Test
-    fun `buildModelOptions selects cpu accelerator when requested`() {
-        val options = EmbeddingGemmaLiteRtEmbedder("unused", useGpu = false).buildModelOptions(false)
-        assertTrue(options.cpuOptions != null)
     }
 
     @Test
