@@ -197,21 +197,27 @@ class SetupViewModel @Inject constructor(
 
     fun onStartEngine() {
         if (_uiState.value.engineStopping) return
-        modelManager.setEngineEnabled(true)
         _uiState.value = _uiState.value.copy(errorMessage = null)
         viewModelScope.launch {
             try {
                 val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = false)
                 if (warmed) {
+                    modelManager.setEngineEnabled(true)
                     context.startForegroundService(Intent(context, LlmForegroundService::class.java))
                     WorkManager.getInstance(context).enqueueUniqueWork(
                         InferenceWorker.WORK_NAME,
                         ExistingWorkPolicy.REPLACE,
                         OneTimeWorkRequestBuilder<InferenceWorker>().build()
                     )
+                } else {
+                    modelManager.setEngineEnabled(false)
                 }
                 _uiState.value = _uiState.value.copy(engineRunning = warmed)
             } catch (e: Exception) {
+                modelManager.setEngineEnabled(false)
+                withContext(Dispatchers.IO) {
+                    runCatching { inferenceProvider.close() }
+                }
                 _uiState.value = _uiState.value.copy(
                     engineRunning = false,
                     errorMessage = "Engine start failed: ${e.message}"
@@ -222,7 +228,7 @@ class SetupViewModel @Inject constructor(
 
     fun onStopEngine() {
         if (_uiState.value.engineStopping) return
-        _uiState.value = _uiState.value.copy(engineStopping = true)
+        _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = true)
         viewModelScope.launch {
             stopEngine("manual stop")
             _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
@@ -236,13 +242,22 @@ class SetupViewModel @Inject constructor(
     private suspend fun stopEngine(reason: String) {
         Log.i(TAG, "Engine stop requested: reason=$reason. Active conversation will be dropped.")
         val elapsedMs = measureTimeMillis {
-            cancelWorkerAndWait()
-            withContext(Dispatchers.IO) {
-                inferenceProvider.close()
-            }
-            Log.i(TAG, "LLM close completed: reason=$reason isReady=${inferenceProvider.isReady()}")
             modelManager.setEngineEnabled(false)
             context.stopService(Intent(context, LlmForegroundService::class.java))
+
+            val cleanupError = runCatching {
+                cancelWorkerAndWait()
+                val closeError = withContext(Dispatchers.IO) {
+                    runCatching { inferenceProvider.close() }.exceptionOrNull()
+                }
+                if (closeError != null) throw closeError
+            }.exceptionOrNull()
+
+            if (cleanupError == null) {
+                Log.i(TAG, "LLM close completed: reason=$reason isReady=${inferenceProvider.isReady()}")
+            } else {
+                Log.e(TAG, "Engine stop cleanup failed: reason=$reason", cleanupError)
+            }
         }
         Log.i(TAG, "Engine stopped: reason=$reason elapsedMs=$elapsedMs")
     }

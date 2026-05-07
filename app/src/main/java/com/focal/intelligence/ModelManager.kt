@@ -98,7 +98,7 @@ class ModelManager(private val context: Context) {
 
     fun setEngineEnabled(enabled: Boolean) {
         val prefs = context.getSharedPreferences("focal_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("llm_engine_enabled", enabled).apply()
+        prefs.edit().putBoolean("llm_engine_enabled", enabled).commit()
     }
 
     fun deleteModel(variant: ModelVariant) {

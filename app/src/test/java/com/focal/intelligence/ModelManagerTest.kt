@@ -34,6 +34,7 @@ class ModelManagerTest {
         every { editor.putString(any(), any()) } returns editor
         every { editor.putBoolean(any(), any()) } returns editor
         every { editor.apply() } just runs
+        every { editor.commit() } returns true
         every { prefs.getString(any(), any()) } answers { secondArg<String?>() }
         every { prefs.getBoolean(any(), any()) } answers { secondArg<Boolean>() }
         modelManager = ModelManager(context)
@@ -128,6 +129,7 @@ class ModelManagerTest {
     fun `setEngineEnabled persists boolean flag`() {
         modelManager.setEngineEnabled(true)
         verify { editor.putBoolean("llm_engine_enabled", true) }
+        verify { editor.commit() }
     }
 
     @Test

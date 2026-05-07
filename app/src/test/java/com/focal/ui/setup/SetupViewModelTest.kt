@@ -194,6 +194,35 @@ class SetupViewModelTest {
     }
 
     @Test
+    fun `onStartEngine rolls back startup preference when warmup does not load model`() = runTest {
+        coEvery { engineWarmupCoordinator.warmUp(any()) } returns false
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onStartEngine()
+        advanceUntilIdle()
+
+        verify(exactly = 0) { modelManager.setEngineEnabled(true) }
+        verify { modelManager.setEngineEnabled(false) }
+        assertFalse(vm.uiState.value.engineRunning)
+    }
+
+    @Test
+    fun `onStartEngine unloads llm and disables preference when service start fails`() = runTest {
+        every { context.startForegroundService(any()) } throws RuntimeException("service denied")
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onStartEngine()
+        advanceUntilIdle()
+
+        verify { modelManager.setEngineEnabled(true) }
+        verify { modelManager.setEngineEnabled(false) }
+        verify(timeout = 1_000) { inferenceProvider.close() }
+        assertFalse(vm.uiState.value.engineRunning)
+    }
+
+    @Test
     fun `onStopEngine closes llm but keeps embedding loaded`() = runTest {
         embeddingProvider = mockk(relaxed = true)
         every { embeddingProvider.isReady() } returns true
@@ -208,6 +237,46 @@ class SetupViewModelTest {
         advanceUntilIdle()
         verify(exactly = 0) { embeddingProvider.close() }
         verify(timeout = 1_000) { modelManager.setEngineEnabled(false) }
+    }
+
+    @Test
+    fun `onStopEngine persists disabled state before closing llm`() = runTest {
+        val calls = mutableListOf<String>()
+        every { inferenceProvider.isReady() } returns true
+        every { modelManager.setEngineEnabled(false) } answers {
+            calls.add("disabled")
+            Unit
+        }
+        every { inferenceProvider.close() } answers {
+            calls.add("closed")
+            Unit
+        }
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onStopEngine()
+        advanceUntilIdle()
+        verify(timeout = 1_000) { inferenceProvider.close() }
+
+        assertEquals(listOf("disabled", "closed"), calls)
+    }
+
+    @Test
+    fun `onStopEngine clears running state even when close fails`() = runTest {
+        every { inferenceProvider.isReady() } returns true
+        every { inferenceProvider.close() } throws RuntimeException("close failed")
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onStopEngine()
+        advanceUntilIdle()
+
+        verify { modelManager.setEngineEnabled(false) }
+        verify(timeout = 1_000) { context.stopService(any()) }
+        verify(timeout = 1_000) { inferenceProvider.close() }
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.engineRunning)
+        assertFalse(vm.uiState.value.engineStopping)
     }
 
     @Test
