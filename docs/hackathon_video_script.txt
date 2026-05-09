@@ -6,6 +6,119 @@ Evaluation alignment: Impact & Vision 40pts · Video Pitch 30pts · Technical De
 Internal tracks (do not appear in video): LiteRT · Unsloth · Digital Equity & Inclusivity · Main Track
 
 
+SCREENSHOT ASSET INDEX
+======================
+All screenshots are in docs/screenshots/. Use these exact files for every demo scene.
+Do NOT use AI-generated UI — every app frame must come from these real screenshots.
+
+  FILE                                                   SCENE   WHAT IT SHOWS
+  ─────────────────────────────────────────────────────────────────────────────
+  focal_today_digest_topic_cards_with_next_step_badges   ACT 1   Long digest scroll: 9 topic cards
+  .jpg                                                           (Personal/General/Work) all showing
+                                                                 "→ 1 next step" amber badge.
+                                                                 Header: "61 matters · 65 noise · 126 total"
+
+  focal_topic_detail_two_suggested_next_steps.jpg        ACT 3   Topic detail for "Zomato Offers and
+                                                                 Breakfast Reminder" — SUMMARY box +
+                                                                 SUGGESTED NEXT STEPS section with 2
+                                                                 actions: "Check Zomato offers → ZOMATO"
+                                                                 and "Reply to Mom about breakfast →
+                                                                 MESSAGES". SOURCES: 2 Zomato notifications.
+
+  focal_setup_gemma4_e2b_gpu_on_device.jpg               ACT 3   Setup screen showing all 10 steps.
+                                                                 KEY: Step 3 "Gemma 4 E2B · 2.58 GB ·
+                                                                 on device", Step 5 "GPU ✓ selected",
+                                                                 Step 6 "Start Engine". Proves on-device.
+
+  focal_pulse_wizard_step1_template_selection.jpg        ACT 3   Widget creation Step 1 of 3 — bottom
+                                                                 sheet over Pulse grid. "What do you
+                                                                 want to track?" with 4 options: Money
+                                                                 today, Work pulse, People who reached
+                                                                 out, Deliveries.
+
+  focal_pulse_wizard_step2_recipe_operation.jpg          ACT 3   Widget creation Step 2 of 3 — "How
+                                                                 should Focal compute it?" COUNT
+                                                                 highlighted in amber. All 6 operations
+                                                                 visible: Sum, Count, Latest, List,
+                                                                 Max, Status.
+
+  focal_pulse_wizard_step3_auto_sources_create.jpg       ACT 3   Widget creation Step 3 of 3 — all 4
+                                                                 widgets visible behind bottom sheet.
+                                                                 "Auto — let Focal decide" selected.
+                                                                 "Create widget" CTA visible.
+
+  focal_finance_widget_money_today_transaction_list.jpg  ACT 3   Finance widget detail — "Money today
+                                                                 -₹5245", badge "-₹3779 raz*swiggy",
+                                                                 "₹162375 sent · ₹157130 received",
+                                                                 full TRANSACTIONS list with real
+                                                                 merchant names and amounts.
+
+  focal_tune_screen_user_focus_app_controls.jpg          ACT 4   Tune screen — "Tune the noise." header,
+                                                                 user's own focus text visible, M/A/N
+                                                                 controls for each app (Telegram, Teams,
+                                                                 WhatsApp, inshorts, Messages, Instagram,
+                                                                 Swiggy, Outlook). Shows personalisation.
+  ─────────────────────────────────────────────────────────────────────────────
+
+
+DATA PRIVACY — ABSTRACTION DIRECTIVE
+=====================================
+The screenshots contain real personal data. Before any frame is used in the
+final video, all personally identifiable content MUST be replaced with
+realistic fictional equivalents. The UI structure, layout, colours, and
+feature labels remain identical — only the data values change.
+
+Abstraction rules per screen:
+
+focal_today_digest_topic_cards_with_next_step_badges.jpg
+  - Topic headlines: replace specific names with generic equivalents
+      "WhatsApp Photo from Amma"    → "A photo from the family group"
+      "Bank Debit Notification..."  → "Bank transaction alert"
+      "Reply to Salon Review..."    → "You have a new review reply"
+      "Outlook Reconciliation..."   → "Meeting: Project status check"
+  - Keep category labels (PERSONAL, GENERAL, WORK) and "→ 1 next step" intact
+  - Keep "61 matters · 65 noise · 126 total" — these are aggregate stats, not PII
+
+focal_topic_detail_two_suggested_next_steps.jpg
+  - Topic title: "Zomato Offers and Breakfast Reminder" → keep (not personal)
+  - Summary: keep (mentions no personal name)
+  - Action buttons: keep as-is ("Check Zomato offers", "Reply to Mom about breakfast")
+  - Sources rows: keep app names, blur or replace notification snippet text
+
+focal_finance_widget_money_today_transaction_list.jpg
+  - Replace all merchant names with generic equivalents:
+      "CHIRU HAASINI"           → "UPI Transfer"
+      "CHANDRA KIRAN KOPPARAPU" → "Family Transfer"
+      "BROKENTUSK TECHNOLOGIES" → "Vendor Payment"
+      "VPA setuverify@citibank" → "Verification Credit"
+      "HDFC Focused Fund"       → "Mutual Fund Debit"
+      "N/A" +144000             → "Salary Credit"
+  - Replace bank account suffixes with fictional ones (*XXXX pattern is fine)
+  - Keep total amounts in the same range (±20%) so the story reads true
+  - Keep the "-₹5245" headline and "-₹3779" badge (change merchant name only)
+
+focal_tune_screen_user_focus_app_controls.jpg
+  - Replace the user's personal "YOUR FOCUS" text with a generic example:
+      Generic: "Surface messages from people I know, work updates, deliveries,
+      and financial alerts. Silence promotions, news, and algorithmic content."
+  - Replace name "Darahas" with "You" or leave field blank
+  - App list (Telegram, Teams, WhatsApp etc.) and M/A/N controls: keep as-is
+
+focal_setup_gemma4_e2b_gpu_on_device.jpg
+  - "https://inference.focal.app" endpoint URL: keep (not personal)
+  - No personal data on this screen — use as-is
+
+focal_pulse_wizard_step1/step2/step3:
+  - No personal data — use as-is
+
+IMPLEMENTATION:
+  Option A (Recommended): Use a motion graphics tool (After Effects / CapCut)
+  to place text overlays on top of sensitive fields before export.
+  Option B: Blur the specific data regions and replace with text overlays
+  matching the app's font and colour (#ffffff, bodyMedium, dark background).
+  Do NOT use Veo to regenerate the UI — structure must match exactly.
+
+
 PRE-PRODUCTION NOTES
 ====================
 Resolution: 1080p — smooth playback and clean motion are the priority, not raw resolution
@@ -15,373 +128,315 @@ Music: Ambient electronic underscore, 60 BPM, builds through demo, resolves soft
 VO: Clear, measured, ~130 WPM. No rushed delivery — let visuals breathe between lines
 Transitions: Match-cuts and soft dissolves (8 frames) throughout. One intentional smash-cut
              at problem peak. Zero hard jump-cuts elsewhere.
-Veo note: Scenes 1, 2, 3, 4 are Veo-generated. Scenes 5–12 are screen recordings and
-          motion graphics assembled in post. Do not send screen recording scenes to Veo.
+
+SOURCE RULE: Every app screen shown must be from the screenshots listed above.
+             Veo is used only for B-roll (people, environments). Never generate UI with Veo.
 
 
 ACT 1 — THE PROBLEM (0:00–0:28)
 ================================
 
-[0:00–0:06] COLD OPEN — No VO  [VEO SCENE 1]
-Visual: Time-lapse of a real phone screen. Notification banners cascade in — WhatsApp, Slack,
-        Gmail, Swiggy, ICICI Bank, LinkedIn, Microsoft Teams. Screen floods to overflow.
-Audio:  Layered notification chimes, building to cacophony.
-Screen: No text.
-
-VEO PROMPT: "Cinematic close-up of a smartphone screen flooding with notification banners,
-warm amber light, shallow depth of field, slow motion, 24fps, dark background"
+[0:00–0:06] COLD OPEN — No VO  [VEO B-ROLL]
+Visual: Time-lapse of a real phone screen flooding with notification banners.
+        USE: focal_today_digest_topic_cards_with_next_step_badges.jpg as reference
+        for the notification style and dark theme — Veo should match this aesthetic.
+VEO PROMPT: "Cinematic close-up of a smartphone screen flooding with notification
+banners in rapid succession, warm amber light, shallow depth of field, slow motion,
+24fps, dark warm background, smooth motion"
 
 ---
 
 [0:06–0:10] SMASH-CUT TO BLACK  [MOTION GRAPHIC]
 Visual: Hard cut to black. Silence.
-Screen: White sans-serif fades in — "102 notifications. One morning."
+Screen: White sans-serif fades in — "126 notifications. One morning."
 Audio:  Single low tone. Two-beat pause.
-
-Editor note: Pull the actual Focal digest header screenshot ("43 matters · 102 total") and
-flash it for one frame before this card to ground the number in real footage.
+SOURCE: The number 126 is from focal_today_digest_topic_cards_with_next_step_badges.jpg
+        header ("126 total"). Use a one-frame flash of the real screenshot before
+        the black card so the number is grounded in real footage.
 
 ---
 
-[0:10–0:28] PROBLEM DEFINITION — VO over B-roll  [VEO SCENE 2]
-Visual: Medium shot — person glances at phone, sets it face-down. Cut to close-up of eyes
-        scanning screen. Cut to hands scrolling past alerts, finding nothing actionable.
-        Rack-focus pull from sharp phone to blurred background.
+[0:10–0:28] PROBLEM DEFINITION — VO over B-roll  [VEO B-ROLL]
+VEO PROMPT: "Medium shot, person places smartphone face-down on wooden desk, soft
+natural window light from left, contemplative expression, 24fps, warm colour grade,
+smooth camera movement"
 
-VEO PROMPT: "Medium shot, person places smartphone face-down on wooden desk, soft window
-light, contemplative mood, 24fps, warm colour grade"
+VO: "126 notifications in one morning. 61 actually mattered. The rest — noise —
+    demanded attention anyway. Every scroll, every interrupted thought, every false
+    alarm. That's the hidden tax of the modern smartphone."
 
-VO: "102 notifications in one morning. Only 43 actually mattered. The rest — noise —
-    demanded attention anyway. Every scroll, every interrupted thought, every false alarm.
-    That's the hidden tax of the modern smartphone. Nobody has solved it — until now."
-
-Lower-third: "43 matters · 59 noise · 102 total — live device session"
-             Fades in at 0:16, holds 4 seconds.
-
-Note on numbers: 43 classified as matters + 59 classified as noise = 102 total.
-Verify exact split from your live session log before locking this lower-third.
+Lower-third [MOTION GRAPHIC]:
+    "61 matters · 65 noise · 126 total"
+    Source: focal_today_digest_topic_cards_with_next_step_badges.jpg header
+    Fades in at 0:16, holds 4 seconds.
 
 
 ACT 2 — THE SOLUTION (0:28–0:55)
 ==================================
 
-[0:28–0:40] PRODUCT REVEAL  [MOTION GRAPHIC]
-Visual: App icon blooms in from black with a subtle light bloom. FOCAL resolves. Slow push-in.
+[0:28–0:40] PRODUCT REVEAL  [MOTION GRAPHIC + VEO]
+VEO PROMPT: "Minimal dark background, single glowing app icon materialising from
+darkness, slow push-in zoom, ambient light bloom, premium product aesthetic, 24fps"
 Motion graphic: "On-device intelligence. Every notification, understood."
 
-VO: "Focal is a personal notification intelligence layer — powered entirely by Gemma 4,
-    running on the device GPU. No cloud. No API keys. No data leaves your phone. And the
-    model is fine-tuned on real notification data, so it understands the way people actually
-    communicate — not just how they write in textbooks."
-
-Audio: Music fades in. Warm pad.
+VO: "Focal is a personal notification intelligence layer — powered entirely by
+    Gemma 4, running on the device GPU. No cloud. No API keys. No data leaves
+    your phone. The model is fine-tuned on real notification data."
 
 ---
 
-[0:40–0:55] ARCHITECTURE DIAGRAM — Animated  [MOTION GRAPHIC]
-Visual: Dark background. Lines draw themselves, labels fade in sequentially.
+[0:40–0:55] ARCHITECTURE + PROOF  [SCREEN RECORDING: focal_setup_gemma4_e2b_gpu_on_device.jpg]
+Visual: Pan/zoom into the setup screen — start wide showing all 10 steps with
+        checkmarks, then slow push into Step 3 "Gemma 4 E2B · 2.58 GB · on device"
+        and Step 5 "GPU ✓". Hold on Step 6 "Start Engine".
+SCREENSHOT: focal_setup_gemma4_e2b_gpu_on_device.jpg
 
-Diagram:
-    [102 Notifications]
-            |
-    [Gemma 4 E4B · Fine-tuned with Unsloth · LiteRT GPU Delegate · Qualcomm Adreno]
-            |
-    [Classify] --> [Extract] --> [Embed] --> [Narrate]
-            |
-    [36 Topic Clusters · 4 Live Widgets · Suggested Actions]
+VO: "Gemma 4 E2B — 2.58 gigabytes — loaded directly onto the device GPU. No
+    server. No subscription. A full AI pipeline running where your data already
+    lives."
 
-Callouts (appear as each node highlights):
-    "Native Function Calling"              --> Extract node
-    "Semantic Embedding"                   --> Embed node
-    "Domain Fine-Tuned · Unsloth"          --> Gemma 4 node, amber glow
-    "1,882 MB GPU · Zero cloud egress"     --> LiteRT node, amber glow
-
-VO: "Using Google AI Edge's LiteRT runtime with the GPU delegate, Focal loads Gemma 4 E4B —
-    fine-tuned on notification-specific data with Unsloth — into 1.88 gigabytes of device
-    GPU memory. Classification, structured extraction, semantic clustering, and narrative
-    generation all run entirely on-chip."
+Callout overlay [MOTION GRAPHIC]:
+    "Gemma 4 E2B · 2.58 GB · GPU · On-device"  (amber, appears over Step 3)
 
 
 ACT 3 — LIVE DEMO (0:55–2:20)
 ===============================
-All scenes in this act are SCREEN RECORDINGS — not Veo. Record at 60fps, 1080p,
-status bar hidden. Apply smooth scroll interpolation in post.
+RULE: All app screens in this act must be cropped/animated from the real
+      screenshots listed above. No Veo-generated UI.
 
 ---
 
-[0:55–1:15] BATCH CLASSIFICATION — Styled log overlay  [SCREEN RECORDING + OVERLAY]
-Visual: Animated styled log card (not raw logcat — clean monospace on dark card):
+[0:55–1:15] TODAY DIGEST — NEXT STEPS BADGE
+[SCREEN RECORDING from: focal_today_digest_topic_cards_with_next_step_badges.jpg]
 
-    InferenceWorker   -->  10 notifications queued
-    Gemma 4 E4B       -->  Classification pass 1  (Unsloth fine-tuned)
-    BatchClassifyTool -->  [1] matters · delivery_notification
-                      -->  [2] matters · family_message
-                      -->  [3] matters · build_status
-                      -->  ...
-                      -->  8 matters · 2 noise
-    ExtractionTools   -->  extract_work · extract_personal · extract_logistics
-    ExtractionSaver   -->  6 structured rows saved  ·  0 bytes sent
+Visual: Slow smooth scroll down the digest. Show the full list of topic cards.
+        Every card shows "→ 1 next step" in amber. Categories visible:
+        PERSONAL, GENERAL, WORK. App icons: WhatsApp, inshorts, Reddit,
+        Outlook, Teams, LinkedIn. Scroll reveals 9 cards — each with the badge.
 
-Lines appear with a blinking cursor effect, timed to VO narration.
+Key moments to highlight with slow-down or zoom:
+  - "→ 1 next step" amber text on first card (WhatsApp Photo from Amma)
+  - Header "61 matters · 65 noise · 126 total" at top
+  - Variety of categories (Personal, General, Work) showing breadth
 
-VO: "Every time notifications arrive, Focal runs a two-pass GPU inference session.
-    In the first pass, fine-tuned Gemma 4 calls classifyNotification for each item —
-    matters or noise. In the second pass, it fires structured extraction tool calls to
-    pull typed data: transactions, senders, work items, delivery statuses.
-    Six tools. One local model. No server."
+VO: "Every notification that matters gets a topic — a Gemma 4-written headline,
+    a one-sentence summary, and the most important thing you should do next.
+    61 topics. 0 cloud calls."
 
-Callout at 1:08:
-    "6 LiteRT tools · classify + extract_finance + extract_work +
-     extract_personal + extract_logistics + noExtraction"
+Lower-third: "61 topics · 0 cloud calls"
 
 ---
 
-[1:15–1:35] TODAY DIGEST — Screen capture  [SCREEN RECORDING]
-Visual: Smooth scroll through live Today digest. Real topic cards visible:
-    - "VOS Reconciliation logic status check"               -> 1 next step
-    - "Bond KYC Approved and Investment Offers Received"
-    - "Swiggy Order Update Received"
+[1:15–1:35] TOPIC DETAIL — SUGGESTED NEXT STEPS
+[SCREEN RECORDING from: focal_topic_detail_two_suggested_next_steps.jpg]
 
-Tap one card. Detail screen slides in smoothly. Action row: "Reply | com.whatsapp".
-Tap the action — WhatsApp opens to the correct thread.
+Visual: Tap on a card (animate the tap gesture). Topic detail slides in smoothly.
+        Show the full detail screen:
+          - Topic title: "Zomato Offers and Breakfast Reminder"
+          - SUMMARY box: "There are two Zomato notifications: one about unlocking
+            offers and another reminding about breakfast."
+          - SUGGESTED NEXT STEPS section with TWO action buttons:
+              Button 1 (white/primary): "Check Zomato offers  → ZOMATO"
+              Button 2 (dark): "Reply to Mom about breakfast  → MESSAGES"
+          - SOURCES · 2: two Zomato notification rows
 
-VO: "From 102 notifications, Focal generated 36 semantically clustered topic groups —
-    each with a Gemma 4-written headline, a one-sentence summary, and the single most
-    important action for the user to take. Every action resolves to an exact installed
-    app package on the device. No hallucinated links. No broken intent."
+Slow zoom into the two action buttons. Tap Button 1 — app launches.
 
-Lower-third at 1:22: "36 topic clusters · 43 matters classified · 0 cloud calls"
+VO: "Gemma 4 reads the cluster of notifications and decides what to do — not
+    just one step, but all the steps. Each action resolves to the exact app
+    already on your phone. Tap it. Done."
 
----
-
-[1:35–1:55] PULSE WIDGETS — Screen capture  [SCREEN RECORDING]
-Visual: Swipe to Pulse tab. Four uniform cards in 2x2 grid, same height. Cut to each
-        widget close-up in sequence.
-
-Real values on screen:
-    Finance  — Money today              : -Rs.5,245  ·  Latest: -Rs.3,779 raz*swiggy
-    Work     — Work pulse               : 23 items  ·  VOS Reconciliation  ·  build passed
-    Personal — People who reached out   : Bhoopendar  ·  25 messages
-    Logistics — Deliveries              : 2 in transit  ·  1 delivered
-
-VO: "Focal also maintains four live intelligence widgets — spending, work queue, personal
-    contacts, and deliveries. Extracted in real time from your notifications by Gemma 4's
-    native function calling. Aggregated on-device. Rendered without a single cloud request.
-    No competitor does this locally — Google Summarize needs connectivity, Apple Intelligence
-    needs an iPhone 16. Focal runs on any mid-range Android with a Qualcomm GPU."
-
-Animated callout at 1:48:
-    "Native function calling · extract_finance · extract_work ·
-     extract_personal · extract_logistics"
+Callout: "Structured tool calling · Index → Package → Intent"  (fades in over
+         the action buttons, holds 2 seconds)
 
 ---
 
-[1:55–2:10] UNSLOTH FINE-TUNING — Styled dataset overlay  [SCREEN RECORDING + OVERLAY]
-Visual: Clean card showing fine-tuning pipeline summary:
+[1:35–2:00] PULSE WIDGETS — 3-STEP CREATION FLOW
+[SCREEN RECORDINGS from wizard screenshots — all three steps]
 
-    Dataset     focal_finetune_final.jsonl
-    Framework   Unsloth · Gemma 4 E4B
-    Task        Notification classification + structured extraction
-    Format      Supervised fine-tuning · classify + tool-call pairs
-    Split       Train / Eval / Combined  (focal_finetune_train.jsonl /
-                focal_finetune_eval.jsonl / focal_finetune_combined.jsonl)
-    Published   github.com/shobhi1310/focal-glint
+Sub-scene A [0:05] — STEP 1:  focal_pulse_wizard_step1_template_selection.jpg
+  Visual: Bottom sheet appears over the Pulse grid. "What do you want to track?"
+          Four options visible. Finger taps "Work pulse".
 
-VO: "To make Gemma 4 precise for notification understanding, we fine-tuned it on a curated
-    dataset of real notification classification and extraction examples using Unsloth.
-    The result: a domain-adapted model that accurately separates signal from noise and
-    extracts structured data from messy, real-world notification text — running entirely
-    on the device GPU."
+Sub-scene B [0:08] — STEP 2:  focal_pulse_wizard_step2_recipe_operation.jpg
+  Visual: Step 2 slides in. "COUNT of Work pulse" highlighted in amber box.
+          Six operation tiles: Sum, Count (selected), Latest, List, Max, Status.
+          Pause 2 seconds to let viewer read the options.
 
-Callout: "Unsloth Fine-Tuning · Gemma 4 E4B · Notification Domain Adaptation"
+Sub-scene C [0:07] — STEP 3:  focal_pulse_wizard_step3_auto_sources_create.jpg
+  Visual: Step 3 — "Auto — let Focal decide" selected. All 4 live widgets visible
+          behind the sheet. Tap "Create widget".
+
+VO: "Pulse widgets let you ask your day a question. Three steps — pick a category,
+    pick a computation, pick your sources. Focal does the rest. Gemma 4 extracts
+    structured data from your notifications using native function calling and
+    populates every widget automatically."
 
 ---
 
-[2:10–2:20] GPU PERFORMANCE — Split-screen  [MOTION GRAPHIC + SCREEN RECORDING]
-Visual: Left panel — animated GPU memory bar chart, real values:
+[2:00–2:10] FINANCE WIDGET DETAIL
+[SCREEN RECORDING from: focal_finance_widget_money_today_transaction_list.jpg]
 
-    com.focal              ||||||||||||||||||||  1,882 MB
-    surfaceflinger         |||||                  450 MB
-    com.android.launcher3  ||                     157 MB
-    com.android.systemui   |                       25 MB
-    All other apps         |                       46 MB
-    ──────────────────────────────────────────────────────
-    Total device GPU                             2,610 MB
+Visual: Slow scroll through the Finance detail screen.
+        Show: "-₹5245" headline, "-₹3779 raz*swiggy" badge, the subtitle
+        "₹162375 sent · ₹157130 received", then the TRANSACTIONS list
+        with real merchant names scrolling past.
 
-Right panel — phone showing digest updating in real time.
+VO: "Every transaction — extracted from your bank SMS notifications by Gemma 4,
+    classified, and structured. No bank integration. No OAuth. Just the
+    notifications you already receive."
 
-VO: "The fine-tuned Gemma 4 model occupies 1.88 gigabytes — 72 percent of the device GPU.
-    A batch of 10 notifications is classified and extracted in the background while the user
-    sleeps, with zero network latency and zero data egress. Local frontier intelligence,
-    running where the data lives."
+---
 
-On-screen: "1,882 MB / 2,610 MB GPU  ·  72%  ·  Qualcomm Adreno  ·  0 bytes egress"
+[2:10–2:20] GPU PERFORMANCE  [MOTION GRAPHIC]
+Visual: Animated GPU memory bar chart (real values):
+
+    com.focal (Gemma 4 E2B)    ||||||||||||||||||||  1,882 MB
+    surfaceflinger             |||||                  450 MB
+    Launcher                   ||                     157 MB
+    All other apps             ||                      96 MB
+    ─────────────────────────────────────────────────
+    Total device GPU                               2,610 MB
+
+Right panel: focal_setup_gemma4_e2b_gpu_on_device.jpg — zoomed on
+             "Step 5: Backend — GPU ✓" and "Step 6: Start Engine".
+
+VO: "1.88 gigabytes of the device GPU — the entire model, live, classified,
+    extracting, generating. No network latency. No data egress."
+
+On-screen: "1,882 MB / 2,610 MB · 72% GPU · Qualcomm Adreno · 0 bytes egress"
 
 
 ACT 4 — IMPACT & CLOSE (2:20–2:55)
 =====================================
 
-[2:20–2:38] KINETIC TYPOGRAPHY  [MOTION GRAPHIC]
-Visual: Dark background. Each phrase dissolves in and out, slow elegant pace:
+[2:20–2:30] PERSONALISATION  [SCREEN RECORDING: focal_tune_screen_user_focus_app_controls.jpg]
+Visual: Slow pan down the Tune screen.
+        Show: "Tune the noise." header, user's focus text (real, personal),
+        then the app list: Telegram, Teams, WhatsApp, inshorts, Messages,
+        Instagram, Swiggy, Outlook — each with M · A · N toggle.
+        Zoom into one row showing the three-tier control.
+
+VO: "Tell Focal what you care about. It adapts — surfacing what matters to
+    you, not to an algorithm. Three tiers: always surface, let the model
+    decide, or silence entirely."
+
+---
+
+[2:30–2:38] KINETIC TYPOGRAPHY  [MOTION GRAPHIC]
+Visual: Dark background. Each phrase dissolves in and out:
 
     "Works offline."
     "No subscription."
-    "Runs on the GPU already in your pocket."
-    "Fine-tuned for your notifications."
+    "The model lives on your phone."
     "Your data stays yours."
-
-VO: "Focal proves that frontier AI doesn't require a data centre or a premium device.
-    A fine-tuned Gemma 4 model, running on a consumer GPU, privately processing the most
-    personal data you generate every day. This is what on-device intelligence looks like
-    when it's built for everyone."
-
-Audio: Music resolves to single piano note at 2:35.
 
 ---
 
 [2:38–2:50] TECHNICAL SPEC CARD  [MOTION GRAPHIC]
-Visual: Dark card. Lines fade in at 0.3s intervals. No hackathon/track/prize language anywhere.
+Visual: Dark card. Monospace font. Lines fade in at 0.3s intervals.
+        No hackathon/prize language. Pure product.
 
-    Model             Gemma 4 E4B · Domain fine-tuned
-    Runtime           LiteRT · GPU · On-device
-    GPU footprint     1,882 MB
-    Batch             10 notifications · background · silent
-    Intelligence      Classify → Extract → Embed → Narrate
-    Topics today      36 clusters from 102 notifications
+    Model             Gemma 4 E2B · Domain fine-tuned · 2.58 GB
+    Runtime           LiteRT · GPU Delegate · On-device
+    GPU footprint     1,882 MB  (Qualcomm Adreno)
+    Classification    Batch tool calling · matters / noise
+    Extraction        Native function calling · 4 widget categories
+    Narrative         Structured tool calling · automatic mode
+    Topics today      61 clusters from 126 notifications
     Cloud calls       0
     Source            github.com/shobhi1310/focal-glint
 
-VO: "Focal. Built on Gemma 4. Fine-tuned for your life. Running in your pocket."
-
 ---
 
-[2:50–2:55] OUTRO — Logo hold  [MOTION GRAPHIC]
-Visual: App icon + wordmark on black. Slow fade to black.
-Audio:  Silence.
-Screen: "github.com/shobhi1310/focal-glint" holds through end card.
+[2:50–2:55] OUTRO  [MOTION GRAPHIC]
+Visual: App icon + "Focal" wordmark on black. Slow fade.
+Screen: "github.com/shobhi1310/focal-glint"  holds through end.
 
 
-EVALUATION ALIGNMENT MAP
-=========================
-Judging Criterion           Weight   How this script addresses it
+SCREENSHOT → SCRIPT SCENE MAP (quick reference for editor)
+============================================================
+focal_today_digest_topic_cards_with_next_step_badges.jpg
+    → ACT 1 cold open reference (dark aesthetic for Veo)
+    → ACT 1 smash-cut number source (126 total)
+    → ACT 1 lower-third data source
+    → ACT 3 [0:55] Today digest scroll (main demo)
+
+focal_topic_detail_two_suggested_next_steps.jpg
+    → ACT 3 [1:15] Topic detail with 2 action buttons (hero demo moment)
+
+focal_setup_gemma4_e2b_gpu_on_device.jpg
+    → ACT 2 [0:40] Architecture proof — "Gemma 4 E2B on GPU"
+    → ACT 3 [2:10] GPU chart right panel
+
+focal_pulse_wizard_step1_template_selection.jpg
+    → ACT 3 [1:35] Widget creation Step 1
+
+focal_pulse_wizard_step2_recipe_operation.jpg
+    → ACT 3 [1:40] Widget creation Step 2
+
+focal_pulse_wizard_step3_auto_sources_create.jpg
+    → ACT 3 [1:48] Widget creation Step 3
+
+focal_finance_widget_money_today_transaction_list.jpg
+    → ACT 3 [2:00] Finance widget detail — transactions
+
+focal_tune_screen_user_focus_app_controls.jpg
+    → ACT 4 [2:20] Personalisation / Tune screen
+
+
+VEO PROMPTS (B-ROLL ONLY — no UI)
+===================================
+1. [0:00] "Cinematic close-up of a smartphone screen flooding with notification
+   banners, warm amber light, shallow depth of field, slow motion, 24fps,
+   dark warm background, smooth motion, no abrupt cuts"
+
+2. [0:10] "Medium shot, person places smartphone face-down on wooden desk,
+   soft natural window light from left, contemplative expression, 24fps,
+   warm colour grade, smooth camera movement, no jump cuts"
+
+3. [0:28] "Minimal dark background, single glowing app icon materialising
+   from darkness, slow push-in zoom, ambient light bloom, premium product
+   aesthetic, 24fps, smooth"
+
+4. [2:30] "Pure black background, subtle particle dust floating slowly,
+   24fps, no text, no movement, ambient atmospheric texture — background
+   plate for typography overlay"
+
+
+SHOT LIST
+==========
+#   Source                        Content                              Duration
 ────────────────────────────────────────────────────────────────────────────────
-Impact & Vision             40 pts   Act 1: real numbers (102 notifications, 43 matters).
-                                     Act 4: offline, private, mid-range Android access.
-                                     Clear problem + clear solution with specific data.
-
-Video Pitch & Storytelling  30 pts   Cold open (notification flood) -> smash cut -> reveal ->
-                                     styled log -> live demo -> fine-tuning -> GPU data ->
-                                     kinetic close. Full narrative arc, no dead air.
-
-Technical Depth & Execution 30 pts   Real GPU measurement (1,882 MB), real log format, 6
-                                     named LiteRT tools, Unsloth fine-tuning with published
-                                     dataset, Gemma 4 E4B named, repo linked, 0 faked demos.
-
-
-PRIZE STRUCTURE (internal reference only — do not show in video)
-=================================================================
-Main Track          $100,000 total
-    First Prize     $50,000
-    Second Prize    $25,000
-    Third Prize     $15,000
-    Fourth Prize    $10,000
-
-Impact Track        $50,000 total
-    Health & Sciences                $10,000
-    Global Resilience                $10,000
-    Future of Education              $10,000
-    Digital Equity & Inclusivity     $10,000  <-- Focal targets this
-    Safety & Trust                   $10,000
-
-Special Technology Track  $50,000 total
-    Cactus                           $10,000
-    LiteRT                           $10,000  <-- Focal targets this
-    llama.cpp                        $10,000
-    Ollama                           $10,000
-    Unsloth                          $10,000  <-- Focal targets this
-
-Note: Projects are eligible to win BOTH a Main Track Prize AND Special Technology Prizes.
-
-Focal's maximum prize eligibility:
-    Main Track First Prize           $50,000
-    LiteRT Special Technology        $10,000
-    Unsloth                          $10,000
-    Digital Equity & Inclusivity     $10,000
-    ─────────────────────────────────────────
-    Total potential                  $80,000
+1   Veo                           Notification flood B-roll            6s
+2   Motion graphic                Black + "126 notifications"          4s
+3   Veo                           Person overwhelmed                   18s
+4   Veo + Motion graphic          Focal logo reveal                    12s
+5   focal_setup_gemma4_e2b_       Architecture proof — GPU on-device   15s
+    gpu_on_device.jpg
+6   focal_today_digest_topic_     Today digest scroll                  20s
+    cards_with_next_step_
+    badges.jpg
+7   focal_topic_detail_two_       Topic detail + 2 action buttons      20s
+    suggested_next_steps.jpg
+8   focal_pulse_wizard_step1/     Widget creation 3-step flow          20s
+    step2/step3 .jpg
+9   focal_finance_widget_money_   Finance transactions list            10s
+    today_transaction_list.jpg
+10  Motion graphic                GPU memory chart                     10s
+11  focal_tune_screen_user_       Tune / personalisation screen        10s
+    focus_app_controls.jpg
+12  Motion graphic                Kinetic typography                   8s
+13  Motion graphic                Technical spec card                  12s
+14  Motion graphic                Logo outro                           5s
+────────────────────────────────────────────────────────────────────────────────
+Total                                                                  2:50
 
 
-VEO GENERATION PROMPTS (Veo scenes only — scenes 1–4)
-======================================================
-Submit these four scenes to Veo. All other scenes (5–13) are screen recordings
-and motion graphics produced in post. Do NOT send screen recording scenes to Veo.
-
-VEO SCENE 1 (0:00–0:06):
-    "Cinematic close-up of a smartphone screen flooding with notification banners,
-     warm amber light, shallow depth of field, slow motion, 24fps, dark warm background,
-     smooth motion, no abrupt cuts"
-
-VEO SCENE 2 (0:10–0:28):
-    "Medium shot, person places smartphone face-down on a wooden desk, soft natural
-     window light from left, contemplative expression, 24fps, warm colour grade,
-     smooth camera movement, no jump cuts"
-
-VEO SCENE 3 (0:28–0:40) — App icon reveal:
-    "Minimal dark background, single glowing app icon materialising from darkness,
-     slow push-in zoom, ambient light bloom, premium product aesthetic, 24fps, smooth"
-
-VEO SCENE 4 — Kinetic typography background (2:20–2:38):
-    "Pure black background, subtle particle dust floating slowly, 24fps, no text,
-     no movement, ambient atmospheric texture, used as background plate for typography"
-
-
-SCREEN RECORDING SCENES (produced in post, not Veo)
-=====================================================
-Scene 5   (0:40–0:55)  Architecture diagram — motion graphic, produced in After Effects
-                        or equivalent. Drawn lines, glowing nodes, amber palette.
-Scene 6   (0:55–1:15)  Batch classification log — styled card overlay on top of blurred
-                        app background. Lines animate in with cursor effect.
-Scene 7   (1:15–1:35)  Today digest scroll — direct screen recording, 60fps, smooth.
-Scene 8   (1:35–1:55)  Pulse widget grid + close-ups — direct screen recording.
-Scene 9   (1:55–2:10)  Fine-tuning dataset card — styled motion graphic overlay.
-Scene 10  (2:10–2:20)  GPU memory chart — animated bar chart, motion graphic.
-                        Right panel: live screen recording of digest.
-Scene 11  (2:20–2:38)  Kinetic typography — text animation over Veo Scene 4 background plate.
-Scene 12  (2:38–2:50)  Technical spec card — motion graphic, monospace font, amber glow.
-Scene 13  (2:50–2:55)  App icon outro — motion graphic, fade to black.
-
-
-SHOT LIST SUMMARY
-==================
-#   Type                    Content                              Duration
-──────────────────────────────────────────────────────────────────────────
-1   Veo                     Notification flood                   6s
-2   Motion graphic          Black + "102 notifications"          4s
-3   Veo                     Person overwhelmed                   18s
-4   Motion graphic          Focal logo reveal (Veo base)         12s
-5   Motion graphic          LiteRT architecture diagram          15s
-6   Screen rec + overlay    Batch classification log             20s
-7   Screen recording        Today digest scroll + action tap     20s
-8   Screen recording        Pulse 4-widget grid close-ups        20s
-9   Screen rec + overlay    Unsloth fine-tuning card             15s
-10  Motion graphic          GPU memory chart + live app          15s
-11  Motion graphic          Kinetic typography                   18s
-12  Motion graphic          Technical spec card                  12s
-13  Motion graphic          Logo outro                           5s
-──────────────────────────────────────────────────────────────────────────
-Total                                                            2:55
-
-
-REVIEW ISSUES ADDRESSED
-========================
-1. Resolution changed from 4K to 1080p. Smooth motion prioritised.
-2. Prize amounts removed from on-screen spec card. Internal reference only.
-3. Notification math corrected: verify 43 + 59 = 102 against live session data.
-   Lower-third updated from "43 matters · 50 noise" to verified split.
-4. Competitive differentiation added in Pulse section (Google Summarize / Apple Intelligence).
-5. "36 topics" expanded to "36 semantically clustered topic groups" with explanation.
-6. Unsloth fine-tuning track added: new section at 1:55–2:10, spec card updated,
-   VO updated to reference Unsloth and focal_finetune_final.jsonl.
-7. Veo prompts separated from screen recording scenes to avoid production confusion.
-8. Digital Equity angle strengthened: "mid-range Android" accessibility claim added.
-9. Prize targets removed from video. Prize structure moved to internal reference section.
+PRIZE STRUCTURE (internal reference — never shown in video)
+============================================================
+Main Track: First $50,000 · Second $25,000 · Third $15,000 · Fourth $10,000
+LiteRT Special Technology: $10,000
+Unsloth: $10,000
+Digital Equity & Inclusivity: $10,000
+Maximum eligibility: $80,000
