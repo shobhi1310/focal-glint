@@ -20,7 +20,8 @@ interface InferenceProvider {
         systemInstruction: String,
         prompt: String,
         tools: List<ToolSet>,
-        waitIfBusy: Boolean = true
+        waitIfBusy: Boolean = true,
+        automaticToolCalling: Boolean = false
     ): Flow<Message>
     suspend fun startConversation(
         systemInstruction: String,

@@ -85,45 +85,69 @@ object PromptBuilder {
         return sb.toString()
     }
 
-    fun buildTopicPrompt(notifications: List<NotificationEntity>): String {
+    fun buildTopicSystemPrompt(): String =
+        "You are Focal, a personal notification assistant. " +
+        "Given a cluster of related notifications, generate a topic card: a title, a summary, and suggested next steps.\n\n" +
+
+        "TITLE: 5–8 words. What happened — not what to do.\n\n" +
+
+        "SUMMARY: 1–2 sentences. Factual. Name people, amounts, and events specifically. No filler.\n\n" +
+
+        "ACTIONS — the most important principle:\n" +
+        "An action is something the user must DO, not somewhere to go. " +
+        "Start every label with a verb. Make it specific to the actual content — " +
+        "include the person's name, the subject, the amount, or the event. " +
+        "A generic label ('Check messages', 'Open app') is always wrong.\n\n" +
+
+        "Fill slots greedily. Every notification in the cluster is a signal. " +
+        "If different notifications call for different responses, give each its own action slot. " +
+        "If the same notification has multiple things to act on, use multiple slots for it too. " +
+        "Only leave a slot empty (label '', index -1) when you have exhausted all meaningful next steps.\n\n" +
+
+        "Urgency order: the action the user should take first goes in slot 1.\n\n" +
+
+        "App index: use the index number from the AVAILABLE APPS list — not the app name string.\n\n" +
+
+        "Output the tool call only. No prose."
+
+    /**
+     * Builds the user-turn prompt and returns both the prompt string and the ordered
+     * available apps list so the caller can construct GenerateTopicCardTool with the same order.
+     */
+    fun buildTopicPromptWithApps(notifications: List<NotificationEntity>): Pair<String, List<Pair<String, String>>> {
+        // Build ordered list: system apps first, then topic apps (deduplicated by package)
+        val seen = mutableSetOf<String>()
+        val orderedApps = mutableListOf<Pair<String, String>>()
+        SYSTEM_APPS.forEach { (name, pkg) ->
+            if (seen.add(pkg)) orderedApps.add(name to pkg)
+        }
+        notifications
+            .filter { it.packageName.isNotBlank() }
+            .distinctBy { it.packageName }
+            .forEach { n ->
+                if (seen.add(n.packageName)) orderedApps.add(n.appName to n.packageName)
+            }
+
         val sb = StringBuilder()
-
-        // Build AVAILABLE APPS: topic apps override system apps if same name
-        val allApps = buildMap<String, String> {
-            SYSTEM_APPS.forEach { (name, pkg) -> put(name, pkg) }
-            notifications
-                .filter { it.packageName.isNotBlank() }
-                .distinctBy { it.packageName }
-                .forEach { put(it.appName, it.packageName) }
+        sb.appendLine("AVAILABLE APPS (use the index number, not the package name):")
+        orderedApps.forEachIndexed { i, (name, pkg) ->
+            sb.appendLine("[$i] $name — $pkg")
         }
-
-        sb.appendLine("AVAILABLE APPS — only use these for actions:")
-        allApps.forEach { (name, pkg) -> sb.appendLine("$name → $pkg") }
         sb.appendLine()
-
         sb.appendLine("Notifications:")
-        notifications.forEachIndexed { index, notif ->
-            val content = notif.bigText ?: notif.content
-            sb.appendLine("[${index + 1}] ${notif.appName} — ${notif.title}: ${content.take(150)}")
+        notifications.forEachIndexed { i, n ->
+            val content = n.bigText ?: n.content
+            sb.appendLine("[${i + 1}] ${n.appName} — ${n.title}: ${content.take(150)}")
         }
         sb.appendLine()
+        sb.append("Call generateTopicCard now.")
 
-        sb.appendLine("You are Focal, a personal assistant. Based on ONLY what happened above:")
-        sb.appendLine()
-        sb.appendLine("1. Write a short TITLE (5–8 words) summarising what happened.")
-        sb.appendLine("2. Write a SUMMARY (1–2 sentences) — factual, specific (names, amounts, times), no fluff.")
-        sb.appendLine("3. Write up to 3 ACTIONS — the most important things the user should do right now.")
-        sb.appendLine("   - Be direct and assertive. \"Reply to Mom\" not \"Check WhatsApp\".")
-        sb.appendLine("   - Reference what specifically happened. \"Review Alice's PR\" not \"Open Teams\".")
-        sb.appendLine("   - Order by urgency. Most important first.")
-        sb.appendLine("   - Format: {label} | {type} | {package_name}")
-        sb.appendLine("   - Only use package names from AVAILABLE APPS above.")
-        sb.appendLine("   - Types: call, reply, open_app, view, pay, track")
-        sb.appendLine()
-        sb.appendLine("TITLE:")
-
-        return sb.toString()
+        return sb.toString() to orderedApps
     }
+
+    // Keep for backward compat — callers that don't need the apps list
+    fun buildTopicPrompt(notifications: List<NotificationEntity>): String =
+        buildTopicPromptWithApps(notifications).first
 
     private val SYSTEM_APPS = mapOf(
         "Phone" to "com.android.phone",

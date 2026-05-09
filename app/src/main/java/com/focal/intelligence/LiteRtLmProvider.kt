@@ -111,7 +111,8 @@ class LiteRtLmProvider @Inject constructor(
         systemInstruction: String,
         prompt: String,
         tools: List<ToolSet>,
-        waitIfBusy: Boolean
+        waitIfBusy: Boolean,
+        automaticToolCalling: Boolean
     ): Flow<Message> {
         val eng = engine
             ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
@@ -135,7 +136,7 @@ class LiteRtLmProvider @Inject constructor(
                     val config = ConversationConfig(
                         systemInstruction = Contents.of(systemInstruction),
                         tools = toolProviders,
-                        automaticToolCalling = false,
+                        automaticToolCalling = automaticToolCalling,
                         channels = THINKING_CHANNELS
                     )
                     ExperimentalFlags.enableConversationConstrainedDecoding = true
@@ -147,8 +148,12 @@ class LiteRtLmProvider @Inject constructor(
                     activeConversation = conv
                     try {
                         conv.sendMessageAsync(prompt).collect { message ->
-                            message.toolCalls.forEach { call ->
-                                toolManager.execute(call.name, call.arguments.toJsonObject())
+                            // Manual dispatch only needed when automaticToolCalling=false.
+                            // When true, the framework executes tool calls internally.
+                            if (!automaticToolCalling) {
+                                message.toolCalls.forEach { call ->
+                                    toolManager.execute(call.name, call.arguments.toJsonObject())
+                                }
                             }
                             send(message)
                         }

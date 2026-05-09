@@ -5,6 +5,7 @@ import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.TopicRepository
+import kotlinx.coroutines.flow.collect
 import org.json.JSONArray
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -64,41 +65,33 @@ class TopicNarrativeProcessor @Inject constructor(
         var actions: List<SuggestedAction> = emptyList()
         var usedLlm = false
 
-        if (members.size == 1) {
-            val m = members.first()
-            headline = m.title.take(40)
-            summary = (m.bigText ?: m.content).take(300)
-            isLlmGenerated = false
-            actions = listOf(
-                SuggestedAction(
-                    label = "Open in ${m.appName}",
-                    type = "open_app",
-                    app = m.appName,
-                    packageName = m.packageName
-                )
-            )
-            Log.d(TAG, "Narrative fallback: topic=${topic.id} reason=single_member")
-        } else if (inferenceProvider.isReady()) {
+        if (inferenceProvider.isReady()) {
             usedLlm = true
             headline = try {
                 val startMs = System.currentTimeMillis()
                 Log.d(TAG, "Narrative LLM start: topic=${topic.id} members=${members.size}")
-                val prompt = PromptBuilder.buildTopicPrompt(members)
-                val raw = inferenceProvider.generate(prompt, maxTokens = 200)
-                val parsed = LlmResponseParser.parseTopicContent(raw)
-                if (parsed != null) {
+                val systemPrompt = PromptBuilder.buildTopicSystemPrompt()
+                val (prompt, availableApps) = PromptBuilder.buildTopicPromptWithApps(members)
+                val tool = GenerateTopicCardTool(availableApps)
+                inferenceProvider.generateWithTools(
+                    systemInstruction = systemPrompt,
+                    prompt = prompt,
+                    tools = listOf(tool),
+                    automaticToolCalling = true
+                ).collect {}
+                if (tool.isComplete()) {
                     isLlmGenerated = true
-                    summary = parsed.summary
-                    actions = resolveActionPackages(parsed.actions)
+                    summary = tool.summary!!
+                    actions = resolveActionPackages(tool.actions)
                     Log.d(
                         TAG,
-                        "Narrative LLM parsed: topic=${topic.id} elapsedMs=${System.currentTimeMillis() - startMs} title=${parsed.title.take(60)} actions=${actions.size}"
+                        "Narrative tool done: topic=${topic.id} elapsedMs=${System.currentTimeMillis() - startMs} title=${tool.title?.take(60)} actions=${actions.size}"
                     )
-                    parsed.title
+                    tool.title!!
                 } else {
                     Log.d(
                         TAG,
-                        "Narrative fallback: topic=${topic.id} reason=parse_failed elapsedMs=${System.currentTimeMillis() - startMs} raw=${raw.take(120)}"
+                        "Narrative fallback: topic=${topic.id} reason=tool_not_called elapsedMs=${System.currentTimeMillis() - startMs}"
                     )
                     summary = fallbackSummary(members)
                     "${members.first().appName} · ${members.size} messages"
