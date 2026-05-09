@@ -107,6 +107,7 @@ internal class BatchConversationRunner(
         val indices = missingIndices.joinToString(", ") { "[$it]" }
         return "Classify the missed notifications at indices $indices now. " +
             "Use the original notification list above. Call classifyNotification exactly once for each listed index. " +
+            "category must be exactly 'matters' or 'noise' — no other value. " +
             "Do not call extraction tools or noExtraction in this turn. Output tool calls only."
     }
 

@@ -89,7 +89,7 @@ class TopicNarrativeProcessor @Inject constructor(
                 if (parsed != null) {
                     isLlmGenerated = true
                     summary = parsed.summary
-                    actions = resolveActionPackages(parsed.actions, members)
+                    actions = resolveActionPackages(parsed.actions)
                     Log.d(
                         TAG,
                         "Narrative LLM parsed: topic=${topic.id} elapsedMs=${System.currentTimeMillis() - startMs} title=${parsed.title.take(60)} actions=${actions.size}"
@@ -132,23 +132,10 @@ class TopicNarrativeProcessor @Inject constructor(
         return members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
     }
 
-    private fun resolveActionPackages(
-        actions: List<SuggestedAction>,
-        members: List<NotificationEntity>
-    ): List<SuggestedAction> {
-        val knownApps = mapOf(
-            "phone" to "com.android.phone",
-            "messages" to "com.google.android.apps.messaging",
-            "chrome" to "com.android.chrome"
-        )
-        return actions.map { action ->
-            val packageName = members.firstOrNull {
-                it.appName.equals(action.app, ignoreCase = true)
-            }?.packageName
-                ?: knownApps[action.app.lowercase()]
-                ?: ""
-            action.copy(packageName = packageName)
-        }
+    private fun resolveActionPackages(actions: List<SuggestedAction>): List<SuggestedAction> {
+        // Package names come directly from the LLM (injected via AVAILABLE APPS in prompt).
+        // Drop any action the LLM failed to resolve to a valid package.
+        return actions.filter { it.packageName.isNotBlank() }
     }
 
     private fun parseJsonArray(json: String): List<String> {

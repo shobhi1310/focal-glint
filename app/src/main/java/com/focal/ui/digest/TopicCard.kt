@@ -39,6 +39,7 @@ fun TopicCard(
     val sourceApps = parseSourceApps(topic.sourceApps)
     val notificationCount = parseNotificationIds(topic.notificationIds).size
     val category = getAppCategory(topic.actionPackage ?: "")
+    val actionCount = parseSuggestedActionCount(topic.suggestedActions)
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -99,6 +100,15 @@ fun TopicCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            if (actionCount > 0) {
+                Text(
+                    text = "→ $actionCount next ${if (actionCount == 1) "step" else "steps"}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Footer: app icons + notification count
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -157,3 +167,6 @@ private fun parseNotificationIds(json: String): List<String> {
         (0 until arr.length()).map { arr.getString(it) }
     } catch (_: Exception) { emptyList() }
 }
+
+private fun parseSuggestedActionCount(json: String?): Int =
+    try { JSONArray(json ?: "[]").length() } catch (_: Exception) { 0 }

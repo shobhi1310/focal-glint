@@ -57,6 +57,11 @@ class WidgetRepository(
     }
 
     suspend fun saveExtractedData(data: List<ExtractedDataEntity>) {
+        data.groupBy { it.notificationId to it.category }
+            .keys
+            .forEach { (nid, cat) ->
+                extractedDataDao.deleteByNotificationIdAndCategory(nid, cat)
+            }
         extractedDataDao.insertAll(data)
     }
 

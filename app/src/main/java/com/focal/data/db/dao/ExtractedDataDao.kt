@@ -43,4 +43,7 @@ interface ExtractedDataDao {
 
     @Query("SELECT * FROM extracted_data WHERE notification_id = :notificationId AND category = :category")
     suspend fun getByNotificationIdAndCategory(notificationId: String, category: String): List<ExtractedDataEntity>
+
+    @Query("DELETE FROM extracted_data WHERE notification_id = :notificationId AND category = :category")
+    suspend fun deleteByNotificationIdAndCategory(notificationId: String, category: String)
 }

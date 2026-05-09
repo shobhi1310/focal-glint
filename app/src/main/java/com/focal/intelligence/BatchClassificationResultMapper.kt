@@ -14,11 +14,8 @@ internal object BatchClassificationResultMapper {
     ): List<Pair<NotificationEntity, ClassificationResult>> = notifications.mapIndexed { i, notification ->
         val (category, reason) = classifyTool.getResult(i + 1)
             ?: return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
-        val resolved = when (category.lowercase().trim()) {
-            "matters" -> ClassificationResult.MATTERS
-            "noise" -> ClassificationResult.NOISE
-            else -> return@mapIndexed notification to ClassificationResult(ClassificationResult.UNCATEGORIZED, "pending")
-        }
+        val isNoise = category.lowercase().trim() in setOf("noise", "promo", "promotional", "spam", "irrelevant")
+        val resolved = if (isNoise) ClassificationResult.NOISE else ClassificationResult.MATTERS
         notification to ClassificationResult(category = resolved, classifiedBy = "llm", reason = reason)
     }
 

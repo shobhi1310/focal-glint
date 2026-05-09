@@ -6,8 +6,9 @@ object PromptBuilder {
 
     private const val TASK_INSTRUCTION =
         "You are a notification triage assistant. You MUST call classifyNotification exactly " +
-            "once for EVERY [index] in the list — no index may be skipped. Use a short " +
-            "snake_case reason. Output tool calls only — no prose."
+            "once for EVERY [index] in the list — no index may be skipped. " +
+            "The category parameter MUST be exactly 'matters' or 'noise' — never any other word. " +
+            "Use a short snake_case reason. Output tool calls only — no prose."
 
     private const val DEFAULT_CRITERIA =
         "Mark it 'matters' if a thoughtful person would want to know about it now — something " +
@@ -30,18 +31,21 @@ object PromptBuilder {
 
     fun buildExtractionAugment(activeCategories: List<String>): String {
         val categoriesStr = activeCategories.joinToString(", ")
-        return "\n\nExtraction happens only after classification is complete and you are asked for an extraction pass. " +
+        return "\n\nEXTRACTION IS A SEPARATE PHASE — do not mix it with classification. " +
+            "During classification, classifyNotification.category must ONLY be 'matters' or 'noise'. " +
+            "Never use extraction category names ($categoriesStr) as a classifyNotification category. " +
+            "Extraction happens only after classification is complete and you are asked for an extraction pass. " +
             "For every notification you marked 'matters', you MUST then call at least one of: " +
             "one or more extraction tools if the notification clearly matches their stated criteria, " +
             "OR noExtraction if none of the extraction tools apply. Do not call noExtraction when any extraction tool applies. " +
             "Read each tool's description carefully. " +
             "When the same real-world event appears across several notifications, call the extraction tool " +
-            "once for the most informative source only and noExtraction for the rest. " +
-            "Available extraction categories: $categoriesStr. Output tool calls only."
+            "once for the most informative source only and noExtraction for the rest. Output tool calls only."
     }
 
     fun buildClassificationPassPrompt(batchPrompt: String): String {
         return "Classify only in this turn. Call classifyNotification exactly once for every index. " +
+            "category must be exactly 'matters' or 'noise' — no other value. " +
             "Do not call extraction tools or noExtraction in this turn.\n\n$batchPrompt"
     }
 
@@ -83,41 +87,47 @@ object PromptBuilder {
 
     fun buildTopicPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
-        sb.appendLine("You are generating a topic card for a notification digest app.")
-        sb.appendLine("Given these notifications, produce:")
-        sb.appendLine("1. TITLE: A short, action-invoking headline (3-5 words max).")
-        sb.appendLine("2. SUMMARY: One sentence explaining what happened. Be specific — names, amounts, times.")
-        sb.appendLine("3. ACTIONS: Up to 3 suggested next steps for the user.")
-        sb.appendLine("   Format each action as: {contextual label} | {type} | {app name}")
-        sb.appendLine("   Types: call, reply, open_app, view, pay, track")
-        sb.appendLine("   Labels should give direction — explain WHY, not just what.")
+
+        // Build AVAILABLE APPS: topic apps override system apps if same name
+        val allApps = buildMap<String, String> {
+            SYSTEM_APPS.forEach { (name, pkg) -> put(name, pkg) }
+            notifications
+                .filter { it.packageName.isNotBlank() }
+                .distinctBy { it.packageName }
+                .forEach { put(it.appName, it.packageName) }
+        }
+
+        sb.appendLine("AVAILABLE APPS — only use these for actions:")
+        allApps.forEach { (name, pkg) -> sb.appendLine("$name → $pkg") }
         sb.appendLine()
-        sb.appendLine("Examples:")
-        sb.appendLine()
-        sb.appendLine("TITLE: Mom wants Sunday lunch")
-        sb.appendLine("SUMMARY: Two missed calls and a WhatsApp asking if you're bringing Maya.")
-        sb.appendLine("ACTIONS:")
-        sb.appendLine("- Call Mom back — she tried twice | call | Phone")
-        sb.appendLine("- Reply about Sunday plans | reply | WhatsApp")
-        sb.appendLine()
-        sb.appendLine("TITLE: ₹44K ICICI card charge")
-        sb.appendLine("SUMMARY: Rs 44,000 spent on your ICICI card at Amazon on Apr 18.")
-        sb.appendLine("ACTIONS:")
-        sb.appendLine("- Check if this charge was you | open_app | Messages")
-        sb.appendLine("- Review your ICICI card statement | view | Gmail")
-        sb.appendLine()
-        sb.appendLine("TITLE: Swiggy order arriving")
-        sb.appendLine("SUMMARY: Your Swiggy order from Biryani Blues is out for delivery.")
-        sb.appendLine("ACTIONS:")
-        sb.appendLine("- Track your delivery | track | Swiggy")
-        sb.appendLine()
+
         sb.appendLine("Notifications:")
         notifications.forEachIndexed { index, notif ->
             val content = notif.bigText ?: notif.content
             sb.appendLine("[${index + 1}] ${notif.appName} — ${notif.title}: ${content.take(150)}")
         }
         sb.appendLine()
+
+        sb.appendLine("You are Focal, a personal assistant. Based on ONLY what happened above:")
+        sb.appendLine()
+        sb.appendLine("1. Write a short TITLE (5–8 words) summarising what happened.")
+        sb.appendLine("2. Write a SUMMARY (1–2 sentences) — factual, specific (names, amounts, times), no fluff.")
+        sb.appendLine("3. Write up to 3 ACTIONS — the most important things the user should do right now.")
+        sb.appendLine("   - Be direct and assertive. \"Reply to Mom\" not \"Check WhatsApp\".")
+        sb.appendLine("   - Reference what specifically happened. \"Review Alice's PR\" not \"Open Teams\".")
+        sb.appendLine("   - Order by urgency. Most important first.")
+        sb.appendLine("   - Format: {label} | {type} | {package_name}")
+        sb.appendLine("   - Only use package names from AVAILABLE APPS above.")
+        sb.appendLine("   - Types: call, reply, open_app, view, pay, track")
+        sb.appendLine()
         sb.appendLine("TITLE:")
+
         return sb.toString()
     }
+
+    private val SYSTEM_APPS = mapOf(
+        "Phone" to "com.android.phone",
+        "Messages" to "com.google.android.apps.messaging",
+        "Chrome" to "com.android.chrome"
+    )
 }

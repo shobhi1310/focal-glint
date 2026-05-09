@@ -41,11 +41,13 @@ class WidgetComputeEngine(
         val filterApps = config.filterApps?.let {
             try { Json.decodeFromString<List<String>>(it) } catch (_: Exception) { null }
         }
-        val data = if (filterApps != null) {
+        val rawData = if (filterApps != null) {
             widgetRepository.getExtractedData(config.category, filterApps)
         } else {
             widgetRepository.getExtractedData(config.category)
         }
+
+        val data = rawData.filter { isValidRow(it, config.category) }
 
         if (data.isEmpty()) {
             return WidgetStateEntity(
@@ -183,7 +185,11 @@ class WidgetComputeEngine(
     }
 
     private fun computeList(config: WidgetConfigEntity, data: List<ExtractedDataEntity>, sourceApps: List<String>): WidgetStateEntity {
-        val groupField = config.groupBy ?: "sender"
+        // Try groupBy candidates in order until one produces non-Unknown groups
+        val candidates = listOfNotNull(config.groupBy, "sender", "item", "merchant", "entity")
+        val groupField = candidates.firstOrNull { field ->
+            data.any { row -> parseField(row.data, field)?.let { it.length > 1 } == true }
+        } ?: "sender"
         val grouped = data.groupBy { parseField(it.data, groupField) ?: "Unknown" }
         val topSender = grouped.maxByOrNull { it.value.size }
         val detailLines = grouped.map { (key, items) ->
@@ -242,6 +248,17 @@ class WidgetComputeEngine(
             sourceAppIcons = Json.encodeToString(sourceApps),
             itemCount = data.size
         )
+    }
+
+    private fun isValidRow(row: ExtractedDataEntity, category: String): Boolean {
+        val field = when (category) {
+            "work" -> "entity"
+            "personal" -> "sender"
+            "logistics" -> "item"
+            else -> return true
+        }
+        val value = parseField(row.data, field) ?: return false
+        return value.length > 1 && value.any { it.isLetterOrDigit() }
     }
 
     private fun parseJson(json: String): JsonObject? {

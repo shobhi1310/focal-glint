@@ -120,7 +120,15 @@ object LlmResponseParser {
                         val type = parts[1].lowercase().let {
                             if (it in SuggestedAction.VALID_TYPES) it else "open_app"
                         }
-                        SuggestedAction(label = parts[0], type = type, app = parts[2])
+                        val thirdField = parts[2]
+                        // New format: 3rd field is a package name (contains ".")
+                        // Legacy format: 3rd field is an app name — kept for compat
+                        val (app, packageName) = if (thirdField.contains(".")) {
+                            "" to thirdField
+                        } else {
+                            thirdField to ""
+                        }
+                        SuggestedAction(label = parts[0], type = type, app = app, packageName = packageName)
                     } else null
                 }
         } else emptyList()
