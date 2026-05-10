@@ -23,7 +23,9 @@ import com.focal.intelligence.ModelBackendPolicy
 import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -224,24 +226,32 @@ class SetupViewModel @Inject constructor(
     fun onStartEngine() {
         if (_uiState.value.engineStopping) return
         _uiState.value = _uiState.value.copy(errorMessage = null)
+        // Engine init takes ~2s; if the host screen is removed mid-init, viewModelScope
+        // is cancelled and the side-effects below (setEngineEnabled, foreground service,
+        // worker enqueue) silently disappear, leaving the engine loaded but the app
+        // believing it's off. NonCancellable lets the work finish either way.
         viewModelScope.launch {
             try {
-                val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = false)
-                if (warmed) {
-                    modelManager.setEngineEnabled(true)
-                    context.startForegroundService(Intent(context, LlmForegroundService::class.java))
-                    WorkManager.getInstance(context).enqueueUniqueWork(
-                        InferenceWorker.WORK_NAME,
-                        ExistingWorkPolicy.REPLACE,
-                        OneTimeWorkRequestBuilder<InferenceWorker>().build()
-                    )
-                } else {
-                    modelManager.setEngineEnabled(false)
+                withContext(NonCancellable) {
+                    val warmed = engineWarmupCoordinator.warmUp(recreateEmbeddings = false)
+                    if (warmed) {
+                        modelManager.setEngineEnabled(true)
+                        context.startForegroundService(Intent(context, LlmForegroundService::class.java))
+                        WorkManager.getInstance(context).enqueueUniqueWork(
+                            InferenceWorker.WORK_NAME,
+                            ExistingWorkPolicy.REPLACE,
+                            OneTimeWorkRequestBuilder<InferenceWorker>().build()
+                        )
+                    } else {
+                        modelManager.setEngineEnabled(false)
+                    }
+                    _uiState.value = _uiState.value.copy(engineRunning = warmed)
                 }
-                _uiState.value = _uiState.value.copy(engineRunning = warmed)
+            } catch (ce: CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 modelManager.setEngineEnabled(false)
-                withContext(Dispatchers.IO) {
+                withContext(NonCancellable + Dispatchers.IO) {
                     runCatching { inferenceProvider.close() }
                 }
                 _uiState.value = _uiState.value.copy(
@@ -256,8 +266,12 @@ class SetupViewModel @Inject constructor(
         if (_uiState.value.engineStopping) return
         _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = true)
         viewModelScope.launch {
-            stopEngine("manual stop")
-            _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
+            // Same reasoning as onStartEngine: don't leave the engine half-stopped
+            // if the host screen is removed during teardown.
+            withContext(NonCancellable) {
+                stopEngine("manual stop")
+                _uiState.value = _uiState.value.copy(engineRunning = false, engineStopping = false)
+            }
         }
     }
 

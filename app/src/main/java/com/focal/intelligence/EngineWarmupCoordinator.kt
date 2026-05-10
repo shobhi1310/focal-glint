@@ -3,6 +3,7 @@ package com.focal.intelligence
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -33,6 +34,8 @@ class EngineWarmupCoordinator @Inject constructor(
             try {
                 inferenceProvider.initialize(modelFile.absolutePath, useGpu, modelManager.getContextTokens())
                 Log.d(TAG, "LLM warmed: ${variant.displayName} gpu=$useGpu")
+            } catch (ce: CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.e(TAG, "LLM warm-up failed (${e.javaClass.simpleName}): ${e.message}")
                 if (useGpu) {
