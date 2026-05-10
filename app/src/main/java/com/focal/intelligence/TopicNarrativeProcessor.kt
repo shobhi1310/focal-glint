@@ -122,7 +122,7 @@ class TopicNarrativeProcessor @Inject constructor(
     }
 
     private fun fallbackSummary(members: List<NotificationEntity>): String {
-        return members.joinToString(". ") { (it.bigText ?: it.content).take(100) }.take(300)
+        return members.joinToString(". ") { (it.bigText ?: it.content).takeCodepointSafe(100) }.takeCodepointSafe(300)
     }
 
     private fun resolveActionPackages(actions: List<SuggestedAction>): List<SuggestedAction> {

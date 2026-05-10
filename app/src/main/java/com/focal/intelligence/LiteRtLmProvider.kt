@@ -98,7 +98,9 @@ class LiteRtLmProvider @Inject constructor(
                     )
                 )
                 eng.createConversation(conversationConfig).use { conversation ->
-                    conversation.sendMessage(prompt).toString()
+                    val (sanitized, lones) = prompt.sanitizeForJni()
+                    if (lones > 0) Log.w(TAG, "generate sanitized $lones JNI-unsafe char(s) before send")
+                    conversation.sendMessage(sanitized).toString()
                 }
             }
         } finally {
@@ -131,6 +133,8 @@ class LiteRtLmProvider @Inject constructor(
                     activeConversation = null
 
                     Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
+                    val (sanitized, lones) = prompt.sanitizeForJni()
+                    if (lones > 0) Log.w(TAG, "generateWithTools sanitized $lones JNI-unsafe char(s) before send")
                     val toolProviders = tools.map { tool(it) }
                     val toolManager = ToolManager(toolProviders)
                     val config = ConversationConfig(
@@ -147,7 +151,7 @@ class LiteRtLmProvider @Inject constructor(
                     }
                     activeConversation = conv
                     try {
-                        conv.sendMessageAsync(prompt).collect { message ->
+                        conv.sendMessageAsync(sanitized).collect { message ->
                             // Manual dispatch only needed when automaticToolCalling=false.
                             // When true, the framework executes tool calls internally.
                             if (!automaticToolCalling) {
@@ -209,7 +213,9 @@ class LiteRtLmProvider @Inject constructor(
                 override fun send(prompt: String): Flow<Message> = channelFlow {
                     withContext(llmDispatcher) {
                         Log.i(TAG, "conversation.send: promptLen=${prompt.length}")
-                        conv.sendMessageAsync(prompt).collect { message ->
+                        val (sanitized, lones) = prompt.sanitizeForJni()
+                        if (lones > 0) Log.w(TAG, "conversation.send sanitized $lones JNI-unsafe char(s) before send")
+                        conv.sendMessageAsync(sanitized).collect { message ->
                             message.toolCalls.forEach { call ->
                                 toolManager.execute(call.name, call.arguments.toJsonObject())
                             }
@@ -250,6 +256,56 @@ class LiteRtLmProvider @Inject constructor(
     companion object {
         private const val TAG = "LiteRtLmProvider"
     }
+}
+
+// Single boundary contract: any string passed to nativeSendMessageAsync MUST round-trip
+// cleanly through JNI's GetStringUTFChars (Modified UTF-8) and nlohmann::json::parse
+// (strict UTF-8). Returns (sanitized, replacementCount). Replacements use U+FFFD.
+//
+// Add a new branch here whenever a future input type triggers SIGABRT at the JNI
+// boundary; do not push these checks to callers — this is the canonical chokepoint.
+//
+// Currently handles:
+//   * Lone UTF-16 surrogates → become invalid 3-byte CESU-8 in Modified UTF-8.
+//   * Embedded U+0000 → encoded as overlong 0xC0 0x80; strict UTF-8 rejects overlong
+//     forms. (Strings normally don't contain NUL but third-party text sources can.)
+private fun String.sanitizeForJni(): Pair<String, Int> {
+    var bad = 0
+    var i = 0
+    while (i < length) {
+        val code = this[i].code
+        when {
+            code == 0 -> bad++
+            code in 0xD800..0xDBFF -> {
+                val next = if (i + 1 < length) this[i + 1].code else -1
+                if (next in 0xDC00..0xDFFF) { i += 2; continue }
+                bad++
+            }
+            code in 0xDC00..0xDFFF -> bad++
+        }
+        i++
+    }
+    if (bad == 0) return this to 0
+    val sb = StringBuilder(length)
+    i = 0
+    while (i < length) {
+        val c = this[i]
+        val code = c.code
+        when {
+            code == 0 -> sb.append('�')
+            code in 0xD800..0xDBFF -> {
+                val next = if (i + 1 < length) this[i + 1].code else -1
+                if (next in 0xDC00..0xDFFF) {
+                    sb.append(c).append(this[i + 1]); i += 2; continue
+                }
+                sb.append('�')
+            }
+            code in 0xDC00..0xDFFF -> sb.append('�')
+            else -> sb.append(c)
+        }
+        i++
+    }
+    return sb.toString() to bad
 }
 
 // ToolCall.arguments values come from LiteRT-LM's JsonObject.toMap() which converts

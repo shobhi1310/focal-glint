@@ -2,6 +2,16 @@ package com.focal.intelligence
 
 import com.focal.data.db.entity.NotificationEntity
 
+// String.take(n) cuts at UTF-16 code-unit n, which can split a surrogate pair on
+// emoji or mathematical-bold characters and leave a high surrogate orphaned —
+// invalid UTF-8 once JNI hands it to native code (SIGABRT in nlohmann::json::parse).
+// Use this for any user-controlled text that may eventually reach the on-device LLM.
+internal fun String.takeCodepointSafe(n: Int): String {
+    if (length <= n) return this
+    val cut = if (this[n - 1].code in 0xD800..0xDBFF) n - 1 else n
+    return substring(0, cut)
+}
+
 object PromptBuilder {
 
     private const val TASK_INSTRUCTION =
@@ -50,7 +60,7 @@ object PromptBuilder {
     }
 
     fun buildClassificationPrompt(notification: NotificationEntity): String {
-        val body = (notification.bigText ?: notification.content).replace('\n', ' ').take(200)
+        val body = (notification.bigText ?: notification.content).replace('\n', ' ').takeCodepointSafe(200)
         return "[1] App: ${notification.appName} · Title: ${notification.title} · Content: $body"
     }
 
@@ -65,7 +75,7 @@ object PromptBuilder {
     fun buildBatchClassificationPrompt(notifications: List<NotificationEntity>): String {
         val sb = StringBuilder()
         notifications.forEachIndexed { i, n ->
-            val body = (n.bigText ?: n.content).replace('\n', ' ').take(200)
+            val body = (n.bigText ?: n.content).replace('\n', ' ').takeCodepointSafe(200)
             sb.appendLine("[${i + 1}] App: ${n.appName} · Title: ${n.title} · Content: $body")
         }
         return sb.toString().trimEnd()
@@ -137,7 +147,7 @@ object PromptBuilder {
         sb.appendLine("Notifications:")
         notifications.forEachIndexed { i, n ->
             val content = n.bigText ?: n.content
-            sb.appendLine("[${i + 1}] ${n.appName} — ${n.title}: ${content.take(150)}")
+            sb.appendLine("[${i + 1}] ${n.appName} — ${n.title}: ${content.takeCodepointSafe(150)}")
         }
         sb.appendLine()
         sb.append("Call generateTopicCard now.")

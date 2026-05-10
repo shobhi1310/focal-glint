@@ -152,8 +152,8 @@ class TopicEngine(
     }
 
     private suspend fun createNewTopic(notif: NotificationEntity) {
-        val headline = notif.title.take(40)
-        val summary = (notif.bigText ?: notif.content).take(300)
+        val headline = notif.title.takeCodepointSafe(40)
+        val summary = (notif.bigText ?: notif.content).takeCodepointSafe(300)
         val sourceApps = JSONArray(listOf(notif.appName)).toString()
         val notificationIds = JSONArray(listOf(notif.id)).toString()
 

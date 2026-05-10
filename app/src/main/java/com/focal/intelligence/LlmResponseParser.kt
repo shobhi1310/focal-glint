@@ -95,14 +95,14 @@ object LlmResponseParser {
         val summary: String
 
         if (titleMatch != null && summaryMatch != null) {
-            title = titleMatch.groupValues[1].trim().take(60)
-            summary = summaryMatch.groupValues[1].trim().take(300)
+            title = titleMatch.groupValues[1].trim().takeCodepointSafe(60)
+            summary = summaryMatch.groupValues[1].trim().takeCodepointSafe(300)
         } else {
             val lines = trimmed.lines().filter { it.isNotBlank() }
             if (lines.isEmpty()) return null
-            title = lines.first().removePrefix("TITLE:").trim().take(60)
+            title = lines.first().removePrefix("TITLE:").trim().takeCodepointSafe(60)
             summary = if (lines.size > 1) {
-                lines.drop(1).first().removePrefix("SUMMARY:").trim().take(300)
+                lines.drop(1).first().removePrefix("SUMMARY:").trim().takeCodepointSafe(300)
             } else title
         }
 

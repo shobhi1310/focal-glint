@@ -41,8 +41,8 @@ class GenerateTopicCardTool(
         @ToolParam("Index of the app for action 3. Use -1 if not needed")
         action3AppIndex: Int
     ): Map<String, Any> {
-        this.title = title.trim().take(60)
-        this.summary = summary.trim().take(300)
+        this.title = title.trim().takeCodepointSafe(60)
+        this.summary = summary.trim().takeCodepointSafe(300)
 
         listOf(
             action1Label to action1AppIndex,
