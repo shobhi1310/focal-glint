@@ -78,6 +78,64 @@ object LlmResponseParser {
         return cleaned.lines().firstOrNull { it.isNotBlank() }?.trim()
     }
 
+    data class TopicContent(
+        val title: String,
+        val summary: String,
+        val actions: List<SuggestedAction> = emptyList()
+    )
+
+    fun parseTopicContent(raw: String): TopicContent? {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return null
+
+        val titleMatch = Regex("(?:TITLE:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
+        val summaryMatch = Regex("(?:SUMMARY:\\s*)(.+)", RegexOption.IGNORE_CASE).find(trimmed)
+
+        val title: String
+        val summary: String
+
+        if (titleMatch != null && summaryMatch != null) {
+            title = titleMatch.groupValues[1].trim().takeCodepointSafe(60)
+            summary = summaryMatch.groupValues[1].trim().takeCodepointSafe(300)
+        } else {
+            val lines = trimmed.lines().filter { it.isNotBlank() }
+            if (lines.isEmpty()) return null
+            title = lines.first().removePrefix("TITLE:").trim().takeCodepointSafe(60)
+            summary = if (lines.size > 1) {
+                lines.drop(1).first().removePrefix("SUMMARY:").trim().takeCodepointSafe(300)
+            } else title
+        }
+
+        // Parse ACTIONS section
+        val actionsStart = trimmed.indexOf("ACTIONS:", ignoreCase = true)
+        val actions = if (actionsStart >= 0) {
+            val actionsBlock = trimmed.substring(actionsStart + "ACTIONS:".length)
+            actionsBlock.lines()
+                .map { it.trim() }
+                .filter { it.startsWith("- ") }
+                .take(3)
+                .mapNotNull { line ->
+                    val parts = line.removePrefix("- ").split("|").map { it.trim() }
+                    if (parts.size >= 3) {
+                        val type = parts[1].lowercase().let {
+                            if (it in SuggestedAction.VALID_TYPES) it else "open_app"
+                        }
+                        val thirdField = parts[2]
+                        // New format: 3rd field is a package name (contains ".")
+                        // Legacy format: 3rd field is an app name — kept for compat
+                        val (app, packageName) = if (thirdField.contains(".")) {
+                            "" to thirdField
+                        } else {
+                            thirdField to ""
+                        }
+                        SuggestedAction(label = parts[0], type = type, app = app, packageName = packageName)
+                    } else null
+                }
+        } else emptyList()
+
+        return TopicContent(title = title, summary = summary, actions = actions)
+    }
+
     private val VALID_CATEGORIES = listOf("matters", "noise")
 
     /**

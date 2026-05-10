@@ -5,6 +5,7 @@ import com.focal.data.db.dao.NotificationDao
 import com.focal.data.db.entity.AppProfileEntity
 import com.focal.data.db.entity.NotificationEntity
 import kotlinx.coroutines.flow.Flow
+import java.security.MessageDigest
 
 class NotificationRepository(
     private val notificationDao: NotificationDao,
@@ -36,6 +37,10 @@ class NotificationRepository(
         return notificationDao.getPending()
     }
 
+    suspend fun getBankTransactionsWithoutExtraction(): List<NotificationEntity> {
+        return notificationDao.getBankTransactionsWithoutExtraction()
+    }
+
     suspend fun saveNotification(notification: NotificationEntity) {
         notificationDao.insert(notification)
         appProfileDao.insertIfNew(
@@ -48,31 +53,41 @@ class NotificationRepository(
     }
 
     suspend fun upsertNotification(notification: NotificationEntity) {
-        val existing = if (notification.notificationKey != null) {
-            notificationDao.getByNotificationKey(notification.notificationKey)
-        } else null
+        val hash = hashContent(buildCanonicalContent(notification))
+        val withHash = notification.copy(contentHash = hash)
 
-        if (existing != null) {
-            // Update existing -- keep the ID, update content and timestamp
-            notificationDao.update(existing.copy(
-                title = notification.title,
-                content = notification.content,
-                bigText = notification.bigText,
-                postedAt = notification.postedAt,
-                extrasJson = notification.extrasJson,
-                // Don't overwrite category if already classified
-                category = if (existing.classifiedBy != "pending") existing.category else notification.category,
-                classifiedBy = if (existing.classifiedBy != "pending") existing.classifiedBy else notification.classifiedBy,
-                processedAt = existing.processedAt
-            ))
-        } else {
-            notificationDao.insert(notification)
-            appProfileDao.insertIfNew(AppProfileEntity(
-                packageName = notification.packageName,
-                appName = notification.appName
-            ))
-            appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
+        val key = notification.notificationKey
+        if (key != null && notificationDao.getByKeyAndHash(key, hash) != null) {
+            return
         }
+
+        insertNewNotification(withHash)
+    }
+
+    private suspend fun insertNewNotification(notification: NotificationEntity) {
+        notificationDao.insert(notification)
+        appProfileDao.insertIfNew(AppProfileEntity(
+            packageName = notification.packageName,
+            appName = notification.appName
+        ))
+        appProfileDao.incrementCount(notification.packageName, notification.capturedAt)
+    }
+
+    private fun buildCanonicalContent(n: NotificationEntity): String {
+        val sb = StringBuilder()
+        for (value in listOf(n.title, n.content, n.bigText, n.conversation, n.extrasJson)) {
+            if (value.isNullOrBlank()) continue
+            val trimmed = value.trim()
+            if (sb.contains(trimmed)) continue
+            if (sb.isNotEmpty()) sb.append(' ')
+            sb.append(trimmed)
+        }
+        return sb.toString()
+    }
+
+    private fun hashContent(canonical: String): String {
+        val bytes = MessageDigest.getInstance("MD5").digest(canonical.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     suspend fun markClassified(notification: NotificationEntity, category: String, classifiedBy: String, ruleId: String? = null) {
@@ -111,5 +126,41 @@ class NotificationRepository(
 
     suspend fun getByIds(ids: List<String>): List<NotificationEntity> {
         return notificationDao.getByIds(ids)
+    }
+
+    suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity> {
+        return notificationDao.getUnembedded(since, until)
+    }
+
+    suspend fun getUnprocessedMatters(since: Long, until: Long): List<NotificationEntity> {
+        return notificationDao.getUnprocessedMatters(since, until)
+    }
+
+    suspend fun setEmbedding(id: String, embedding: ByteArray) {
+        notificationDao.setEmbedding(id, embedding, System.currentTimeMillis())
+    }
+
+    suspend fun markProcessedForTopics(ids: List<String>) {
+        notificationDao.markProcessedForTopics(ids)
+    }
+
+    suspend fun resetAllProcessedFlags() {
+        notificationDao.resetAllProcessedFlags()
+    }
+
+    suspend fun resetUncategorizedForReclassification() {
+        notificationDao.resetUncategorizedForReclassification()
+    }
+
+    suspend fun invalidateEmbedding(id: String) {
+        notificationDao.invalidateEmbedding(id)
+    }
+
+    suspend fun resetAllEmbeddings() {
+        notificationDao.resetAllEmbeddings()
+    }
+
+    suspend fun purgeOlderThan(before: Long) {
+        notificationDao.deleteOlderThan(before)
     }
 }

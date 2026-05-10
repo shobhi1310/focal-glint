@@ -1,7 +1,9 @@
 package com.focal.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,8 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -19,7 +24,9 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,9 +35,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    onNavigateToSetup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshEmbeddingState()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -46,11 +58,33 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
+
+            item {
+                BackendToggleRow(
+                    useGpu = state.useGpu,
+                    restarting = state.engineRestarting,
+                    onSelect = { viewModel.setBackendPreference(it) }
+                )
+            }
+
+            item {
+                EmbeddingEngineRow(
+                    isModelAvailable = state.isEmbeddingModelAvailable,
+                    isReady = state.isEmbeddingReady,
+                    isInitializing = state.isEmbeddingInitializing,
+                    onInitialize = { viewModel.initializeEmbedding() }
+                )
+            }
+
+            item {
+                SetupNavRow(onClick = onNavigateToSetup)
+            }
+
             item {
                 Text(
                     text = "Choose how each app is classified",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -61,7 +95,7 @@ fun SettingsScreen(
                     Text(
                         text = "No apps seen yet. Notifications will appear here as they arrive.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
@@ -78,13 +112,132 @@ fun SettingsScreen(
         state.snackbarMessage?.let { message ->
             Snackbar(
                 modifier = Modifier.padding(16.dp),
-                shape = RoundedCornerShape(8.dp)
+                shape = MaterialTheme.shapes.small
             ) {
                 Text(text = message)
             }
         }
     }
 }
+
+@Composable
+private fun SetupNavRow(onClick: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Setup AI Engine",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Configure model & permissions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BackendToggleRow(
+    useGpu: Boolean,
+    restarting: Boolean,
+    onSelect: (Boolean) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Inference Backend",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = if (restarting) "Restarting engine…" else "GPU is faster on supported devices",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                listOf("GPU", "CPU").forEachIndexed { index, label ->
+                    SegmentedButton(
+                        selected = if (index == 0) useGpu else !useGpu,
+                        onClick = { if (!restarting) onSelect(index == 0) },
+                        enabled = !restarting,
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = 2)
+                    ) {
+                        Text(label)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmbeddingEngineRow(
+    isModelAvailable: Boolean,
+    isReady: Boolean,
+    isInitializing: Boolean,
+    onInitialize: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Embedding Engine",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = when {
+                        !isModelAvailable -> "Model not downloaded"
+                        isInitializing -> "Starting…"
+                        isReady -> "Active"
+                        else -> "Not started"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (isModelAvailable && !isInitializing) {
+                Button(onClick = onInitialize) {
+                    Text(if (isReady) "Restart" else "Start")
+                }
+            }
+        }
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +261,7 @@ private fun AppOverrideRow(
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -120,7 +273,7 @@ private fun AppOverrideRow(
             Text(
                 text = "${app.notificationCount} notifications · $systemHint",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(8.dp))

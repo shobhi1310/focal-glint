@@ -1,6 +1,7 @@
 package com.focal.ui.settings
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingWorkPolicy
@@ -8,15 +9,23 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
-import com.focal.worker.ClassificationWorker
+import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.InferenceProvider
+import com.focal.intelligence.ModelBackendPolicy
+import com.focal.intelligence.ModelManager
+import com.focal.intelligence.ModelVariant
+import com.focal.intelligence.TopicEngine
+import com.focal.worker.InferenceWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class AppOverride(
@@ -29,14 +38,22 @@ data class AppOverride(
 
 data class SettingsUiState(
     val apps: List<AppOverride> = emptyList(),
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
+    val useGpu: Boolean = true,
+    val engineRestarting: Boolean = false,
+    val isEmbeddingModelAvailable: Boolean = false,
+    val isEmbeddingReady: Boolean = false,
+    val isEmbeddingInitializing: Boolean = false
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val notificationRepository: NotificationRepository,
-    @ApplicationContext private val context: Context
+    private val inferenceProvider: InferenceProvider,
+    private val embeddingProvider: EmbeddingProvider,
+    private val modelManager: ModelManager,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -46,6 +63,11 @@ class SettingsViewModel @Inject constructor(
     private val pendingChanges = mutableMapOf<String, String?>()
 
     init {
+        _uiState.value = _uiState.value.copy(
+            useGpu = modelManager.getBackendPreference(),
+            isEmbeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable,
+            isEmbeddingReady = embeddingProvider.isReady()
+        )
         loadApps()
     }
 
@@ -95,6 +117,70 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setBackendPreference(useGpu: Boolean) {
+        if (_uiState.value.engineRestarting) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(engineRestarting = true, useGpu = useGpu)
+            modelManager.saveBackendPreference(useGpu)
+            if (modelManager.isEngineEnabled() && modelManager.isModelAvailable) {
+                try {
+                    InferenceWorker.cancelAndWait(WorkManager.getInstance(context))
+                    val variant = modelManager.activeVariant() ?: ModelVariant.GEMMA4_E2B
+                    inferenceProvider.restart(modelManager.modelPath, useGpu, modelManager.getContextTokens())
+                    reinitializeEmbeddings(useGpu)
+                } catch (e: Exception) {
+                    val fallback = !useGpu
+                    modelManager.saveBackendPreference(fallback)
+                    _uiState.value = _uiState.value.copy(
+                        useGpu = fallback,
+                        snackbarMessage = "Backend switch failed, reverted."
+                    )
+                }
+            } else {
+                reinitializeEmbeddings(useGpu)
+            }
+            _uiState.value = _uiState.value.copy(engineRestarting = false)
+        }
+    }
+
+    private suspend fun reinitializeEmbeddings(useGpu: Boolean) {
+        if (!modelManager.isGemmaEmbeddingAvailable) return
+        if (embeddingProvider.isReady()) {
+            withContext(Dispatchers.IO) { embeddingProvider.close() }
+        }
+        embeddingProvider.initialize(modelManager.gemmaEmbeddingModelFile.absolutePath, "", useGpu)
+    }
+
+    fun refreshEmbeddingState() {
+        _uiState.value = _uiState.value.copy(
+            isEmbeddingModelAvailable = modelManager.isGemmaEmbeddingAvailable,
+            isEmbeddingReady = embeddingProvider.isReady()
+        )
+    }
+
+    fun initializeEmbedding() {
+        if (_uiState.value.isEmbeddingInitializing || !_uiState.value.isEmbeddingModelAvailable) return
+        if (embeddingProvider.isReady()) {
+            _uiState.value = _uiState.value.copy(isEmbeddingReady = true)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isEmbeddingInitializing = true)
+            try {
+                reinitializeEmbeddings(modelManager.getBackendPreference())
+                _uiState.value = _uiState.value.copy(
+                    isEmbeddingReady = true,
+                    snackbarMessage = "Embedding engine started."
+                )
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Failed to start embedding engine", e)
+                _uiState.value = _uiState.value.copy(snackbarMessage = "Failed to start embedding engine.")
+            } finally {
+                _uiState.value = _uiState.value.copy(isEmbeddingInitializing = false)
+            }
+        }
+    }
+
     fun dismissSnackbar() {
         _uiState.value = _uiState.value.copy(snackbarMessage = null)
     }
@@ -111,10 +197,10 @@ class SettingsViewModel @Inject constructor(
             }
         }
 
-        val workRequest = OneTimeWorkRequestBuilder<ClassificationWorker>().build()
+        val workRequest = OneTimeWorkRequestBuilder<InferenceWorker>().build()
         WorkManager.getInstance(context).enqueueUniqueWork(
-            ClassificationWorker.WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            InferenceWorker.WORK_NAME,
+            ExistingWorkPolicy.KEEP,
             workRequest
         )
 

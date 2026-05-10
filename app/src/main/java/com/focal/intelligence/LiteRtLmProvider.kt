@@ -1,74 +1,360 @@
 package com.focal.intelligence
 
+import android.content.Context
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
-import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolManager
+import com.google.ai.edge.litertlm.ToolSet
+import com.google.ai.edge.litertlm.tool
+import com.google.gson.JsonElement
+import com.google.gson.JsonNull
+import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.Executors
+import javax.inject.Inject
 
-class LiteRtLmProvider : InferenceProvider {
+private val THINKING_CHANNELS = listOf(ThinkingMode.thoughtChannel)
+
+class LiteRtLmProvider @Inject constructor(
+    @param:ApplicationContext private val context: Context
+) : InferenceProvider {
 
     private var engine: Engine? = null
-    private val mutex = Mutex()
+    private var activeConversation: Conversation? = null
 
-    override suspend fun initialize(modelPath: String) {
+    // Serializes inference. tryLock() lets UI callers fail fast when busy
+    // instead of stacking up behind a long-running background batch.
+    private val inferenceMutex = Mutex()
+
+    // Single thread ensures LiteRT's one-session-at-a-time constraint at the engine level.
+    // Recreated on each initialize() so Stop → Start works correctly.
+    private var llmDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
+    override suspend fun initialize(modelPath: String, useGpu: Boolean, maxContextTokens: Int) {
         withContext(Dispatchers.IO) {
+            val backend: Backend = if (useGpu) Backend.GPU() else Backend.CPU()
             val config = EngineConfig(
                 modelPath = modelPath,
-                backend = Backend.CPU,
+                backend = backend,
+                cacheDir = context.cacheDir.absolutePath,
+                maxNumTokens = maxContextTokens
             )
             val newEngine = Engine(config)
             newEngine.initialize()
             engine = newEngine
-            Log.d(TAG, "Engine initialized with model: $modelPath")
+            // Recreate dispatcher so Stop → Start produces a fresh single thread
+            llmDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+            Log.d(TAG, "Engine initialized with model: $modelPath, gpu=$useGpu")
         }
     }
 
-    override suspend fun generate(prompt: String, maxTokens: Int): String {
+    override suspend fun restart(modelPath: String, useGpu: Boolean, maxContextTokens: Int) {
+        withContext(Dispatchers.IO) {
+            engine?.close()
+            engine = null
+        }
+        initialize(modelPath, useGpu, maxContextTokens)
+    }
+
+    override suspend fun generate(prompt: String, maxTokens: Int, waitIfBusy: Boolean): String {
         val eng = engine
             ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
 
-        return mutex.withLock {
-            withContext(Dispatchers.IO) {
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
+
+        return try {
+            withContext(llmDispatcher) {
+                activeConversation?.let { if (it.isAlive) it.close() }
+                activeConversation = null
+
                 val conversationConfig = ConversationConfig(
                     samplerConfig = SamplerConfig(
-                        topK = 10,
+                        topK = 64,
                         topP = 0.95,
-                        temperature = 0.3,
+                        temperature = 1.0,
                     )
                 )
                 eng.createConversation(conversationConfig).use { conversation ->
-                    val inputMessage = Message.of(prompt)
-                    val response = conversation.sendMessage(inputMessage)
-                    extractText(response)
+                    val (sanitized, lones) = prompt.sanitizeForJni()
+                    if (lones > 0) Log.w(TAG, "generate sanitized $lones JNI-unsafe char(s) before send")
+                    conversation.sendMessage(sanitized).toString()
+                }
+            }
+        } finally {
+            inferenceMutex.unlock()
+        }
+    }
+
+    @OptIn(ExperimentalApi::class)
+    override suspend fun generateWithTools(
+        systemInstruction: String,
+        prompt: String,
+        tools: List<ToolSet>,
+        waitIfBusy: Boolean,
+        automaticToolCalling: Boolean
+    ): Flow<Message> {
+        val eng = engine
+            ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
+
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
+
+        return channelFlow {
+            try {
+                withContext(llmDispatcher) {
+                    activeConversation?.let { if (it.isAlive) it.close() }
+                    activeConversation = null
+
+                    Log.i(TAG, "generateWithTools: promptLen=${prompt.length} tools=${tools.size}")
+                    val (sanitized, lones) = prompt.sanitizeForJni()
+                    if (lones > 0) Log.w(TAG, "generateWithTools sanitized $lones JNI-unsafe char(s) before send")
+                    val toolProviders = tools.map { tool(it) }
+                    val toolManager = ToolManager(toolProviders)
+                    val config = ConversationConfig(
+                        systemInstruction = Contents.of(systemInstruction),
+                        tools = toolProviders,
+                        automaticToolCalling = automaticToolCalling,
+                        channels = THINKING_CHANNELS
+                    )
+                    ExperimentalFlags.enableConversationConstrainedDecoding = true
+                    val conv = try {
+                        eng.createConversation(config)
+                    } finally {
+                        ExperimentalFlags.enableConversationConstrainedDecoding = false
+                    }
+                    activeConversation = conv
+                    try {
+                        conv.sendMessageAsync(sanitized).collect { message ->
+                            // Manual dispatch only needed when automaticToolCalling=false.
+                            // When true, the framework executes tool calls internally.
+                            if (!automaticToolCalling) {
+                                message.toolCalls.forEach { call ->
+                                    toolManager.execute(call.name, call.arguments.toJsonObject())
+                                }
+                            }
+                            send(message)
+                        }
+                    } finally {
+                        if (conv.isAlive) conv.close()
+                        activeConversation = null
+                    }
+                }
+            } finally {
+                inferenceMutex.unlock()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalApi::class)
+    override suspend fun startConversation(
+        systemInstruction: String,
+        tools: List<ToolSet>,
+        waitIfBusy: Boolean
+    ): ConversationSession {
+        val eng = engine
+            ?: throw IllegalStateException("Engine not initialized. Call initialize() first.")
+
+        val acquired = if (waitIfBusy) {
+            inferenceMutex.lock(); true
+        } else {
+            inferenceMutex.tryLock()
+        }
+        if (!acquired) throw InferenceBusyException()
+
+        return withContext(llmDispatcher) {
+            activeConversation?.let { if (it.isAlive) it.close() }
+            activeConversation = null
+
+            val toolProviders = tools.map { tool(it) }
+            val toolManager = ToolManager(toolProviders)
+            val config = ConversationConfig(
+                systemInstruction = Contents.of(systemInstruction),
+                tools = toolProviders,
+                automaticToolCalling = false,
+                channels = THINKING_CHANNELS
+            )
+            ExperimentalFlags.enableConversationConstrainedDecoding = true
+            val conv = try {
+                eng.createConversation(config)
+            } finally {
+                ExperimentalFlags.enableConversationConstrainedDecoding = false
+            }
+            activeConversation = conv
+            Log.i(TAG, "startConversation: tools=${tools.size}")
+
+            object : ConversationSession {
+                override fun send(prompt: String): Flow<Message> = channelFlow {
+                    withContext(llmDispatcher) {
+                        Log.i(TAG, "conversation.send: promptLen=${prompt.length}")
+                        val (sanitized, lones) = prompt.sanitizeForJni()
+                        if (lones > 0) Log.w(TAG, "conversation.send sanitized $lones JNI-unsafe char(s) before send")
+                        conv.sendMessageAsync(sanitized).collect { message ->
+                            message.toolCalls.forEach { call ->
+                                toolManager.execute(call.name, call.arguments.toJsonObject())
+                            }
+                            send(message)
+                        }
+                    }
+                }
+
+                override fun close() {
+                    try { conv.cancelProcess() } catch (_: Exception) {}
+                    try { if (conv.isAlive) conv.close() } catch (_: Exception) {}
+                    activeConversation = null
+                    inferenceMutex.unlock()
+                    Log.i(TAG, "ConversationSession closed")
                 }
             }
         }
     }
 
-    override fun isReady(): Boolean {
-        return engine != null
-    }
+    override fun isReady(): Boolean = engine != null
 
     override fun close() {
-        engine?.close()
-        engine = null
-    }
-
-    private fun extractText(message: Message): String {
-        return message.contents
-            .filterIsInstance<Content.Text>()
-            .joinToString("") { it.text }
+        Log.i(TAG, "Closing engine. Waiting for in-flight inference to drain (up to ${CLOSE_DRAIN_TIMEOUT_MS}ms)...")
+        // The litertlm SDK's cancelProcess()/Conversation.close() are advisory — they don't
+        // synchronously join the JNI worker thread. If we run engine.close() while the JNI
+        // thread is still decoding or executing tools (especially under automaticToolCalling),
+        // its onDone callback dereferences freed engine state → SIGSEGV.
+        //
+        // inferenceMutex is held for the entire duration of generateWithTools(), released
+        // only after the channelFlow's outer finally runs (which happens after the consumer's
+        // collect{} returns, i.e. after the SDK's flow completes). Callers using
+        // automaticToolCalling=true wrap their collect in NonCancellable so the in-flight
+        // call runs to natural completion. Acquiring the mutex here therefore guarantees
+        // the JNI thread has fully exited before we tear down.
+        //
+        // WorkManager's cancelAndWait does NOT wait for the worker's coroutine to finish —
+        // it returns as soon as WorkInfo.state is CANCELLED, which happens the moment the
+        // future is cancelled. So we cannot rely on cancelAndWait alone; this mutex wait is
+        // the actual synchronization point.
+        val acquiredMutex = runBlocking {
+            try {
+                withTimeout(CLOSE_DRAIN_TIMEOUT_MS) {
+                    inferenceMutex.lock()
+                }
+                true
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "Timeout (${CLOSE_DRAIN_TIMEOUT_MS}ms) draining in-flight inference; forcing close (may crash)")
+                false
+            }
+        }
+        try {
+            activeConversation?.let {
+                try { if (it.isAlive) it.close() } catch (_: Exception) {}
+            }
+            activeConversation = null
+            engine?.close()
+            engine = null
+            llmDispatcher.close()
+            Log.i(TAG, "Engine resources released")
+            Log.i(TAG, "LLM engine has stopped completely (isReady=${isReady()})")
+        } finally {
+            if (acquiredMutex) {
+                try { inferenceMutex.unlock() } catch (_: Exception) {}
+            }
+        }
     }
 
     companion object {
         private const val TAG = "LiteRtLmProvider"
+        private const val CLOSE_DRAIN_TIMEOUT_MS = 30_000L
     }
+}
+
+// Single boundary contract: any string passed to nativeSendMessageAsync MUST round-trip
+// cleanly through JNI's GetStringUTFChars (Modified UTF-8) and nlohmann::json::parse
+// (strict UTF-8). Returns (sanitized, replacementCount). Replacements use U+FFFD.
+//
+// Add a new branch here whenever a future input type triggers SIGABRT at the JNI
+// boundary; do not push these checks to callers — this is the canonical chokepoint.
+//
+// Currently handles:
+//   * Lone UTF-16 surrogates → become invalid 3-byte CESU-8 in Modified UTF-8.
+//   * Embedded U+0000 → encoded as overlong 0xC0 0x80; strict UTF-8 rejects overlong
+//     forms. (Strings normally don't contain NUL but third-party text sources can.)
+private fun String.sanitizeForJni(): Pair<String, Int> {
+    var bad = 0
+    var i = 0
+    while (i < length) {
+        val code = this[i].code
+        when {
+            code == 0 -> bad++
+            code in 0xD800..0xDBFF -> {
+                val next = if (i + 1 < length) this[i + 1].code else -1
+                if (next in 0xDC00..0xDFFF) { i += 2; continue }
+                bad++
+            }
+            code in 0xDC00..0xDFFF -> bad++
+        }
+        i++
+    }
+    if (bad == 0) return this to 0
+    val sb = StringBuilder(length)
+    i = 0
+    while (i < length) {
+        val c = this[i]
+        val code = c.code
+        when {
+            code == 0 -> sb.append('�')
+            code in 0xD800..0xDBFF -> {
+                val next = if (i + 1 < length) this[i + 1].code else -1
+                if (next in 0xDC00..0xDFFF) {
+                    sb.append(c).append(this[i + 1]); i += 2; continue
+                }
+                sb.append('�')
+            }
+            code in 0xDC00..0xDFFF -> sb.append('�')
+            else -> sb.append(c)
+        }
+        i++
+    }
+    return sb.toString() to bad
+}
+
+// ToolCall.arguments values come from LiteRT-LM's JsonObject.toMap() which converts
+// JsonPrimitive(number) → Number, JsonPrimitive(string) → String, etc. We must
+// reconstruct proper JsonElement types so ReflectionTool's isNumber/isString checks pass.
+private fun Map<String, Any?>.toJsonObject(): JsonObject =
+    JsonObject().also { obj ->
+        forEach { (k, v) -> obj.add(k, v.toJsonElement()) }
+    }
+
+private fun Any?.toJsonElement(): JsonElement = when (this) {
+    null -> JsonNull.INSTANCE
+    is JsonElement -> this
+    is Number -> JsonPrimitive(this)
+    is Boolean -> JsonPrimitive(this)
+    is String -> JsonPrimitive(this)
+    else -> JsonPrimitive(this.toString())
 }

@@ -22,6 +22,7 @@ class RulesEngine(private val ruleRepository: RuleRepository) {
 
         for (rule in orderedRules) {
             if (matches(rule, notification)) {
+                if (rule.category == "auto") return null
                 ruleRepository.incrementHitCount(rule)
                 return ClassificationResult(
                     category = rule.category,

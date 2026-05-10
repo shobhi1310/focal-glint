@@ -40,5 +40,11 @@ data class TopicEntity(
     @ColumnInfo(name = "is_read")
     val isRead: Boolean = false,
     @ColumnInfo(name = "briefing_contribution")
-    val briefingContribution: String? = null
+    val briefingContribution: String? = null,
+
+    @ColumnInfo(name = "needs_narrative_regen")
+    val needsNarrativeRegen: Boolean = true,
+
+    @ColumnInfo(name = "suggested_actions")
+    val suggestedActions: String? = null
 )

@@ -25,6 +25,9 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE processed_at IS NULL ORDER BY posted_at ASC")
     suspend fun getPending(): List<NotificationEntity>
 
+    @Query("SELECT * FROM notifications WHERE is_bank_transaction = 1 AND id NOT IN (SELECT notification_id FROM transactions) ORDER BY posted_at ASC")
+    suspend fun getBankTransactionsWithoutExtraction(): List<NotificationEntity>
+
     @Query("SELECT * FROM notifications WHERE package_name = :packageName AND posted_at > :since ORDER BY posted_at DESC")
     suspend fun getByPackage(packageName: String, since: Long): List<NotificationEntity>
 
@@ -43,6 +46,30 @@ interface NotificationDao {
     @Query("DELETE FROM notifications WHERE posted_at < :before")
     suspend fun deleteOlderThan(before: Long)
 
-    @Query("SELECT * FROM notifications WHERE notification_key = :key LIMIT 1")
-    suspend fun getByNotificationKey(key: String): NotificationEntity?
+    @Query("SELECT * FROM notifications WHERE notification_key = :key AND content_hash = :hash LIMIT 1")
+    suspend fun getByKeyAndHash(key: String, hash: String): NotificationEntity?
+
+    @Query("SELECT * FROM notifications WHERE embedding IS NULL AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+    suspend fun getUnembedded(since: Long, until: Long): List<NotificationEntity>
+
+    @Query("SELECT * FROM notifications WHERE processed_for_topics = 0 AND posted_at >= :since AND posted_at < :until AND is_summary = 0 AND category = 'matters'")
+    suspend fun getUnprocessedMatters(since: Long, until: Long): List<NotificationEntity>
+
+    @Query("UPDATE notifications SET embedding = :embedding, embedded_at = :timestamp WHERE id = :id")
+    suspend fun setEmbedding(id: String, embedding: ByteArray, timestamp: Long)
+
+    @Query("UPDATE notifications SET processed_for_topics = 1 WHERE id IN (:ids)")
+    suspend fun markProcessedForTopics(ids: List<String>)
+
+    @Query("UPDATE notifications SET processed_for_topics = 0")
+    suspend fun resetAllProcessedFlags()
+
+    @Query("UPDATE notifications SET processed_at = NULL WHERE classified_by = 'pending' AND processed_at IS NOT NULL")
+    suspend fun resetUncategorizedForReclassification()
+
+    @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL WHERE id = :id")
+    suspend fun invalidateEmbedding(id: String)
+
+    @Query("UPDATE notifications SET embedding = NULL, embedded_at = NULL")
+    suspend fun resetAllEmbeddings()
 }

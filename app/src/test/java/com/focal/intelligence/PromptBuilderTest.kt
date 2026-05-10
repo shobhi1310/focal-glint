@@ -46,19 +46,12 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `classification prompt requests JSON with matters field`() {
-        val prompt = PromptBuilder.buildClassificationPrompt(notification())
-        assertTrue(prompt.contains("JSON"))
-        assertTrue(prompt.contains("\"matters\""))
-    }
-
-    @Test
-    fun `narrative prompt includes all notification contents`() {
+    fun `topic prompt includes all notification contents`() {
         val notifications = listOf(
             notification(title = "Mom", content = "Let's go to Manali"),
             notification(title = "Dad", content = "I'll book the hotel")
         )
-        val prompt = PromptBuilder.buildNarrativePrompt(notifications)
+        val prompt = PromptBuilder.buildTopicPrompt(notifications)
         assertTrue(prompt.contains("Manali"))
         assertTrue(prompt.contains("hotel"))
         assertTrue(prompt.contains("[1]"))
@@ -66,29 +59,19 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `narrative prompt truncates long content to 150 chars`() {
+    fun `topic prompt truncates long content to 150 chars`() {
         val longContent = "A".repeat(300)
         val notifications = listOf(notification(content = longContent))
-        val prompt = PromptBuilder.buildNarrativePrompt(notifications)
+        val prompt = PromptBuilder.buildTopicPrompt(notifications)
         assertFalse(prompt.contains("A".repeat(300)))
         assertTrue(prompt.contains("A".repeat(150)))
     }
 
     @Test
-    fun `briefing prompt includes narratives and noise count`() {
-        val narratives = listOf(
-            "Mom asked about dinner plans",
-            "Swiggy delivered your lunch"
-        )
-        val prompt = PromptBuilder.buildBriefingPrompt(narratives, noiseCount = 7)
-        assertTrue(prompt.contains("dinner plans"))
-        assertTrue(prompt.contains("Swiggy"))
-        assertTrue(prompt.contains("7 promotional"))
-    }
-
-    @Test
-    fun `briefing prompt omits noise line when count is zero`() {
-        val prompt = PromptBuilder.buildBriefingPrompt(listOf("Mom messaged"), noiseCount = 0)
-        assertFalse(prompt.contains("promotional/noise"))
+    fun `topic prompt asks for TITLE and SUMMARY`() {
+        val notifications = listOf(notification())
+        val prompt = PromptBuilder.buildTopicPrompt(notifications)
+        assertTrue(prompt.contains("TITLE:"))
+        assertTrue(prompt.contains("SUMMARY:"))
     }
 }

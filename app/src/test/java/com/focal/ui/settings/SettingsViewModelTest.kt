@@ -5,6 +5,12 @@ import com.focal.data.db.entity.AppProfileEntity
 import com.focal.data.db.entity.RuleEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.RuleRepository
+import com.focal.intelligence.EmbeddingProvider
+import com.focal.intelligence.InferenceProvider
+import com.focal.intelligence.ModelManager
+import com.focal.intelligence.ModelVariant
+import com.focal.intelligence.TopicEngine
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -12,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -32,18 +39,30 @@ class SettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var ruleRepository: RuleRepository
     private lateinit var notificationRepository: NotificationRepository
+    private lateinit var inferenceProvider: InferenceProvider
+    private lateinit var embeddingProvider: EmbeddingProvider
+    private lateinit var modelManager: ModelManager
     private lateinit var context: Context
+    private lateinit var workManager: WorkManager
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         ruleRepository = mockk(relaxed = true)
         notificationRepository = mockk(relaxed = true)
+        inferenceProvider = mockk(relaxed = true)
+        embeddingProvider = mockk(relaxed = true)
+        modelManager = mockk(relaxed = true)
         context = mockk(relaxed = true)
+        every { modelManager.isEngineEnabled() } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns false
+        every { embeddingProvider.isReady() } returns false
 
         mockkStatic(WorkManager::class)
-        val workManager = mockk<WorkManager>(relaxed = true)
+        workManager = mockk(relaxed = true)
         every { WorkManager.getInstance(any()) } returns workManager
+        every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList<WorkInfo>())
+        TopicEngine.pendingFullRebuild.set(false)
     }
 
     @After
@@ -53,7 +72,14 @@ class SettingsViewModelTest {
     }
 
     private fun createViewModel(): SettingsViewModel {
-        return SettingsViewModel(ruleRepository, notificationRepository, context)
+        return SettingsViewModel(
+            ruleRepository,
+            notificationRepository,
+            inferenceProvider,
+            embeddingProvider,
+            modelManager,
+            context
+        )
     }
 
     private fun setupProfiles(vararg apps: Pair<String, Int>) {
@@ -157,4 +183,105 @@ class SettingsViewModelTest {
 
         coVerify { ruleRepository.clearUserOverride("com.whatsapp") }
     }
+
+    @Test
+    fun `setBackendPreference closes active embedding model before reinit`() = runTest {
+        setupProfiles("whatsapp" to 10)
+        coEvery { ruleRepository.getUserOverrides() } returns emptyList()
+        coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
+        every { modelManager.getBackendPreference() } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
+        every { embeddingProvider.isReady() } returns true
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.setBackendPreference(false)
+        advanceUntilIdle()
+
+        verify { modelManager.saveBackendPreference(false) }
+        verify(timeout = 1_000) { embeddingProvider.close() }
+    }
+
+    @Test
+    fun `setBackendPreference restarts llm and reinitializes embedding`() = runTest {
+        setupProfiles("whatsapp" to 10)
+        coEvery { ruleRepository.getUserOverrides() } returns emptyList()
+        coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
+        every { modelManager.getBackendPreference() } returns true
+        every { modelManager.isModelAvailable } returns true
+        every { modelManager.activeVariant() } returns ModelVariant.GEMMA4_E2B
+        every { modelManager.modelPath } returns "/models/gemma-4-E2B-it.litertlm"
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
+        every { embeddingProvider.isReady() } returns false
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.setBackendPreference(false)
+        advanceUntilIdle()
+
+        coVerify(timeout = 1_000) {
+            inferenceProvider.restart(
+                "/models/gemma-4-E2B-it.litertlm",
+                false,
+                ModelVariant.GEMMA4_E2B.maxContextTokens
+            )
+        }
+        coVerify(timeout = 1_000) {
+            embeddingProvider.initialize("/models/embeddinggemma.tflite", "", false)
+        }
+    }
+
+    @Test
+    fun `setBackendPreference does not restart llm when engine is disabled`() = runTest {
+        setupProfiles("whatsapp" to 10)
+        coEvery { ruleRepository.getUserOverrides() } returns emptyList()
+        coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
+        every { modelManager.getBackendPreference() } returns true
+        every { modelManager.isEngineEnabled() } returns false
+        every { modelManager.isModelAvailable } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns false
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.setBackendPreference(false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { inferenceProvider.restart(any(), any(), any()) }
+    }
+
+    @Test
+    fun `setBackendPreference reinitializes gemma embedding without explicit tokenizer path`() = runTest {
+        setupProfiles("whatsapp" to 10)
+        coEvery { ruleRepository.getUserOverrides() } returns emptyList()
+        coEvery { ruleRepository.getSystemDefaults() } returns emptyList()
+        every { modelManager.getBackendPreference() } returns true
+        every { modelManager.isGemmaEmbeddingAvailable } returns true
+        every { modelManager.gemmaEmbeddingModelFile } returns mockk {
+            every { absolutePath } returns "/models/embeddinggemma.tflite"
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.setBackendPreference(false)
+        advanceUntilIdle()
+
+        coVerify(timeout = 1_000) {
+            embeddingProvider.initialize(
+                "/models/embeddinggemma.tflite",
+                "",
+                false
+            )
+        }
+    }
+
 }

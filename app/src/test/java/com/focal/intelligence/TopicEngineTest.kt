@@ -1,0 +1,239 @@
+package com.focal.intelligence
+
+import com.focal.data.db.entity.NotificationEntity
+import com.focal.data.db.entity.TopicEntity
+import com.focal.data.repository.NotificationRepository
+import com.focal.data.repository.TopicRepository
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class TopicEngineTest {
+
+    private lateinit var inferenceProvider: InferenceProvider
+    private lateinit var embeddingProvider: EmbeddingProvider
+    private lateinit var notificationRepo: NotificationRepository
+    private lateinit var topicRepo: TopicRepository
+    private lateinit var engine: TopicEngine
+
+    @Before
+    fun setup() {
+        inferenceProvider = mockk(relaxed = true)
+        embeddingProvider = mockk(relaxed = true)
+        notificationRepo = mockk(relaxed = true)
+        topicRepo = mockk(relaxed = true)
+        TopicEngine.pendingFullRebuild.set(false)
+        engine = TopicEngine(embeddingProvider, notificationRepo, topicRepo)
+    }
+
+    private fun notification(
+        id: String = "n1",
+        title: String = "Mom",
+        content: String = "Are you coming for dinner?",
+        appName: String = "WhatsApp",
+        packageName: String = "com.whatsapp",
+        embedding: ByteArray? = null
+    ) = NotificationEntity(
+        id = id,
+        packageName = packageName,
+        appName = appName,
+        title = title,
+        content = content,
+        postedAt = System.currentTimeMillis(),
+        category = ClassificationResult.MATTERS,
+        embedding = embedding
+    )
+
+    private fun makeVec(vararg values: Float): FloatArray = VectorMath.l2Normalize(floatArrayOf(*values))
+    private fun vecBytes(vararg values: Float): ByteArray = VectorMath.toBytes(makeVec(*values))
+
+    @Test
+    fun `creates new topic when no topics exist`() = runTest {
+        val vec = makeVec(1f, 0f, 0f)
+        val notif = notification(embedding = VectorMath.toBytes(vec))
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(notif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify { topicRepo.saveTopic(any()) }
+        coVerify { notificationRepo.markProcessedForTopics(listOf("n1")) }
+    }
+
+    @Test
+    fun `assigns notification to existing topic when similar`() = runTest {
+        val existingVec = makeVec(1f, 0f, 0f)
+        val newVec = makeVec(0.95f, 0.05f, 0f)
+
+        val existingNotif = notification(id = "n1", embedding = VectorMath.toBytes(existingVec))
+        val newNotif = notification(id = "n2", embedding = VectorMath.toBytes(newVec))
+
+        val existingTopic = TopicEntity(
+            id = "t1",
+            headline = "Mom: Are you coming?",
+            summary = "test",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1")).toString(),
+            sourceApps = JSONArray(listOf("WhatsApp")).toString(),
+            needsNarrativeRegen = false
+        )
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(newNotif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(existingTopic)
+        coEvery { notificationRepo.getByIds(listOf("n1")) } returns listOf(existingNotif)
+        coEvery { topicRepo.getById("t1") } returns existingTopic
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify { topicRepo.updateTopicMembers(eq("t1"), any(), any(), any()) }
+        coVerify { topicRepo.markDirty("t1") }
+    }
+
+    @Test
+    fun `creates new topic when score below threshold`() = runTest {
+        val existingVec = makeVec(1f, 0f, 0f)
+        val newVec = makeVec(0f, 1f, 0f)
+
+        val existingNotif = notification(id = "n1", embedding = VectorMath.toBytes(existingVec))
+        val newNotif = notification(id = "n2", title = "Amazon", content = "Your order shipped",
+            appName = "Gmail", packageName = "com.google.android.gm",
+            embedding = VectorMath.toBytes(newVec))
+
+        val existingTopic = TopicEntity(
+            id = "t1",
+            headline = "Mom: Are you coming?",
+            summary = "test",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1")).toString(),
+            sourceApps = JSONArray(listOf("WhatsApp")).toString()
+        )
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(newNotif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(existingTopic)
+        coEvery { notificationRepo.getByIds(listOf("n1")) } returns listOf(existingNotif)
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify { topicRepo.saveTopic(any()) }
+    }
+
+    @Test
+    fun `creates new topic when score is below stricter threshold`() = runTest {
+        val existingVec = makeVec(1f, 0f, 0f)
+        val newVec = makeVec(0.87f, 0.4930517f, 0f)
+
+        val existingNotif = notification(id = "n1", embedding = VectorMath.toBytes(existingVec))
+        val newNotif = notification(id = "n2", title = "Market update", content = "Watchlist move",
+            appName = "WhatsApp", packageName = "com.whatsapp",
+            embedding = VectorMath.toBytes(newVec))
+
+        val existingTopic = TopicEntity(
+            id = "t1",
+            headline = "Mom: Are you coming?",
+            summary = "test",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1")).toString(),
+            sourceApps = JSONArray(listOf("WhatsApp")).toString()
+        )
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(newNotif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(existingTopic)
+        coEvery { notificationRepo.getByIds(listOf("n1")) } returns listOf(existingNotif)
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify(exactly = 0) { topicRepo.updateTopicMembers(eq("t1"), any(), any(), any()) }
+        coVerify { topicRepo.saveTopic(any()) }
+    }
+
+    @Test
+    fun `defers notifications with null embedding without marking processed`() = runTest {
+        val notif = notification(id = "n1", embedding = null)
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(notif)
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics()
+
+        coVerify(exactly = 0) { notificationRepo.markProcessedForTopics(any()) }
+        coVerify(exactly = 0) { topicRepo.saveTopic(any()) }
+    }
+
+    @Test
+    fun `full rebuild resets flags and clears topics`() = runTest {
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnembedded(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns emptyList()
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics(fullRebuild = true)
+
+        coVerify { notificationRepo.resetAllProcessedFlags() }
+        coVerify { topicRepo.clearAndSaveTopics(emptyList()) }
+    }
+
+    @Test
+    fun `full rebuild exits early and preserves pending flag when embeddings are not ready`() = runTest {
+        val notif = notification(embedding = vecBytes(1f, 0f, 0f))
+        TopicEngine.pendingFullRebuild.set(false)
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns listOf(notif)
+        coEvery { notificationRepo.getRecentNotificationsSnapshot() } returns emptyList()
+
+        engine.generateTopics(fullRebuild = true)
+
+        coVerify(exactly = 0) { notificationRepo.markProcessedForTopics(any()) }
+        coVerify(exactly = 0) { topicRepo.saveTopic(any()) }
+        assertTrue(TopicEngine.pendingFullRebuild.get())
+    }
+
+    @Test
+    fun `generateTopics does not run narrative llm inline`() = runTest {
+        val topic = TopicEntity(
+            id = "t1",
+            headline = "Team thread",
+            summary = "old",
+            category = ClassificationResult.MATTERS,
+            notificationIds = JSONArray(listOf("n1", "n2")).toString(),
+            sourceApps = JSONArray(listOf("Teams")).toString(),
+            needsNarrativeRegen = true
+        )
+        val first = notification(id = "n1", title = "Alice", content = "Can you review this?", appName = "Teams")
+        val second = notification(id = "n2", title = "Bob", content = "I will check it.", appName = "Teams")
+
+        coEvery { embeddingProvider.isReady() } returns false
+        coEvery { notificationRepo.getUnprocessedMatters(any(), any()) } returns emptyList()
+        coEvery { topicRepo.getActiveTopicsInWindow(any(), any()) } returns listOf(topic)
+        coEvery { notificationRepo.getByIds(listOf("n1", "n2")) } returns listOf(first, second)
+        coEvery { inferenceProvider.isReady() } returns true
+        coEvery { inferenceProvider.generate(any(), any(), any()) } returns "TITLE: Team Review\nSUMMARY: Alice asked Bob to review the work."
+
+        engine.generateTopics()
+
+        coVerify(exactly = 0) { inferenceProvider.generate(any(), any(), any()) }
+        coVerify(exactly = 0) { topicRepo.updateTopicHeadline(any(), any(), any(), any()) }
+    }
+}

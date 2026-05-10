@@ -2,7 +2,9 @@ package com.focal.data.notification
 
 import android.app.Notification
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
 import android.service.notification.StatusBarNotification
 import com.focal.data.db.entity.NotificationEntity
 
@@ -43,20 +45,33 @@ class NotificationExtractor(private val packageManager: PackageManager) {
     }
 
     private fun extractMessagingStyle(extras: Bundle): String? {
-        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
-        if (messages.isNullOrEmpty()) return null
+        val messageBundles = getMessageBundles(extras) ?: return null
+        val messages = Notification.MessagingStyle.Message.getMessagesFromBundleArray(messageBundles)
 
         val sb = StringBuilder("[")
-        messages.forEachIndexed { index, msg ->
-            if (msg is Bundle) {
-                val sender = msg.getCharSequence("sender")?.toString() ?: "Unknown"
-                val text = msg.getCharSequence("text")?.toString() ?: ""
-                if (index > 0) sb.append(",")
-                sb.append("{\"sender\":\"$sender\",\"text\":\"$text\"}")
-            }
+        messageBundles.forEachIndexed { index, parcelable ->
+            val bundle = parcelable as? Bundle
+            val parsedMessage = messages.getOrNull(index)
+            val sender = bundle?.getCharSequence("sender")?.toString()
+                ?: parsedMessage?.senderPerson?.name?.toString()
+                ?: "Unknown"
+            val text = bundle?.getCharSequence("text")?.toString()
+                ?: parsedMessage?.text?.toString()
+                ?: ""
+            if (index > 0) sb.append(",")
+            sb.append("{\"sender\":\"$sender\",\"text\":\"$text\"}")
         }
         sb.append("]")
         return if (sb.length > 2) sb.toString() else null
+    }
+
+    private fun getMessageBundles(extras: Bundle): Array<Parcelable>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES, Parcelable::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        }
     }
 
     companion object {

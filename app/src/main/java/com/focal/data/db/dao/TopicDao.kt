@@ -52,4 +52,19 @@ interface TopicDao {
         deleteAll()
         insertAll(topics)
     }
+
+    @Query("SELECT * FROM topics WHERE headline != 'BRIEFING' AND updated_at >= :since AND updated_at < :until")
+    suspend fun getActiveTopicsInWindow(since: Long, until: Long): List<TopicEntity>
+
+    @Query("SELECT * FROM topics WHERE headline = 'BRIEFING' AND updated_at >= :since AND updated_at < :until LIMIT 1")
+    suspend fun getBriefingInWindow(since: Long, until: Long): TopicEntity?
+
+    @Query("UPDATE topics SET needs_narrative_regen = 1, updated_at = :timestamp WHERE id = :id")
+    suspend fun markDirty(id: String, timestamp: Long)
+
+    @Query("UPDATE topics SET needs_narrative_regen = 0 WHERE id = :id")
+    suspend fun markClean(id: String)
+
+    @Query("UPDATE topics SET suggested_actions = :actionsJson, updated_at = :timestamp WHERE id = :topicId")
+    suspend fun updateActions(topicId: String, actionsJson: String, timestamp: Long)
 }

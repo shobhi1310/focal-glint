@@ -84,7 +84,7 @@ object DetailTemplates {
         val json = JSONObject().apply {
             put("type", "transactional")
             put("status", status)
-            put("latest_update", latest.content.take(100))
+            put("latest_update", latest.content.takeCodepointSafe(100))
         }
 
         return Pair(json.toString(), "Track order")
@@ -102,7 +102,7 @@ object DetailTemplates {
             put("type", "calendar")
             put("event_name", eventName)
             if (latest.content.isNotBlank()) {
-                put("details", latest.content.take(100))
+                put("details", latest.content.takeCodepointSafe(100))
             }
         }
 
