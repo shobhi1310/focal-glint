@@ -62,6 +62,7 @@ class PulseDetailViewModel @Inject constructor(
             val config = widgetRepository.getConfig(widgetId)
             val rows = if (config != null && config.category != "finance") {
                 widgetRepository.getExtractedData(config.category)
+                    .filter { widgetComputeEngine.isValidRow(it, config.category) }
             } else emptyList()
             val transactions = if (config != null && config.category == "finance") {
                 transactionRepository.getAll()
@@ -158,6 +159,7 @@ class PulseDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(transactions = transactions)
         } else {
             val rows = widgetRepository.getExtractedData(config.category)
+                .filter { widgetComputeEngine.isValidRow(it, config.category) }
             _uiState.value = _uiState.value.copy(rows = rows)
         }
     }
@@ -167,6 +169,9 @@ class PulseDetailViewModel @Inject constructor(
     }
 
     fun onWipe() {
-        viewModelScope.launch { widgetRepository.wipeWidgetData(widgetId) }
+        viewModelScope.launch {
+            widgetRepository.wipeWidgetData(widgetId)
+            reloadData()
+        }
     }
 }

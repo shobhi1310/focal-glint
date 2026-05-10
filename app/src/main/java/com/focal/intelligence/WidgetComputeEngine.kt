@@ -190,7 +190,9 @@ class WidgetComputeEngine(
         val groupField = candidates.firstOrNull { field ->
             data.any { row -> parseField(row.data, field)?.let { it.length > 1 } == true }
         } ?: "sender"
-        val grouped = data.groupBy { parseField(it.data, groupField) ?: "Unknown" }
+        val grouped = data
+            .groupBy { parseField(it.data, groupField) ?: "Unknown" }
+            .filterKeys { key -> key == "Unknown" || (key.length > 1 && key.any { it.isLetterOrDigit() }) }
         val topSender = grouped.maxByOrNull { it.value.size }
         val detailLines = grouped.map { (key, items) ->
             mapOf("label" to key, "value" to "${items.size}")
@@ -250,7 +252,7 @@ class WidgetComputeEngine(
         )
     }
 
-    private fun isValidRow(row: ExtractedDataEntity, category: String): Boolean {
+    internal fun isValidRow(row: ExtractedDataEntity, category: String): Boolean {
         val field = when (category) {
             "work" -> "entity"
             "personal" -> "sender"
