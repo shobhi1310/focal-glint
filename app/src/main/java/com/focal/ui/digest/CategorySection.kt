@@ -32,9 +32,11 @@ fun CategorySection(
     count: Int,
     notifications: List<NotificationEntity>,
     initiallyExpanded: Boolean = true,
+    countPrefix: String = "",
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    val countText = if (countPrefix.isNotBlank()) "$countPrefix $count" else "$count"
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -45,7 +47,7 @@ fun CategorySection(
                 .padding(vertical = 8.dp)
         ) {
             Text(
-                text = "$label · $count",
+                text = "$label · $countText",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Medium
                 ),

@@ -51,7 +51,8 @@ fun AllNotificationsScreen(
                     label = "MATTERS TO YOU",
                     count = state.matters.size,
                     notifications = state.matters,
-                    initiallyExpanded = true
+                    initiallyExpanded = true,
+                    countPrefix = "latest"
                 )
             }
         }
@@ -62,7 +63,8 @@ fun AllNotificationsScreen(
                     label = "NOISE",
                     count = state.noise.size,
                     notifications = state.noise,
-                    initiallyExpanded = false
+                    initiallyExpanded = false,
+                    countPrefix = "latest"
                 )
             }
         }
@@ -73,7 +75,8 @@ fun AllNotificationsScreen(
                     label = "UNCLASSIFIED",
                     count = state.uncategorized.size,
                     notifications = state.uncategorized,
-                    initiallyExpanded = true
+                    initiallyExpanded = true,
+                    countPrefix = "latest"
                 )
             }
         }
