@@ -260,7 +260,19 @@ class WidgetComputeEngine(
             else -> return true
         }
         val value = parseField(row.data, field) ?: return false
-        return value.length > 1 && value.any { it.isLetterOrDigit() }
+        if (value.length <= 1 || !value.any { it.isLetterOrDigit() }) return false
+        if (category == "personal") {
+            val lower = value.lowercase().trim()
+            if (lower in GENERIC_SENDER_LABELS || lower.startsWith("app:")) return false
+        }
+        return true
+    }
+
+    companion object {
+        private val GENERIC_SENDER_LABELS = setOf(
+            "citizen", "user", "customer", "member", "system",
+            "you", "me", "unknown", "sender", "admin"
+        )
     }
 
     private fun parseJson(json: String): JsonObject? {

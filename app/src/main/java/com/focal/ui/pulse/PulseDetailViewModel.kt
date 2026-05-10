@@ -171,6 +171,7 @@ class PulseDetailViewModel @Inject constructor(
     fun onWipe() {
         viewModelScope.launch {
             widgetRepository.wipeWidgetData(widgetId)
+            widgetComputeEngine.computeAll()
             reloadData()
         }
     }

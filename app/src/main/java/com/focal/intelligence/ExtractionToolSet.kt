@@ -76,7 +76,7 @@ class ExtractPersonalTool : ToolSet {
     @Tool("Call only when a real named person directly sent the user a 1-on-1 message or placed a call — the communication is intentionally addressed to this specific user. Skip: broadcast or channel posts sent to many people at once, meeting reminders and calendar alerts, automated system messages, social activity notifications (reactions, follows, story posts, likes), professional network alerts, and any notification where an app or service is the sender rather than a real individual.")
     fun extractPersonal(
         @ToolParam("1-based index of the notification") index: Int,
-        @ToolParam("Full name of the real person who sent the message or call — not an app, channel, or automated sender") sender: String,
+        @ToolParam("Full name of the real person who sent the message or call — never a generic label like Citizen, User, Customer, Member, You, App, or System; if no real human name is present do not call this tool") sender: String,
         @ToolParam("How they reached out: call, message, email, or dm") channel: String,
         @ToolParam("Number of messages or call attempts, default 1") count: Int,
         @ToolParam("Brief snippet of what they said, if visible") snippet: String
