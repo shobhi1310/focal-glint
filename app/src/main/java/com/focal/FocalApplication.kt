@@ -34,7 +34,6 @@ class FocalApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         ThemePreference.initialize(this)
-        DebugLogger.init(this)
         cancelOrphanedWork()
         seedDefaultRules()
         migrateTopicClusteringIfNeeded()
