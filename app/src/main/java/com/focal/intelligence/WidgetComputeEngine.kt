@@ -194,13 +194,29 @@ class WidgetComputeEngine(
             .groupBy { parseField(it.data, groupField) ?: "Unknown" }
             .filterKeys { key -> key == "Unknown" || (key.length > 1 && key.any { it.isLetterOrDigit() }) }
         val topSender = grouped.maxByOrNull { it.value.size }
-        val detailLines = grouped.map { (key, items) ->
-            mapOf("label" to key, "value" to "${items.size}")
+        val detailLines = grouped
+            .entries
+            .sortedByDescending { it.value.size }
+            .map { (key, items) -> mapOf("label" to key, "value" to "${items.size}") }
+
+        val uniqueCount = grouped.size
+        val topName = topSender?.key ?: ""
+        val headline = when (config.category) {
+            "personal" -> "$uniqueCount ${if (uniqueCount == 1) "person" else "people"}"
+            "work" -> "$uniqueCount ${if (uniqueCount == 1) "item" else "items"}"
+            "logistics" -> "$uniqueCount ${if (uniqueCount == 1) "order" else "orders"}"
+            else -> "$uniqueCount"
+        }
+        val subtitle = when (config.category) {
+            "personal" -> if (topName.isNotBlank()) "$topName reached out most" else null
+            "work" -> if (topName.isNotBlank()) "$topName most active" else null
+            else -> null
         }
 
         return WidgetStateEntity(
             widgetId = config.id,
-            headline = "${topSender?.key ?: ""} · ${data.size}",
+            headline = headline,
+            subtitle = subtitle,
             detailJson = Json.encodeToString(detailLines),
             sourceAppIcons = Json.encodeToString(sourceApps),
             itemCount = data.size
