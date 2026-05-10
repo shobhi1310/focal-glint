@@ -116,7 +116,8 @@ object PromptBuilder {
 
         "Urgency order: the action the user should take first goes in slot 1.\n\n" +
 
-        "App index: use the index number from the AVAILABLE APPS list — not the app name string.\n\n" +
+        "App index: use the index number from the AVAILABLE APPS list — not the app name string. " +
+        "Pick only from that list. Never invent or substitute another app, even if it would be more convenient.\n\n" +
 
         "Output the tool call only. No prose."
 
@@ -125,17 +126,15 @@ object PromptBuilder {
      * available apps list so the caller can construct GenerateTopicCardTool with the same order.
      */
     fun buildTopicPromptWithApps(notifications: List<NotificationEntity>): Pair<String, List<Pair<String, String>>> {
-        // Build ordered list: system apps first, then topic apps (deduplicated by package)
+        // Restrict actions to apps that actually posted notifications in this topic.
+        // Without this, the model invents actions in unrelated apps (e.g. suggesting
+        // "send a message" in Messages for an Outlook+Teams topic).
         val seen = mutableSetOf<String>()
-        val orderedApps = mutableListOf<Pair<String, String>>()
-        SYSTEM_APPS.forEach { (name, pkg) ->
-            if (seen.add(pkg)) orderedApps.add(name to pkg)
-        }
-        notifications
+        val orderedApps = notifications
             .filter { it.packageName.isNotBlank() }
             .distinctBy { it.packageName }
-            .forEach { n ->
-                if (seen.add(n.packageName)) orderedApps.add(n.appName to n.packageName)
+            .mapNotNull { n ->
+                if (seen.add(n.packageName)) n.appName to n.packageName else null
             }
 
         val sb = StringBuilder()
@@ -159,9 +158,4 @@ object PromptBuilder {
     fun buildTopicPrompt(notifications: List<NotificationEntity>): String =
         buildTopicPromptWithApps(notifications).first
 
-    private val SYSTEM_APPS = mapOf(
-        "Phone" to "com.android.phone",
-        "Messages" to "com.google.android.apps.messaging",
-        "Chrome" to "com.android.chrome"
-    )
 }
