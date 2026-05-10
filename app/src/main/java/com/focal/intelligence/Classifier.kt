@@ -5,8 +5,10 @@ import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.repository.WidgetRepository
 import com.google.ai.edge.litertlm.ToolSet
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 
 private const val TAG = "Classifier"
 private val TOOL_ECHO_PREFIX = Regex("""^classifyNotification\s*[\(\{]""")
@@ -49,20 +51,26 @@ class Classifier(
             var toolCallCount = 0
 
             val systemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus())
-            inferenceProvider.generateWithTools(systemPrompt, prompt, listOf(tool))
-                .catch { e ->
-                    Log.e(TAG, "stream error: ${e.message}", e)
-                    throw e
-                }
-                .collect { message ->
-                    val calls = message.toolCalls
-                    calls?.forEachIndexed { i, call ->
-                        Log.i(TAG, "toolCall[$i]: name=${call.name} args=${call.arguments}")
-                        toolCallCount++
+            // NonCancellable: the litertlm SDK spawns a native worker thread on each
+            // sendMessageAsync. cancelProcess() is advisory — the JNI thread will fire
+            // onDone() regardless. If we let cancellation unwind this collect early,
+            // engine.close() can run while JNI is still alive → SIGSEGV on onDone.
+            withContext(NonCancellable) {
+                inferenceProvider.generateWithTools(systemPrompt, prompt, listOf(tool))
+                    .catch { e ->
+                        Log.e(TAG, "stream error: ${e.message}", e)
+                        throw e
                     }
-                    rawResponse.append(message.toString())
-                    messageCount++
-                }
+                    .collect { message ->
+                        val calls = message.toolCalls
+                        calls?.forEachIndexed { i, call ->
+                            Log.i(TAG, "toolCall[$i]: name=${call.name} args=${call.arguments}")
+                            toolCallCount++
+                        }
+                        rawResponse.append(message.toString())
+                        messageCount++
+                    }
+            }
 
             val finalText = ThinkingMode.stripThoughtBlocks(rawResponse.toString()).trim()
             val toolExecuted = wasToolExecuted(tool)
@@ -123,15 +131,18 @@ class Classifier(
             var toolCallCount = 0
 
             val classifySystemPrompt = PromptBuilder.buildClassificationSystemPrompt(modelManager?.getUserFocus())
-            inferenceProvider.generateWithTools(classifySystemPrompt, prompt, listOf(tool))
-                .catch { e -> Log.e(TAG, "batch stream error: ${e.message}", e); throw e }
-                .collect { message ->
-                    message.toolCalls?.forEachIndexed { i, call ->
-                        Log.i(TAG, "batch toolCall[$i]: name=${call.name} args=${call.arguments}")
-                        toolCallCount++
+            // NonCancellable — see comment in classify() above for rationale.
+            withContext(NonCancellable) {
+                inferenceProvider.generateWithTools(classifySystemPrompt, prompt, listOf(tool))
+                    .catch { e -> Log.e(TAG, "batch stream error: ${e.message}", e); throw e }
+                    .collect { message ->
+                        message.toolCalls?.forEachIndexed { i, call ->
+                            Log.i(TAG, "batch toolCall[$i]: name=${call.name} args=${call.arguments}")
+                            toolCallCount++
+                        }
+                        messageCount++
                     }
-                    messageCount++
-                }
+            }
 
             Log.i(TAG, "batch done: messages=$messageCount toolCalls=$toolCallCount classified=${tool.resultCount()}/${notifications.size}")
 

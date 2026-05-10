@@ -21,13 +21,16 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.util.concurrent.Executors
 import javax.inject.Inject
 
@@ -238,23 +241,54 @@ class LiteRtLmProvider @Inject constructor(
     override fun isReady(): Boolean = engine != null
 
     override fun close() {
-        Log.i(TAG, "Closing engine. Active conversation will be dropped immediately if present.")
-        // Cancel any ongoing decode first so the JNI worker thread stops before we tear down
-        // the engine. Without this, engine?.close() races with RunDecodeAsync → SIGSEGV.
-        activeConversation?.let {
-            try { it.cancelProcess() } catch (_: Exception) {}
-            try { if (it.isAlive) it.close() } catch (_: Exception) {}
+        Log.i(TAG, "Closing engine. Waiting for in-flight inference to drain (up to ${CLOSE_DRAIN_TIMEOUT_MS}ms)...")
+        // The litertlm SDK's cancelProcess()/Conversation.close() are advisory — they don't
+        // synchronously join the JNI worker thread. If we run engine.close() while the JNI
+        // thread is still decoding or executing tools (especially under automaticToolCalling),
+        // its onDone callback dereferences freed engine state → SIGSEGV.
+        //
+        // inferenceMutex is held for the entire duration of generateWithTools(), released
+        // only after the channelFlow's outer finally runs (which happens after the consumer's
+        // collect{} returns, i.e. after the SDK's flow completes). Callers using
+        // automaticToolCalling=true wrap their collect in NonCancellable so the in-flight
+        // call runs to natural completion. Acquiring the mutex here therefore guarantees
+        // the JNI thread has fully exited before we tear down.
+        //
+        // WorkManager's cancelAndWait does NOT wait for the worker's coroutine to finish —
+        // it returns as soon as WorkInfo.state is CANCELLED, which happens the moment the
+        // future is cancelled. So we cannot rely on cancelAndWait alone; this mutex wait is
+        // the actual synchronization point.
+        val acquiredMutex = runBlocking {
+            try {
+                withTimeout(CLOSE_DRAIN_TIMEOUT_MS) {
+                    inferenceMutex.lock()
+                }
+                true
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "Timeout (${CLOSE_DRAIN_TIMEOUT_MS}ms) draining in-flight inference; forcing close (may crash)")
+                false
+            }
         }
-        activeConversation = null
-        engine?.close()
-        engine = null
-        llmDispatcher.close()
-        Log.i(TAG, "Engine resources released")
-        Log.i(TAG, "LLM engine has stopped completely (isReady=${isReady()})")
+        try {
+            activeConversation?.let {
+                try { if (it.isAlive) it.close() } catch (_: Exception) {}
+            }
+            activeConversation = null
+            engine?.close()
+            engine = null
+            llmDispatcher.close()
+            Log.i(TAG, "Engine resources released")
+            Log.i(TAG, "LLM engine has stopped completely (isReady=${isReady()})")
+        } finally {
+            if (acquiredMutex) {
+                try { inferenceMutex.unlock() } catch (_: Exception) {}
+            }
+        }
     }
 
     companion object {
         private const val TAG = "LiteRtLmProvider"
+        private const val CLOSE_DRAIN_TIMEOUT_MS = 30_000L
     }
 }
 

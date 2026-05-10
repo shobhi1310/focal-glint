@@ -3,8 +3,10 @@ package com.focal.intelligence
 import android.util.Log
 import com.focal.data.db.entity.NotificationEntity
 import com.google.ai.edge.litertlm.ToolSet
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 
 internal data class BatchConversationRequest(
     val systemPrompt: String,
@@ -46,11 +48,16 @@ internal class BatchConversationRunner(
         classifyTool: BatchClassifyNotificationTool,
         notificationCount: Int
     ) {
-        session.send(PromptBuilder.buildClassificationPassPrompt(batchPrompt))
-            .catch { e -> Log.e(TAG, "pass1 error: ${e.message}", e); throw e }
-            .collect { message ->
-                message.toolCalls?.forEach { call -> Log.i(TAG, "pass1 toolCall: name=${call.name}") }
-            }
+        // NonCancellable: JNI worker thread can't be safely interrupted; let the call
+        // complete naturally so engine.close() (which waits on inferenceMutex) doesn't
+        // race with onDone() → SIGSEGV.
+        withContext(NonCancellable) {
+            session.send(PromptBuilder.buildClassificationPassPrompt(batchPrompt))
+                .catch { e -> Log.e(TAG, "pass1 error: ${e.message}", e); throw e }
+                .collect { message ->
+                    message.toolCalls?.forEach { call -> Log.i(TAG, "pass1 toolCall: name=${call.name}") }
+                }
+        }
 
         Log.i(TAG, "pass1 done: classified=${classifyTool.resultCount()}/$notificationCount")
     }
@@ -67,11 +74,14 @@ internal class BatchConversationRunner(
             val before = classifyTool.resultCount()
             val retryPrompt = buildClassificationRetryPrompt(missingIndices)
             Log.w(TAG, "pass1 retry ${attempt + 1}: missing=${missingIndices.joinToString(",")}")
-            session.send(retryPrompt)
-                .catch { e -> Log.w(TAG, "pass1 retry error: ${e.message}", e) }
-                .collect { message ->
-                    message.toolCalls?.forEach { call -> Log.i(TAG, "pass1 retry toolCall: name=${call.name}") }
-                }
+            // NonCancellable — see runClassificationPass for rationale.
+            withContext(NonCancellable) {
+                session.send(retryPrompt)
+                    .catch { e -> Log.w(TAG, "pass1 retry error: ${e.message}", e) }
+                    .collect { message ->
+                        message.toolCalls?.forEach { call -> Log.i(TAG, "pass1 retry toolCall: name=${call.name}") }
+                    }
+            }
 
             if (classifyTool.resultCount() <= before) {
                 Log.w(TAG, "pass1 retry made no progress; classified=${classifyTool.resultCount()}/$notificationCount")
@@ -91,11 +101,14 @@ internal class BatchConversationRunner(
         val bankIndices = mattersIndices.filter { request.notifications[it - 1].isBankTransaction }
         val extractionPrompt = PromptBuilder.buildExtractionPassPrompt(mattersIndices, bankIndices)
 
-        session.send(extractionPrompt)
-            .catch { e -> Log.w(TAG, "pass2 error: ${e.message}", e) }
-            .collect { message ->
-                message.toolCalls?.forEach { call -> Log.i(TAG, "pass2 toolCall: name=${call.name}") }
-            }
+        // NonCancellable — see runClassificationPass for rationale.
+        withContext(NonCancellable) {
+            session.send(extractionPrompt)
+                .catch { e -> Log.w(TAG, "pass2 error: ${e.message}", e) }
+                .collect { message ->
+                    message.toolCalls?.forEach { call -> Log.i(TAG, "pass2 toolCall: name=${call.name}") }
+                }
+        }
 
         val extractionResults = ExtractionToolFactory.collectResults(request.extractionTools)
         val noExtractionTool = request.extractionTools[ExtractionCategoryRegistry.NONE] as? NoExtractionTool

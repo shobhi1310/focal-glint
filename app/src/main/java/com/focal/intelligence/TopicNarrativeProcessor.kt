@@ -5,7 +5,9 @@ import com.focal.data.db.entity.NotificationEntity
 import com.focal.data.db.entity.TopicEntity
 import com.focal.data.repository.NotificationRepository
 import com.focal.data.repository.TopicRepository
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,12 +75,20 @@ class TopicNarrativeProcessor @Inject constructor(
                 val systemPrompt = PromptBuilder.buildTopicSystemPrompt()
                 val (prompt, availableApps) = PromptBuilder.buildTopicPromptWithApps(members)
                 val tool = GenerateTopicCardTool(availableApps)
-                inferenceProvider.generateWithTools(
-                    systemInstruction = systemPrompt,
-                    prompt = prompt,
-                    tools = listOf(tool),
-                    automaticToolCalling = true
-                ).collect {}
+                // NonCancellable: with automaticToolCalling=true, the litertlm JNI worker thread
+                // can't be safely interrupted mid-flight (cancelProcess is advisory, JNI keeps
+                // running through tool calls until onDone). If we let cancellation propagate
+                // here, engine.close() during user "stop" runs while the native thread is still
+                // alive → SIGSEGV in JniMessageCallbackImpl.onDone. Letting the call complete
+                // naturally (~10–15s) is the only safe option.
+                withContext(NonCancellable) {
+                    inferenceProvider.generateWithTools(
+                        systemInstruction = systemPrompt,
+                        prompt = prompt,
+                        tools = listOf(tool),
+                        automaticToolCalling = true
+                    ).collect {}
+                }
                 if (tool.isComplete()) {
                     isLlmGenerated = true
                     summary = tool.summary!!
