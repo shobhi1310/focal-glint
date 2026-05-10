@@ -10,7 +10,11 @@ data class ChatCompletionRequest(
     val tools: List<ToolDefinition>? = null,
     @SerialName("tool_choice") val toolChoice: String? = "auto",
     @SerialName("max_tokens") val maxTokens: Int = 512,
-    val temperature: Double = 0.1
+    val temperature: Double = 1.0,
+    @SerialName("top_k") val topK: Int = 64,
+    @SerialName("top_p") val topP: Double = 0.95,
+    @SerialName("chat_template_kwargs") val chatTemplateKwargs: Map<String, Boolean>? = null,
+    @SerialName("reasoning_budget") val reasoningBudget: Int? = null
 )
 
 @Serializable

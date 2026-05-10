@@ -95,7 +95,11 @@ try:
             {"role": "user", "content": "Say hello in exactly 3 words."}
         ],
         "max_tokens": 50,
-        "temperature": 0.1
+        "temperature": 1.0,
+        "top_k": 64,
+        "top_p": 0.95,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_budget": 0
     }
     start = time.time()
     r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
@@ -164,7 +168,11 @@ try:
         "tools": [CLASSIFY_TOOL],
         "tool_choice": "auto",
         "max_tokens": 512,
-        "temperature": 0.1
+        "temperature": 1.0,
+        "top_k": 64,
+        "top_p": 0.95,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_budget": 0
     }
     start = time.time()
     r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
@@ -269,7 +277,11 @@ try:
         "tools": [CLASSIFY_TOOL, EXTRACT_FINANCE_TOOL, EXTRACT_LOGISTICS_TOOL],
         "tool_choice": "auto",
         "max_tokens": 1024,
-        "temperature": 0.1
+        "temperature": 1.0,
+        "top_k": 64,
+        "top_p": 0.95,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_budget": 0
     }
     start = time.time()
     r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL, headers=HEADERS)
@@ -338,7 +350,12 @@ try:
     payload = {
         "model": MODEL,
         "messages": [{"role": "user", "content": "Say ok."}],
-        "max_tokens": 10
+        "max_tokens": 10,
+        "temperature": 1.0,
+        "top_k": 64,
+        "top_p": 0.95,
+        "chat_template_kwargs": {"enable_thinking": False},
+        "reasoning_budget": 0
     }
     consent_headers = {**HEADERS, "X-Focal-Consent": "true"}
     r = requests.post(CHAT_URL, json=payload, timeout=TIMEOUT, verify=VERIFY_SSL,

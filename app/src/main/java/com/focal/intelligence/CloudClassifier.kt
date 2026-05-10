@@ -24,7 +24,10 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "CloudClassifier"
 
-private val json = Json { ignoreUnknownKeys = true }
+private val json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
 
 class CloudClassifier(
     private val modelManager: ModelManager,
@@ -56,7 +59,8 @@ class CloudClassifier(
             tools = listOf(buildClassifyToolDefinition()),
             toolChoice = "auto",
             maxTokens = 512 + (notifications.size * 40),
-            temperature = 0.1
+            chatTemplateKwargs = mapOf("enable_thinking" to false),
+            reasoningBudget = 0
         )
 
         return try {
@@ -108,7 +112,8 @@ class CloudClassifier(
             tools = tools,
             toolChoice = "auto",
             maxTokens = 1024 + (notifications.size * 80),
-            temperature = 0.1
+            chatTemplateKwargs = mapOf("enable_thinking" to false),
+            reasoningBudget = 0
         )
 
         return try {
