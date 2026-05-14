@@ -1,0 +1,45 @@
+---
+---
+
+/* Override jekyll-theme-minimal narrow width */
+.wrapper {
+  max-width: 960px;
+  width: 100%;
+}
+
+section {
+  max-width: 960px;
+}
+
+header {
+  max-width: 260px;
+}
+
+@media print, screen and (max-width: 960px) {
+  header {
+    position: relative;
+    max-width: 100%;
+    float: none;
+    width: auto;
+  }
+
+  section {
+    max-width: 100%;
+    float: none;
+    width: auto;
+    padding: 0 20px;
+  }
+
+  .wrapper {
+    width: auto;
+    padding: 0 12px;
+  }
+}
+
+@media print, screen and (min-width: 961px) {
+  section {
+    width: 660px;
+    float: right;
+    padding-bottom: 50px;
+  }
+}

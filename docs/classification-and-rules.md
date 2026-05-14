@@ -5,7 +5,7 @@ description: How Focal decides what matters and what's noise using the rules eng
 
 # Classification & rules
 
-Every notification Focal intercepts gets a label: **Matters**, **Noise**, or **Auto**. This page covers the two systems that make that decision — the deterministic rules engine and the LLM classifier.
+Every notification Focal intercepts gets a label: **Matters**, **Noise**, or **Auto**. This page covers the two systems that make that decision . the deterministic rules engine and the LLM classifier.
 
 ---
 
@@ -62,7 +62,7 @@ Matches a sender pattern within a specific app. Checks notification title agains
 }
 ```
 
-This catches bank SMS within the Messages app — the notification title contains the bank's shortcode.
+This catches bank SMS within the Messages app . the notification title contains the bank's shortcode.
 
 **3. `app_match` (lowest priority)**
 
@@ -85,7 +85,7 @@ Every time a rule fires, its `hit_count` is incremented. This gives visibility i
 
 ### "Auto" rules
 
-A rule can specify `"auto"` as its category. This doesn't classify the notification — it explicitly lets it fall through to the LLM. The notification remains uncategorized and the rule is skipped (not counted as a hit).
+A rule can specify `"auto"` as its category. This doesn't classify the notification . it explicitly lets it fall through to the LLM. The notification remains uncategorized and the rule is skipped (not counted as a hit).
 
 ---
 
@@ -111,7 +111,7 @@ User focus:
 "Track my UPI spends from GPay and PhonePe. Show me when Shruti or Amma messages. Flag HDFC and ICICI bank alerts."
 ```
 
-The model uses this to personalize classification. It knows to flag UPI payment notifications, prioritize specific contacts, and surface specific bank alerts — even without explicit rules.
+The model uses this to personalize classification. It knows to flag UPI payment notifications, prioritize specific contacts, and surface specific bank alerts . even without explicit rules.
 
 ---
 
@@ -162,7 +162,7 @@ The `collect {}` block that reads the stream runs inside `withContext(NonCancell
 
 ```
 LiteRT-LM spawns a native worker thread for inference. cancelProcess()
-is advisory — the JNI thread will fire onDone() regardless. If we let
+is advisory . the JNI thread will fire onDone() regardless. If we let
 coroutine cancellation unwind collect() early, engine.close() can run
 while JNI is still alive → SIGSEGV in onDone callback.
 ```
@@ -204,7 +204,7 @@ After the stream completes, `BatchClassificationResultMapper.missingIndices()` c
 
 ```kotlin
 fun missingIndices(tool: BatchClassifyNotificationTool, notificationCount: Int): List<Int> =
-    (1..notificationCount).filter { tool.getResult(it) == null }
+    (1.notificationCount).filter { tool.getResult(it) == null }
 ```
 
 Missing indices are left in `"pending"` state for the next worker cycle.
@@ -213,7 +213,7 @@ Missing indices are left in `"pending"` state for the next worker cycle.
 
 For classification, `automaticToolCalling = false`. This means the model must explicitly invoke tool calls in its text output. The tool call stream is collected and each call is processed by `BatchClassifyNotificationTool`.
 
-This is intentional. Enabling automatic tool calling for classification would mean we can't audit whether every notification was classified — the runtime handles it silently.
+This is intentional. Enabling automatic tool calling for classification would mean we can't audit whether every notification was classified . the runtime handles it silently.
 
 ---
 
@@ -243,15 +243,15 @@ For the combined classify+extract, `automaticToolCalling = true`. This is necess
 `CloudClassifier` provides optional cloud-based classification:
 
 ```kotlin
-suspend fun classifyBatch(notifications: List<NotificationEntity>): List<Pair<...>>
-suspend fun classifyAndExtractBatch(notifications: List<NotificationEntity>, categories: List<String>): List<Pair<...>>
+suspend fun classifyBatch(notifications: List<NotificationEntity>): List<Pair<.>>
+suspend fun classifyAndExtractBatch(notifications: List<NotificationEntity>, categories: List<String>): List<Pair<.>>
 ```
 
 Configured in Developer Settings:
-- `cloud_inference_enabled` — toggle on/off
-- `cloud_endpoint` — API URL
-- `cloud_api_key` — authentication
-- `cloud_model_name` — model to use
+- `cloud_inference_enabled` . toggle on/off
+- `cloud_endpoint` . API URL
+- `cloud_api_key` . authentication
+- `cloud_model_name` . model to use
 
 When enabled, `Classifier.classifyBatch()` and `classifyAndExtractBatch()` check `modelManager.isCloudEnabled()` first and delegate to the cloud if true. Cloud results are written to the same database columns as on-device results.
 
@@ -264,12 +264,12 @@ All prompt text is sanitized before entering native code. Java/Kotlin strings ca
 `String.sanitizeForJni()` strips these characters at every JNI boundary:
 - `generate()`, `generateWithTools()`, and `startConversation()->send()` all sanitize before crossing into native code
 - This prevents `SIGABRT` from the LiteRT-LM native library
-- Callers never need to worry about it — the inference provider handles it transparently
+- Callers never need to worry about it . the inference provider handles it transparently
 
 ---
 
 ## What to read next
 
-- [LLM inference pipeline](inference-pipeline.html) — how the model is actually invoked and managed
-- [Extraction & widgets](extraction-and-widgets.html) — what gets extracted and how widgets consume it
-- [Architecture & internals](architecture.html) — all the backend plumbing
+- [LLM inference pipeline](inference-pipeline.html) . how the model is actually invoked and managed
+- [Extraction & widgets](extraction-and-widgets.html) . what gets extracted and how widgets consume it
+- [Architecture & internals](architecture.html) . all the backend plumbing

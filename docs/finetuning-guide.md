@@ -7,7 +7,7 @@ description: How Focal's Gemma 4 E2B model is fine-tuned for notification triage
 
 Focal's on-device model is a fine-tuned version of Gemma 4 E2B. The base model is great at general reasoning, but Focal needs it to be excellent at one specific thing: reading a batch of Android notifications and emitting structured tool calls that classify and extract data.
 
-This page explains the entire pipeline — dataset design, how records are built, training configuration, and verification.
+This page explains the entire pipeline . dataset design, how records are built, training configuration, and verification.
 
 ---
 
@@ -15,10 +15,10 @@ This page explains the entire pipeline — dataset design, how records are built
 
 Gemma 4 E2B is 2.58 GB and runs locally. The base model can classify and extract when given good prompts, but fine-tuning makes it:
 
-- **Reliable** — every notification gets classified, no missed indices
-- **Consistent** — uses the exact snake_case reasons the app expects
-- **Efficient** — lower temperature at inference, faster output, fewer tokens wasted on prose
-- **Dedup-aware** — learns to collapse cross-channel echoes (same transaction across SMS + email + app push)
+- **Reliable** . every notification gets classified, no missed indices
+- **Consistent** . uses the exact snake_case reasons the app expects
+- **Efficient** . lower temperature at inference, faster output, fewer tokens wasted on prose
+- **Dedup-aware** . learns to collapse cross-channel echoes (same transaction across SMS + email + app push)
 
 Fine-tuning was done using [Unsloth](https://github.com/unslothai/unsloth) on Colab with LoRA adapters.
 
@@ -28,8 +28,8 @@ Fine-tuning was done using [Unsloth](https://github.com/unslothai/unsloth) on Co
 
 For a batch of up to 10 Android notifications, the model emits two kinds of tool calls:
 
-1. **`classifyNotification(index, category, reason)`** — exactly once per notification
-2. **`extract<Category>(...)`** — only for `matters` notifications, only when parseable data exists
+1. **`classifyNotification(index, category, reason)`** . exactly once per notification
+2. **`extract<Category>(.)`** . only for `matters` notifications, only when parseable data exists
 
 The model outputs **tool calls only. No prose.** This keeps inference fast and output deterministic.
 
@@ -47,7 +47,7 @@ The model outputs **tool calls only. No prose.** This keeps inference fast and o
 
 ## Dataset format
 
-Training data lives in a JSONL file — one JSON object per line. Each record is a complete training example:
+Training data lives in a JSONL file . one JSON object per line. Each record is a complete training example:
 
 ```json
 {
@@ -55,16 +55,16 @@ Training data lives in a JSONL file — one JSON object per line. Each record is
   "messages": [
     {"role": "system", "content": "<system prompt>"},
     {"role": "user", "content": "<batch of 10 notifications>"},
-    {"role": "assistant", "content": "", "tool_calls": [...]}
+    {"role": "assistant", "content": "", "tool_calls": [.]}
   ],
-  "tools": [...]
+  "tools": [.]
 }
 ```
 
 **Key invariants:**
-- `assistant.content` is always the empty string `""` — never `null`, never prose
+- `assistant.content` is always the empty string `""` . never `null`, never prose
 - System prompts are byte-identical across all records of the same shape
-- Tool call IDs are sequential (`call_1`, `call_2`, ...) within the assistant turn
+- Tool call IDs are sequential (`call_1`, `call_2`, .) within the assistant turn
 - Classification calls are in index order; extract calls follow, grouped by parent index
 
 ---
@@ -73,19 +73,19 @@ Training data lives in a JSONL file — one JSON object per line. Each record is
 
 Each source batch of 10 notifications produces exactly two training records, with identical user content but different system prompts and tool lists.
 
-### Shape A — classify only
+### Shape A . classify only
 
 The model learns classification in isolation.
 
 **System prompt:**
 
-> You are a notification triage assistant. Your job is to decide whether each notification meaningfully adds value to the user's day or just demands their attention without giving anything back. For every [index] in the list, call classifyNotification exactly once with that same index. Mark it 'matters' if a thoughtful person would want to know about it now — something asks for their attention, response, awareness, or money. Mark it 'noise' if it exists to pull the user into an app, sell them something, surface algorithmic content, or repeat what they already know. Use a short snake_case reason. Output tool calls only — no prose.
+> You are a notification triage assistant. Your job is to decide whether each notification meaningfully adds value to the user's day or just demands their attention without giving anything back. For every [index] in the list, call classifyNotification exactly once with that same index. Mark it 'matters' if a thoughtful person would want to know about it now . something asks for their attention, response, awareness, or money. Mark it 'noise' if it exists to pull the user into an app, sell them something, surface algorithmic content, or repeat what they already know. Use a short snake_case reason. Output tool calls only . no prose.
 
 **Tools available:** `classifyNotification` only.
 
 **Assistant output:** N `classifyNotification` calls (one per notification index).
 
-### Shape B — classify + extract
+### Shape B . classify + extract
 
 The model learns to classify AND extract in a single pass.
 
@@ -178,17 +178,17 @@ Dedup key: `(rounded amount, direction)`.
 
 ### Work extraction
 
-Teams/Outlook only. Dedup by `(sender, entity)` — same person acting on the same item → one call.
+Teams/Outlook only. Dedup by `(sender, entity)` . same person acting on the same item → one call.
 
 ### Personal extraction
 
-Real chats, calls, and email-from-person. Dedup by `(sender, channel)` — collapsed into one call with `count=N` and the latest snippet.
+Real chats, calls, and email-from-person. Dedup by `(sender, channel)` . collapsed into one call with `count=N` and the latest snippet.
 
 Generic sender labels are excluded: `citizen`, `user`, `customer`, `member`, `system`, `admin`. If no real human name is present, the extract tool does not fire.
 
 ### Logistics extraction
 
-Delivery and order updates with a clear merchant + status. Dedup by merchant — picks the most advanced status in the batch:
+Delivery and order updates with a clear merchant + status. Dedup by merchant . picks the most advanced status in the batch:
 
 ```
 delivered > out_for_delivery > shipped > ordered > cancelled
@@ -212,10 +212,10 @@ The input is a notification dump file produced by the Android app's debug loggin
 
 | Script | Purpose |
 |---|---|
-| `append_dataset.py` | State management — tracks offset, provides batch windows |
-| `append_dataset_records.py` | Record builder — takes a batch spec and produces JSONL records |
-| `normalize_dataset.py` | Idempotent fix-up — rewrites all records to canonical form |
-| `verify_dataset.py` | End-to-end verifier — checks script/Kotlin alignment and dataset invariants |
+| `append_dataset.py` | State management . tracks offset, provides batch windows |
+| `append_dataset_records.py` | Record builder . takes a batch spec and produces JSONL records |
+| `normalize_dataset.py` | Idempotent fix-up . rewrites all records to canonical form |
+| `verify_dataset.py` | End-to-end verifier . checks script/Kotlin alignment and dataset invariants |
 
 ### Loop
 
@@ -239,7 +239,7 @@ For each batch of 10 notifications:
     {"index": 2, "category": "noise", "reason": "commercial_app_marketing_or_engagement"}
   ],
   "extracts": [
-    {"name": "extractPersonal", "arguments": {"index": 1, "sender": "...", "channel": "message", "count": 2, "snippet": "..."}}
+    {"name": "extractPersonal", "arguments": {"index": 1, "sender": ".", "channel": "message", "count": 2, "snippet": "."}}
   ]
 }
 ```
@@ -318,10 +318,10 @@ Eval / Save every:       28 steps  (10 evaluations per run)
 
 ### Why this won't overfit
 
-- **2 epochs** — enough to learn the schema, not enough to memorize 1,131 samples
-- **Rank 16** — small adapter capacity, can't memorize the dataset
-- **Dropout 0.05 + weight decay 0.01** — dual regularization
-- **`load_best_model_at_end: true`** — keep the best checkpoint, not the final one
+- **2 epochs** . enough to learn the schema, not enough to memorize 1,131 samples
+- **Rank 16** . small adapter capacity, can't memorize the dataset
+- **Dropout 0.05 + weight decay 0.01** . dual regularization
+- **`load_best_model_at_end: true`** . keep the best checkpoint, not the final one
 
 ---
 
@@ -340,7 +340,7 @@ At inference time, the fine-tuned model runs through the same `InferenceProvider
 
 ## What to read next
 
-- [How Focal works](index.html) — the full story from notification to widget
-- [Classification & rules](classification-and-rules.html) — how the model is invoked at inference time
-- [LLM inference pipeline](inference-pipeline.html) — how the model is loaded and streamed
-- [Technology decisions](tech-decisions.html) — why LiteRT-LM and on-device inference
+- [How Focal works](index.html) . the full story from notification to widget
+- [Classification & rules](classification-and-rules.html) . how the model is invoked at inference time
+- [LLM inference pipeline](inference-pipeline.html) . how the model is loaded and streamed
+- [Technology decisions](tech-decisions.html) . why LiteRT-LM and on-device inference

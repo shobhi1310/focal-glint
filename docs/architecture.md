@@ -5,7 +5,7 @@ description: Database schema, dependency injection, background services, and how
 
 # Architecture & internals
 
-This page covers the internal plumbing. Read [How Focal works](index.html) first if you haven't already — this page assumes you know the overall pipeline.
+This page covers the internal plumbing. Read [How Focal works](index.html) first if you haven't already . this page assumes you know the overall pipeline.
 
 ---
 
@@ -175,31 +175,31 @@ fun provideDatabase(@ApplicationContext context: Context): FocalDatabase
 
 @Provides
 fun provideNotificationDao(db: FocalDatabase): NotificationDao
-// ... 8 more DAO providers following the same pattern
+// . 8 more DAO providers following the same pattern
 ```
 
 ### `RepositoryModule`
 
 Binds repository implementations to their interfaces. The repositories are thin abstractions over DAOs, offering suspend functions tailored to business logic:
 
-- `NotificationRepository` — queries for unclassified, unembedded, unprocessed notifications; bulk classification updates; embedding storage; app profile management
-- `TopicRepository` — CRUD, active topics in window, dirty topic queries, member updates
-- `RuleRepository` — CRUD, priority-ordered rule listing, hit count incrementing
-- `TransactionRepository` — insert, query by notification ID, get all
-- `WidgetRepository` — config CRUD, state management, extracted data queries, active category detection
+- `NotificationRepository` . queries for unclassified, unembedded, unprocessed notifications; bulk classification updates; embedding storage; app profile management
+- `TopicRepository` . CRUD, active topics in window, dirty topic queries, member updates
+- `RuleRepository` . CRUD, priority-ordered rule listing, hit count incrementing
+- `TransactionRepository` . insert, query by notification ID, get all
+- `WidgetRepository` . config CRUD, state management, extracted data queries, active category detection
 
 ### `IntelligenceModule`
 
 Provides the intelligence layer singletons:
 
-- `InferenceProvider` (singleton) — the LLM inference engine
-- `Classifier` — notification classifier
-- `RulesEngine` — deterministic rule-based classification
-- `TopicEngine` — notification clustering
-- `TopicNarrativeProcessor` — LLM-powered narrative generation
-- `EmbeddingProvider` / `SwitchableEmbeddingProvider` — embedding model access
-- `WidgetComputeEngine` — widget value computation
-- `TransactionCorrelator` — merchant-to-app matching
+- `InferenceProvider` (singleton) . the LLM inference engine
+- `Classifier` . notification classifier
+- `RulesEngine` . deterministic rule-based classification
+- `TopicEngine` . notification clustering
+- `TopicNarrativeProcessor` . LLM-powered narrative generation
+- `EmbeddingProvider` / `SwitchableEmbeddingProvider` . embedding model access
+- `WidgetComputeEngine` . widget value computation
+- `TransactionCorrelator` . merchant-to-app matching
 
 ---
 
@@ -207,21 +207,21 @@ Provides the intelligence layer singletons:
 
 Focal uses a strict singleton pattern for all inference-related components. This is necessary because:
 
-1. **LLM inference is stateful** — the Gemma model holds a KV cache in GPU/CPU memory. Loading two instances would require 2× RAM.
+1. **LLM inference is stateful** . the Gemma model holds a KV cache in GPU/CPU memory. Loading two instances would require 2× RAM.
 
-2. **Embedding model is stateful** — `SentencePieceTokenizer` and `EmbeddingGemmaLiteRtEmbedder` each hold native heap-allocated objects pointed to by `Long` handles. Two instances would duplicate native allocations.
+2. **Embedding model is stateful** . `SentencePieceTokenizer` and `EmbeddingGemmaLiteRtEmbedder` each hold native heap-allocated objects pointed to by `Long` handles. Two instances would duplicate native allocations.
 
-3. **Work queue must be global** — `InferenceWorkQueue` deduplicates work types. Two queues would defeat deduplication.
+3. **Work queue must be global** . `InferenceWorkQueue` deduplicates work types. Two queues would defeat deduplication.
 
 ```kotlin
 @Singleton
-class InferenceWorkQueue @Inject constructor() { ... }
+class InferenceWorkQueue @Inject constructor() { . }
 
 @Singleton
-class TopicNarrativeProcessor @Inject constructor(...) { ... }
+class TopicNarrativeProcessor @Inject constructor(.) { . }
 
 @Singleton
-class WidgetComputeEngine @Inject constructor(...) { ... }
+class WidgetComputeEngine @Inject constructor(.) { . }
 ```
 
 The `InferenceProvider` is a singleton created by `LiteRtLmProviderFactory` in `IntelligenceModule`. It's injected everywhere that needs LLM access.
@@ -241,14 +241,14 @@ Key behaviors:
 
 - Posts a **silent, minimum-priority notification** with title "Focal AI" and body "Processing notifications in the background"
 - Uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` on Android 14+
-- Checks if the engine is enabled on every `onStartCommand` — stops self if disabled
+- Checks if the engine is enabled on every `onStartCommand` . stops self if disabled
 - Handles pending topic rebuilds: if the engine is warm and a rebuild was queued, it enqueues a new `InferenceWorker` run
-- Returns `START_NOT_STICKY` — won't be restarted by the system if killed
+- Returns `START_NOT_STICKY` . won't be restarted by the system if killed
 
 The service is started in three places:
-1. `MainActivity.warmEngines()` — when the app opens and models load
-2. `InferenceWorker.doWork()` — at the start of every inference cycle
-3. `BootReceiver` — after device reboot
+1. `MainActivity.warmEngines()` . when the app opens and models load
+2. `InferenceWorker.doWork()` . at the start of every inference cycle
+3. `BootReceiver` . after device reboot
 
 ---
 
@@ -257,9 +257,9 @@ The service is started in three places:
 `InferenceWorker` is a `CoroutineWorker` registered as a unique work chain with name `"focal_inference"`. It uses `ExistingWorkPolicy.REPLACE` so only one instance runs at a time.
 
 The worker is triggered by:
-1. `FocalNotificationListener` — when new notifications arrive
-2. `LlmForegroundService` — on pending rebuild
-3. `DailyResetWorker` — at 2 AM daily reset
+1. `FocalNotificationListener` . when new notifications arrive
+2. `LlmForegroundService` . on pending rebuild
+3. `DailyResetWorker` . at 2 AM daily reset
 
 ---
 
@@ -279,8 +279,8 @@ The worker is triggered by:
 
 ## What to read next
 
-- [Classification & rules](classification-and-rules.html) — how each notification is triaged
-- [LLM inference pipeline](inference-pipeline.html) — model invocation, streaming, worker lifecycle
-- [Embeddings & clustering](embeddings-and-clustering.html) — JNI bridge, vector math, topic engine
-- [Extraction & widgets](extraction-and-widgets.html) — tool-based data extraction and Pulse dashboard
-- [Technology decisions](tech-decisions.html) — why we made the choices we made
+- [Classification & rules](classification-and-rules.html) . how each notification is triaged
+- [LLM inference pipeline](inference-pipeline.html) . model invocation, streaming, worker lifecycle
+- [Embeddings & clustering](embeddings-and-clustering.html) . JNI bridge, vector math, topic engine
+- [Extraction & widgets](extraction-and-widgets.html) . tool-based data extraction and Pulse dashboard
+- [Technology decisions](tech-decisions.html) . why we made the choices we made

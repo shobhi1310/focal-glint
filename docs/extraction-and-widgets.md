@@ -5,7 +5,7 @@ description: How the LLM extracts structured data from notifications and how Pul
 
 # Extraction & widgets
 
-Focal doesn't just classify and summarize. It pulls structured data out of notifications — amounts, merchants, senders, delivery statuses — and uses it to power live-updating widgets on the Pulse dashboard.
+Focal doesn't just classify and summarize. It pulls structured data out of notifications . amounts, merchants, senders, delivery statuses . and uses it to power live-updating widgets on the Pulse dashboard.
 
 ---
 
@@ -77,7 +77,7 @@ The tool description explicitly tells the model to skip social network activity,
 @Tool("Call only when a real named person directly sent the user a 1-on-1 message or placed a call")
 fun extractPersonal(
     @ToolParam("1-based index of the notification") index: Int,
-    @ToolParam("Full name of the person — never a generic label") sender: String,
+    @ToolParam("Full name of the person . never a generic label") sender: String,
     @ToolParam("How they reached out: call, message, email, or dm") channel: String,
     @ToolParam("Number of messages or call attempts, default 1") count: Int,
     @ToolParam("Brief snippet of what they said, if visible") snippet: String
@@ -102,7 +102,7 @@ private val GENERIC_SENDER_LABELS = setOf(
 )
 ```
 
-If the sender label is generic or starts with `"app:"`, the row is excluded from widgets — these are system/broadcast messages, not real people.
+If the sender label is generic or starts with `"app:"`, the row is excluded from widgets . these are system/broadcast messages, not real people.
 
 ---
 
@@ -112,7 +112,7 @@ If the sender label is generic or starts with `"app:"`, the row is excluded from
 @Tool("Call only when an order the user placed is actively moving through delivery")
 fun extractLogistics(
     @ToolParam("1-based index of the notification") index: Int,
-    @ToolParam("What is being delivered — item name or order description") item: String,
+    @ToolParam("What is being delivered . item name or order description") item: String,
     @ToolParam("The seller or delivery service handling the shipment") merchant: String,
     @ToolParam("Status: shipped, out_for_delivery, delivered, delayed, or cancelled") status: String,
     @ToolParam("Estimated minutes until arrival, or -1 if not stated") etaMinutes: Int
@@ -166,10 +166,10 @@ object BankSmsDetector {
     private val BANK_SENDER_PATTERN = Regex("^[A-Z]{2}-[A-Za-z]{3,}")
 
     // Keywords: debited, credited, sent rs, withdrawn, transferred, etc.
-    private val TRANSACTION_KEYWORDS = listOf("debited", "credited", "sent rs", ...)
+    private val TRANSACTION_KEYWORDS = listOf("debited", "credited", "sent rs", .)
 
     // Exclusions: OTP, verification, login (don't extract auth messages)
-    private val EXCLUSION_KEYWORDS = listOf("otp", "one time password", ...)
+    private val EXCLUSION_KEYWORDS = listOf("otp", "one time password", .)
 
     fun isBankTransaction(packageName: String, title: String, content: String): Boolean
 }
@@ -238,8 +238,8 @@ Takes extracted data and computes widget answers. Runs as the last step in every
 ### Finance widgets (special handling)
 
 Finance widgets merge data from two sources:
-1. **Extracted data** (category = `finance`) — from UPI payment notifications
-2. **Transactions** (from `TransactionEntity`) — from bank SMS extraction
+1. **Extracted data** (category = `finance`) . from UPI payment notifications
+2. **Transactions** (from `TransactionEntity`) . from bank SMS extraction
 
 ```kotlin
 private suspend fun computeFinanceFromTransactions(config): WidgetStateEntity {
@@ -259,7 +259,7 @@ private suspend fun computeFinanceFromTransactions(config): WidgetStateEntity {
 
 ### Grouped detail lines
 
-Most operations produce `detailJson` — a JSON array of label/value pairs for the drill-down view:
+Most operations produce `detailJson` . a JSON array of label/value pairs for the drill-down view:
 
 ```json
 [
@@ -271,7 +271,7 @@ Most operations produce `detailJson` — a JSON array of label/value pairs for t
 
 ### Source app icons
 
-Each widget state includes `sourceAppIcons` — a JSON array of package names:
+Each widget state includes `sourceAppIcons` . a JSON array of package names:
 
 ```json
 ["com.google.android.apps.nbu.paisa.user", "com.phonepe.app"]
@@ -303,9 +303,9 @@ This enables the Pulse detail screen to show "paid via GPay" next to a bank tran
 Users create widgets through `PulseWizard`:
 
 1. **Pick a question** from templates or type custom text
-2. **Select category** — finance, work, personal, logistics
-3. **Choose operation** — sum, count, latest, etc.
-4. **Optional app filters** — limit to notifications from specific apps
+2. **Select category** . finance, work, personal, logistics
+3. **Choose operation** . sum, count, latest, etc.
+4. **Optional app filters** . limit to notifications from specific apps
 
 The wizard creates a `WidgetConfigEntity` row. From that point on, the `WidgetComputeEngine` updates the widget's state every inference cycle.
 
@@ -345,7 +345,7 @@ fun isValidRow(row: ExtractedDataEntity, category: String): Boolean {
 
 ## What to read next
 
-- [Classification & rules](classification-and-rules.html) — classification happens in the same LLM pass
-- [Embeddings & clustering](embeddings-and-clustering.html) — how matters notifications are clustered
-- [LLM inference pipeline](inference-pipeline.html) — how the model is invoked
-- [Architecture & internals](architecture.html) — widget_configs and widget_state tables
+- [Classification & rules](classification-and-rules.html) . classification happens in the same LLM pass
+- [Embeddings & clustering](embeddings-and-clustering.html) . how matters notifications are clustered
+- [LLM inference pipeline](inference-pipeline.html) . how the model is invoked
+- [Architecture & internals](architecture.html) . widget_configs and widget_state tables

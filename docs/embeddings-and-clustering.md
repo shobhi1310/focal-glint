@@ -5,7 +5,7 @@ description: How notifications are converted to vectors and grouped into topics 
 
 # Embeddings & clustering
 
-Notifications are text. Computers need numbers. Focal converts every "matters" notification into a 768-dimensional vector, then groups similar vectors into topics. This page covers the entire embedding pipeline — from text to vector to topic.
+Notifications are text. Computers need numbers. Focal converts every "matters" notification into a 768-dimensional vector, then groups similar vectors into topics. This page covers the entire embedding pipeline . from text to vector to topic.
 
 ---
 
@@ -87,7 +87,7 @@ static jintArray nativeEncode(JNIEnv* env, jobject, jlong handle, jstring text) 
 
 ## EmbeddingGemmaLiteRtEmbedder
 
-The embedding model is EmbeddingGemma 300M — a 300M parameter TFLite model that produces 768-dimensional embeddings.
+The embedding model is EmbeddingGemma 300M . a 300M parameter TFLite model that produces 768-dimensional embeddings.
 
 ### Kotlin-side pipeline
 
@@ -157,17 +157,17 @@ object LiteRtEmbedderJni {
 The native code manages the full LiteRT inference lifecycle:
 
 **Init (`initHandle`):**
-1. `LiteRtCreateEnvironment()` — creates runtime
-2. `LiteRtCreateModelFromFile(path)` — loads `.tflite` from disk
-3. `LiteRtCreateOptions()` + `LiteRtSetOptionsHardwareAccelerators(kLiteRtHwAcceleratorCpu)` — CPU only
-4. `LiteRtCreateCompiledModel()` — compiles
+1. `LiteRtCreateEnvironment()` . creates runtime
+2. `LiteRtCreateModelFromFile(path)` . loads `.tflite` from disk
+3. `LiteRtCreateOptions()` + `LiteRtSetOptionsHardwareAccelerators(kLiteRtHwAcceleratorCpu)` . CPU only
+4. `LiteRtCreateCompiledModel()` . compiles
 5. Introspect tensor shapes: input IDs (1024), attention mask (1024), output (768)
 6. Create managed tensor buffers via `LiteRtCreateManagedTensorBufferFromRequirements()`
 
 **Inference (`nativeEmbed`):**
 1. Copy `input_ids` IntArray → `in_ids` tensor buffer (direct HOST_MEMORY pointer, no lock/unlock)
 2. Copy `attention_mask` IntArray → `in_mask` tensor buffer
-3. `LiteRtRunCompiledModel()` — run inference
+3. `LiteRtRunCompiledModel()` . run inference
 4. Read float embedding from output tensor buffer
 5. Copy to `jfloatArray` and return
 
@@ -311,7 +311,7 @@ LiteRT C API headers are downloaded from GitHub releases, not FetchContent. The 
 ```
 # FetchContent creates a subbuild that inherits the Android NDK toolchain
 # and fails compiler checks in CMake 3.22 cross-compilation builds
-file(DOWNLOAD "https://github.com/.../headers-2.1.4.tar.gz" ...)
+file(DOWNLOAD "https://github.com/./headers-2.1.4.tar.gz" .)
 ```
 
 A minimal `build_config.h` is generated programmatically (GPU=0, NPU=0).
@@ -368,7 +368,7 @@ notificationRepository.setEmbedding(id, bytes)
     → stored in notifications.embedding BLOB column
     │
     ▼
-TopicEngine.assignOrCreateTopic(notif, vec, ...)
+TopicEngine.assignOrCreateTopic(notif, vec, .)
     → channel-first match → cosine similarity → create new
     │
     ▼
@@ -379,7 +379,7 @@ TopicEntity (headline, summary, notificationIds, needsNarrativeRegen=true)
 
 ## What to read next
 
-- [LLM inference pipeline](inference-pipeline.html) — how narratives get generated from these topics
-- [Extraction & widgets](extraction-and-widgets.html) — how extracted data feeds widgets
-- [Technology decisions](tech-decisions.html) — why C++, why CPU, why arm64-only
-- [Architecture & internals](architecture.html) — the overall component layout
+- [LLM inference pipeline](inference-pipeline.html) . how narratives get generated from these topics
+- [Extraction & widgets](extraction-and-widgets.html) . how extracted data feeds widgets
+- [Technology decisions](tech-decisions.html) . why C++, why CPU, why arm64-only
+- [Architecture & internals](architecture.html) . the overall component layout

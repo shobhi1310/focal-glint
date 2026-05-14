@@ -106,7 +106,7 @@ and embedded NULs that survive into JNI's Modified UTF-8 output
 and crash strict UTF-8 parsers (nlohmann, etc.) with SIGABRT.
 ```
 
-`String.sanitizeForJni()` is called at every boundary. No caller needs to know about it — the inference provider handles it transparently.
+`String.sanitizeForJni()` is called at every boundary. No caller needs to know about it . the inference provider handles it transparently.
 
 ---
 
@@ -132,12 +132,12 @@ All `generateWithTools()` calls with `automaticToolCalling = true` run inside `w
 
 ```
 The litertlm SDK spawns a native worker thread on each sendMessageAsync.
-cancelProcess() is advisory — the JNI thread will fire onDone() regardless.
+cancelProcess() is advisory . the JNI thread will fire onDone() regardless.
 If we let cancellation unwind collect() early, engine.close() can run while
 JNI is still alive → SIGSEGV in JniMessageCallbackImpl.onDone.
 ```
 
-With `automaticToolCalling = false`, the same pattern is followed for safety — the stream can't be cleanly cancelled mid-tool-call.
+With `automaticToolCalling = false`, the same pattern is followed for safety . the stream can't be cleanly cancelled mid-tool-call.
 
 ---
 
@@ -171,7 +171,7 @@ fun enqueue(type: WorkType, priority: WorkPriority): Boolean {
         Log.d(TAG, "Already enqueued: $type, skipping")
         return false
     }
-    // ...
+    // .
 }
 ```
 
@@ -206,7 +206,7 @@ This means classification always wins. If 50 notifications arrive during narrati
 
 `InferenceWorker` is a `@HiltWorker` that receives all intelligence components via DI.
 
-### doWork() — the main loop
+### doWork() . the main loop
 
 ```kotlin
 override suspend fun doWork(): Result {
@@ -231,19 +231,19 @@ override suspend fun doWork(): Result {
 }
 ```
 
-### doClassification() — the classification phase
+### doClassification() . the classification phase
 
-1. **Re-apply rules to all recent notifications** — catches rule updates since last cycle
-2. **Query pending notifications** — uncategorized + bank transactions needing extraction
-3. **Wait for LLM readiness** — up to 45 seconds if model is still loading
-4. **Batch classification** — process in chunks of 10 with `classifyAndExtractBatch()` or `classifyBatch()`
-5. **Save bank transactions** — creates `TransactionEntity` rows from bank extraction data
-6. **Run topic generation** — generates topics from newly classified matters
-7. **Enqueue narrative generation** — as LOW priority for after classification is done
-8. **Correlate transactions** — matches merchants to apps
-9. **Compute widgets** — refreshes all Pulse widget states
+1. **Re-apply rules to all recent notifications** . catches rule updates since last cycle
+2. **Query pending notifications** . uncategorized + bank transactions needing extraction
+3. **Wait for LLM readiness** . up to 45 seconds if model is still loading
+4. **Batch classification** . process in chunks of 10 with `classifyAndExtractBatch()` or `classifyBatch()`
+5. **Save bank transactions** . creates `TransactionEntity` rows from bank extraction data
+6. **Run topic generation** . generates topics from newly classified matters
+7. **Enqueue narrative generation** . as LOW priority for after classification is done
+8. **Correlate transactions** . matches merchants to apps
+9. **Compute widgets** . refreshes all Pulse widget states
 
-### doNarrativeGeneration() — the narrative phase
+### doNarrativeGeneration() . the narrative phase
 
 1. Check LLM readiness
 2. Process each dirty topic one at a time via `TopicNarrativeProcessor`
@@ -279,7 +279,7 @@ Called from `MainActivity` on app start and from `InferenceWorker` before topic 
 | Daily reset | `DailyResetWorker` → `WorkManager.enqueueUniqueWork()` | 2 AM every day |
 | Pull-to-refresh | `DigestViewModel.onRefresh()` → `WorkManager.enqueueUniqueWork()` | User manually refreshes |
 
-All triggers use `ExistingWorkPolicy.REPLACE` with unique name `"focal_inference"` — only one worker runs at a time.
+All triggers use `ExistingWorkPolicy.REPLACE` with unique name `"focal_inference"` . only one worker runs at a time.
 
 ---
 
@@ -291,7 +291,7 @@ Android kills apps in the background. When Gemma 4 E2B (2.58 GB) is loaded into 
 2. Loading it back takes 10–30 seconds
 3. Any in-flight inference work is lost
 
-The foreground service prevents this with a persistent notification. The notification is silent and minimal-priority — users barely notice it.
+The foreground service prevents this with a persistent notification. The notification is silent and minimal-priority . users barely notice it.
 
 On Android 14+, the service uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`, which requires declaring the use case in the manifest.
 
@@ -299,7 +299,7 @@ On Android 14+, the service uses `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`, which re
 
 ## What to read next
 
-- [Classification & rules](classification-and-rules.html) — what the LLM is classifying
-- [Embeddings & clustering](embeddings-and-clustering.html) — how embeddings flow through JNI
-- [Architecture & internals](architecture.html) — all the backend components
-- [Technology decisions](tech-decisions.html) — why the architecture looks this way
+- [Classification & rules](classification-and-rules.html) . what the LLM is classifying
+- [Embeddings & clustering](embeddings-and-clustering.html) . how embeddings flow through JNI
+- [Architecture & internals](architecture.html) . all the backend components
+- [Technology decisions](tech-decisions.html) . why the architecture looks this way

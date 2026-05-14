@@ -131,14 +131,14 @@ Requires Android Studio Hedgehog+ and NDK 28.0.
 
 Full documentation is available at [focal.shobhi1310.dev](https://shobhi1310.github.io/focal-glint):
 
-- [How Focal works](https://shobhi1310.github.io/focal-glint/) — the full story from notification to widget
-- [Architecture & internals](https://shobhi1310.github.io/focal-glint/architecture) — database schema, DI wiring, services
-- [Classification & rules](https://shobhi1310.github.io/focal-glint/classification-and-rules) — how each notification is triaged
-- [LLM inference pipeline](https://shobhi1310.github.io/focal-glint/inference-pipeline) — model invocation, workers, priority queuing
-- [Embeddings & clustering](https://shobhi1310.github.io/focal-glint/embeddings-and-clustering) — JNI bridge, vector math, topic engine
-- [Extraction & widgets](https://shobhi1310.github.io/focal-glint/extraction-and-widgets) — tool-based extraction, Pulse dashboard
-- [Technology decisions](https://shobhi1310.github.io/focal-glint/tech-decisions) — C++, CPU embeddings, library conflicts
-- [Fine-tuning guide](https://shobhi1310.github.io/focal-glint/finetuning-guide) — dataset design, training, and model export
+- [How Focal works](https://shobhi1310.github.io/focal-glint/) . the full story from notification to widget
+- [Architecture & internals](https://shobhi1310.github.io/focal-glint/architecture) . database schema, DI wiring, services
+- [Classification & rules](https://shobhi1310.github.io/focal-glint/classification-and-rules) . how each notification is triaged
+- [LLM inference pipeline](https://shobhi1310.github.io/focal-glint/inference-pipeline) . model invocation, workers, priority queuing
+- [Embeddings & clustering](https://shobhi1310.github.io/focal-glint/embeddings-and-clustering) . JNI bridge, vector math, topic engine
+- [Extraction & widgets](https://shobhi1310.github.io/focal-glint/extraction-and-widgets) . tool-based extraction, Pulse dashboard
+- [Technology decisions](https://shobhi1310.github.io/focal-glint/tech-decisions) . C++, CPU embeddings, library conflicts
+- [Fine-tuning guide](https://shobhi1310.github.io/focal-glint/finetuning-guide) . dataset design, training, and model export
 
 Source for the docs is in the [`docs/`](docs/) folder.
 
