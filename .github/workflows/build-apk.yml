@@ -3,6 +3,12 @@ name: Build Release APK
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/**'
+      - 'finetuning/**'
+      - 'scripts/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
