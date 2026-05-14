@@ -59,7 +59,7 @@ Focal is an on-device Android app that reads your notifications, classifies what
 - Android 12+ (API 31)
 - ARM64 device
 - **8 GB RAM minimum** (12 GB RAM recommended)
-- **Chipset more powerful than Snapdragon 8 Gen 2**
+- **Chipset more capable or equal to Snapdragon 8 Gen 2**
 - ~3 GB free storage (model files)
 
 ### Setup
@@ -126,6 +126,20 @@ cd focal
 ```
 
 Requires Android Studio Hedgehog+ and NDK 28.0.
+
+## Documentation
+
+Full documentation is available at [focal.shobhi1310.dev](https://shobhi1310.github.io/focal-glint):
+
+- [How Focal works](https://shobhi1310.github.io/focal-glint/) — the full story from notification to widget
+- [Architecture & internals](https://shobhi1310.github.io/focal-glint/architecture) — database schema, DI wiring, services
+- [Classification & rules](https://shobhi1310.github.io/focal-glint/classification-and-rules) — how each notification is triaged
+- [LLM inference pipeline](https://shobhi1310.github.io/focal-glint/inference-pipeline) — model invocation, workers, priority queuing
+- [Embeddings & clustering](https://shobhi1310.github.io/focal-glint/embeddings-and-clustering) — JNI bridge, vector math, topic engine
+- [Extraction & widgets](https://shobhi1310.github.io/focal-glint/extraction-and-widgets) — tool-based extraction, Pulse dashboard
+- [Technology decisions](https://shobhi1310.github.io/focal-glint/tech-decisions) — C++, CPU embeddings, library conflicts
+
+Source for the docs is in the [`docs/`](docs/) folder.
 
 ## License
 
