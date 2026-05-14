@@ -43,8 +43,18 @@ jobs:
       - name: Build release APK
         run: ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: focal-${{ github.sha }}-release
           path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: Latest Build
+          body: Automated build from ${{ github.sha }}
+          artifacts: app/build/outputs/apk/release/app-release.apk
+          allowUpdates: true
