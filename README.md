@@ -138,6 +138,7 @@ Full documentation is available at [focal.shobhi1310.dev](https://shobhi1310.git
 - [Embeddings & clustering](https://shobhi1310.github.io/focal-glint/embeddings-and-clustering) — JNI bridge, vector math, topic engine
 - [Extraction & widgets](https://shobhi1310.github.io/focal-glint/extraction-and-widgets) — tool-based extraction, Pulse dashboard
 - [Technology decisions](https://shobhi1310.github.io/focal-glint/tech-decisions) — C++, CPU embeddings, library conflicts
+- [Fine-tuning guide](https://shobhi1310.github.io/focal-glint/finetuning-guide) — dataset design, training, and model export
 
 Source for the docs is in the [`docs/`](docs/) folder.
 

@@ -254,3 +254,4 @@ Every step runs on-device. Every step is verifiable through Room data, logcat ou
 - [Embeddings & clustering](embeddings-and-clustering.html) — JNI bridge, vector math, topic engine
 - [Extraction & widgets](extraction-and-widgets.html) — tool-based data extraction and Pulse dashboard
 - [Technology decisions](tech-decisions.html) — why we made the choices we made
+- [Fine-tuning guide](finetuning-guide.html) — how Gemma 4 E2B was fine-tuned for notification triage
