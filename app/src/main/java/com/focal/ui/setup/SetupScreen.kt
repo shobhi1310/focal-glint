@@ -260,7 +260,7 @@ fun SetupScreen(
                 StepCard(
                     number = 7,
                     title = "Embedding Model",
-                    description = "Place embeddinggemma-300M_seq1024_mixed-precision.tflite in the app's embeddings folder to enable smart notification grouping.",
+                    description = "Place embeddinggemma-300M_seq1024_mixed-precision.tflite and sentencepiece.model in the app's embeddings folder to enable smart notification grouping.",
                     isComplete = state.embeddingModelAvailable
                 ) {
                     Text(

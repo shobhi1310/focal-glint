@@ -5,13 +5,13 @@ import java.io.File
 
 object ModelAssetManager {
 
-    private const val TOKENIZER_ASSET = "tokenizer.model"
+    private const val TOKENIZER_ASSET = "sentencepiece.model"
 
     /**
-     * Copies tokenizer.model from APK assets into filesDir on first use (skipped if already
+     * Copies sentencepiece.model from APK assets into filesDir on first use (skipped if already
      * present with the same byte length). Returns the absolute path for native code.
      *
-     * Developer setup: place tokenizer.model in app/src/main/assets/ before building.
+     * Developer setup: place sentencepiece.model in app/src/main/assets/ before building.
      * Obtain it from the same source as the EmbeddingGemma .tflite (e.g. the model card on
      * HuggingFace). The file is ~800 KB and is shipped inside the APK.
      */

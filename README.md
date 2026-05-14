@@ -1,64 +1,44 @@
-# Focal 💎
+# Focal
 
-**Focus, Locally.** An on-device notification triage and semantic summarization engine powered by Edge LLMs.
+Focal is an Android notification intelligence app. It reads local notifications, groups related items, and uses on-device Gemma models to turn notification noise into focused topics and summaries.
 
-Focal is a privacy-first notification management system that runs entirely on your device's NPU/GPU. It transforms the "noisy" stream of mobile notifications into a structured, actionable "Daily Digest" without a single byte of your personal data ever leaving the device.
+## Install
 
-## 🌟 Key Features
+1. Download the APK from this repository's Releases page.
 
-- **Semantic Triage:** Automatically categorizes notifications into "Urgent," "Informational," or "Noise" based on your current context and habits.
+2. Install the APK on your Android device.
 
-- **Threaded Summarization:** Uses a quantized Gemma-2b model to condense long WhatsApp or Slack threads into a single-sentence preview on your lock screen.
+   ```bash
+   adb install focal-0.1.0-release.apk
+   ```
 
-- **Privacy-by-Design:** Processing happens in the device RAM. No cloud APIs, no data mining, 100% offline.
+3. Open Focal and complete the setup screen:
 
-- **Actionable Insights:** "Smart Replies" generated based on the context of the entire thread, not just the last message.
+   - grant Notification Access
+   - disable battery optimization when Android asks
+   - keep the selected model as `Gemma 4 E2B`
+   - tap `Download` to download `gemma-4-E2B-it.litertlm`
+   - tap `Start` to load the model
 
-- **Zero-Latency:** Immediate processing of incoming push events via local inference.
+4. Accept the Gemma terms before downloading the embedding files:
 
-## 🏗️ Technical Architecture
+   https://ai.google.dev/gemma/terms
 
-Focal is designed to work within the memory constraints of modern mobile devices (8GB+ RAM):
+5. Download these two EmbeddingGemma files from Hugging Face:
 
-- **Model:** Gemma-2b-IT (4-bit quantized via MLC LLM).
-- **Inference Engine:** WebGPU / Vulkan / Metal (via TVM Unity).
-- **Orchestration:** Rust-based background service for low-footprint lifecycle management.
-- **Data Layer:** Local vector store (HNSW) for personalized context retrieval without cloud sync.
+   - `embeddinggemma-300M_seq1024_mixed-precision.tflite`
+     `https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/embeddinggemma-300M_seq1024_mixed-precision.tflite`
+   - `sentencepiece.model`
+     `https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/sentencepiece.model`
 
-## 🚀 Getting Started
+6. Copy both files to the exact path Focal checks:
 
-### Prerequisites
+   ```bash
+   adb shell mkdir -p /sdcard/Android/data/com.focal/files/models/embeddings
+   adb push embeddinggemma-300M_seq1024_mixed-precision.tflite /sdcard/Android/data/com.focal/files/models/embeddings/
+   adb push sentencepiece.model /sdcard/Android/data/com.focal/files/models/embeddings/
+   ```
 
-- Android 12+ or iOS 15+
-- Device with NPU support (Snapdragon 8 Gen 2+, Apple A15+)
-- 400MB free storage for model weights
+7. Reopen Focal. The setup screen should show `Model found` under `Embedding Model`.
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/shobhi1310/focal-glint.git
-
-# Install dependencies
-cd focal-glint && npm install
-
-# Download quantized model weights (local cache)
-npm run fetch-weights
-```
-
-## 🔒 Security Policy
-
-Focal is built on the principle of **Zero-Trust Intelligence**.
-
-- **Internet Access:** The application core has no network permissions after the initial model download.
-- **Persistence:** Summaries are stored in an encrypted local database and purged every 24 hours.
-
-## 🗺️ Roadmap
-
-- [ ] v1.0: Basic summarization for SMS and WhatsApp.
-- [ ] v1.1: Context-aware "Do Not Disturb" (auto-silencing low-priority alerts).
-- [ ] v1.2: Multi-modal support (summarizing image-based notifications).
-
-## 📄 License
-
-MIT License. See [LICENSE](LICENSE) for details.
+There is no EmbeddingGemma download button in Developer Settings yet because users must accept Google's Gemma terms before accessing those files.
