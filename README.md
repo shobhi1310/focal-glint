@@ -66,10 +66,10 @@ Focal is an on-device Android app that reads your notifications, classifies what
 
 **1. Install the APK**
 
-Download the latest APK from [Releases](https://github.com/darahas/focal/releases) and install:
+Download the latest APK from [Releases](https://github.com/shobhi1310/focal-glint/releases), or grab the latest build artifact from [GitHub Actions](https://github.com/shobhi1310/focal-glint/actions/workflows/build-apk.yml):
 
 ```bash
-adb install focal-0.1.0-release.apk
+adb install focal-release.apk
 ```
 
 **2. Developer settings**
@@ -120,7 +120,7 @@ Reopen Focal. The **Embedding Model** indicator should show `Model found`.
 ## Build from source
 
 ```bash
-git clone https://github.com/darahas/focal.git
+git clone https://github.com/shobhi1310/focal-glint.git
 cd focal
 ./gradlew assembleRelease
 ```
@@ -129,7 +129,7 @@ Requires Android Studio Hedgehog+ and NDK 28.0.
 
 ## Documentation
 
-Full documentation is available at [focal.shobhi1310.dev](https://shobhi1310.github.io/focal-glint):
+Full documentation is available at [shobhi1310.github.io/focal-glint](https://shobhi1310.github.io/focal-glint):
 
 - [How Focal works](https://shobhi1310.github.io/focal-glint/) . the full story from notification to widget
 - [Architecture & internals](https://shobhi1310.github.io/focal-glint/architecture) . database schema, DI wiring, services
