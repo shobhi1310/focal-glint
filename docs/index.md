@@ -1,9 +1,9 @@
 ---
-title: How Focal works
-description: From notification to widget . a story of on-device intelligence
+title: Focal
+description: On-device notification intelligence. AI that stays on your phone, protecting your privacy.
 ---
 
-# How Focal works
+# Focal
 
 Every day, your phone buzzes with notifications. Some matter. Most don't. Focal intercepts every one of them, figures out which ones you actually care about, groups the important stuff into topics, summarizes them, and even pulls out data you can query later. All of this happens on your phone. No cloud required.
 
