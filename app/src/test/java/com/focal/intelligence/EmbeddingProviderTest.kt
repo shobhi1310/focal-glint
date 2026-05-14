@@ -2,6 +2,7 @@ package com.focal.intelligence
 
 import android.content.Context
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
@@ -61,8 +62,7 @@ class EmbeddingProviderTest {
         try {
             val modelDir = File(tempDir, "embeddings").apply { mkdirs() }
             val modelFile = File(modelDir, "embeddinggemma.tflite").apply { writeText("model") }
-            File(modelDir, "sentencepiece.model").apply { writeText("legacy-tokenizer") }
-            val siblingTokenizer = File(modelDir, "sentencepiece.model.2").apply { writeText("gemma-tokenizer") }
+            val siblingTokenizer = File(modelDir, "sentencepiece.model").apply { writeText("gemma-tokenizer") }
             val context = mockk<Context>()
             every { context.assets } throws AssertionError("asset fallback should not be used")
 

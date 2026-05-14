@@ -93,7 +93,7 @@ class ModelManagerTest {
     @Test
     fun `tokenizerFile points to gemma sentencepiece model in embedding directory`() {
         assertEquals(
-            File(tempDir, "external_models/embeddings/sentencepiece.model.2").absolutePath,
+            File(tempDir, "external_models/embeddings/sentencepiece.model").absolutePath,
             modelManager.tokenizerFile.absolutePath
         )
     }

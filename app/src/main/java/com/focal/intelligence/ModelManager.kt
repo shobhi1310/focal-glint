@@ -244,6 +244,6 @@ class ModelManager(private val context: Context) {
         const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
         const val MIN_MODEL_SIZE = 100_000_000L
         const val GEMMA_MODEL_FILENAME = "embeddinggemma-300M_seq1024_mixed-precision.tflite"
-        const val TOKENIZER_FILENAME = "sentencepiece.model.2"
+        const val TOKENIZER_FILENAME = "sentencepiece.model"
     }
 }

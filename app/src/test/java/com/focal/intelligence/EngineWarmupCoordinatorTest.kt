@@ -36,9 +36,10 @@ class EngineWarmupCoordinatorTest {
         every { modelManager.isModelAvailable(ModelVariant.GEMMA4_E2B) } returns true
         every { modelManager.modelFileFor(ModelVariant.GEMMA4_E2B).absolutePath } returns "/models/gemma4.litertlm"
         every { modelManager.getBackendPreference() } returns true
+        every { modelManager.getContextTokens() } returns ModelVariant.GEMMA4_E2B.maxContextTokens
         every { modelManager.isGemmaEmbeddingAvailable } returns true
         every { modelManager.gemmaEmbeddingModelFile.absolutePath } returns "/models/embedding.tflite"
-        every { modelManager.tokenizerFile.absolutePath } returns "/models/tokenizer.model"
+        every { modelManager.tokenizerFile.absolutePath } returns "/models/sentencepiece.model"
         every { inferenceProvider.isReady() } answers { inferenceReady }
         every { embeddingProvider.isReady() } answers { embeddingReady }
         coEvery { inferenceProvider.initialize(any(), any(), any()) } answers {
@@ -73,7 +74,7 @@ class EngineWarmupCoordinatorTest {
         coVerify {
             embeddingProvider.initialize(
                 "/models/embedding.tflite",
-                "/models/tokenizer.model",
+                "/models/sentencepiece.model",
                 false
             )
         }
@@ -87,7 +88,7 @@ class EngineWarmupCoordinatorTest {
         coVerify {
             embeddingProvider.initialize(
                 "/models/embedding.tflite",
-                "/models/tokenizer.model",
+                "/models/sentencepiece.model",
                 false
             )
         }
@@ -101,7 +102,7 @@ class EngineWarmupCoordinatorTest {
 
         assertTrue(result)
         coVerify(exactly = 0) { inferenceProvider.initialize(any(), any(), any()) }
-        coVerify { embeddingProvider.initialize("/models/embedding.tflite", "/models/tokenizer.model", false) }
+        coVerify { embeddingProvider.initialize("/models/embedding.tflite", "/models/sentencepiece.model", false) }
     }
 
     @Test

@@ -42,7 +42,7 @@ class GemmaEmbeddingProvider(
 
     companion object {
         private const val TAG = "GemmaEmbedding"
-        private const val GEMMA_SENTENCEPIECE_FILENAME = "sentencepiece.model.2"
+        private const val GEMMA_SENTENCEPIECE_FILENAME = "sentencepiece.model"
         private const val LEGACY_TOKENIZER_FILENAME = "tokenizer.model"
 
         internal fun resolveTokenizerPath(
