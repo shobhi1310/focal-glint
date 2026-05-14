@@ -1,4 +1,4 @@
-# Built application files
+# Android build outputs
 *.apk
 *.ap_
 *.aab
@@ -13,35 +13,56 @@ build/
 *.iml
 local.properties
 
-# Kotlin
+# Kotlin / JVM
 *.class
+.kotlin/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Android/tool homes
+.android-user-home/
+.localappdata/
+
 # Model weights
 model/
 
-# Visual companion brainstorming files
+# Local agent/session files
 .superpowers/
-
-# Claude Code session files
 .claude/
-
-# Kotlin build cache
-.kotlin/
+.codex/
 
 # CMake build cache
 app/.cxx/
 
-# Debug output files
+# Debug/log captures
+.logcat_*.txt
 focal_embeddings_debug.txt
 focal_notifications_debug.txt
 focal_embeddings_debug_*.txt
 focal_notifications_debug_*.txt
+
+# Dataset / fine-tuning scratch files
+.batch_*
+DATASET_GUIDE.md
+finetune_config.md
+append_dataset.py
+append_dataset_records.py
+normalize_dataset.py
+smoke_extend_dataset.py
+split_unsloth_dataset.py
+verify_dataset.py
+focal_finetune_*.jsonl
 focal_notifications_finetune_README.md
 focal_notifications_finetune_toolcalls.jsonl
 focal_notifications_label_summary.md
 focal_notifications_labeled_dedup.csv
+
+# Generated docs/assets
 docs/screenshots/
