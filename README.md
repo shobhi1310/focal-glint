@@ -1,37 +1,31 @@
 # Focal
 
-Focal is an Android notification intelligence app. It reads local notifications, groups related items, and uses on-device Gemma models to turn notification noise into focused topics and summaries.
+Focal is an Android app that turns notifications into local topics and summaries using on-device Gemma models.
 
 ## Install
 
-1. Download the APK from this repository's Releases page.
+1. Install the release APK from this repository's Releases page.
 
-2. Install the APK on your Android device.
+```bash
+adb install focal-0.1.0-release.apk
+```
 
-   ```bash
-   adb install focal-0.1.0-release.apk
-   ```
+2. Open `Tune -> Developer Settings` in Focal and complete the built-in setup:
 
-3. Open Focal and complete the setup screen:
+- Grant Notification Access
+- Disable battery optimization
+- Keep the selected model as `Gemma 4 E2B`
+- Tap `Download` to fetch `gemma-4-E2B-it.litertlm`
+- Tap `Start` to load the model
 
-   - grant Notification Access
-   - disable battery optimization when Android asks
-   - keep the selected model as `Gemma 4 E2B`
-   - tap `Download` to download `gemma-4-E2B-it.litertlm`
-   - tap `Start` to load the model
+3. Accept the [Gemma terms](https://ai.google.dev/gemma/terms).
 
-4. Accept the Gemma terms before downloading the embedding files:
+4. Download the embedding files:
 
-   https://ai.google.dev/gemma/terms
+- [`embeddinggemma-300M_seq1024_mixed-precision.tflite`](https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/embeddinggemma-300M_seq1024_mixed-precision.tflite)
+- [`sentencepiece.model`](https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/sentencepiece.model)
 
-5. Download these two EmbeddingGemma files from Hugging Face:
-
-   - `embeddinggemma-300M_seq1024_mixed-precision.tflite`
-     `https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/embeddinggemma-300M_seq1024_mixed-precision.tflite`
-   - `sentencepiece.model`
-     `https://huggingface.co/litert-community/embeddinggemma-300m/blob/main/sentencepiece.model`
-
-6. Copy both files to the exact path Focal checks:
+5. Copy both files to the path Focal checks:
 
    ```bash
    adb shell mkdir -p /sdcard/Android/data/com.focal/files/models/embeddings
@@ -39,6 +33,6 @@ Focal is an Android notification intelligence app. It reads local notifications,
    adb push sentencepiece.model /sdcard/Android/data/com.focal/files/models/embeddings/
    ```
 
-7. Reopen Focal. The setup screen should show `Model found` under `Embedding Model`.
+6. Reopen Focal. `Embedding Model` should show `Model found`.
 
-There is no EmbeddingGemma download button in Developer Settings yet because users must accept Google's Gemma terms before accessing those files.
+EmbeddingGemma is not downloadable inside Developer Settings yet because access requires accepting the Gemma terms first.
