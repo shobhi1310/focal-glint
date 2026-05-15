@@ -61,7 +61,7 @@ The model sees a prompt listing every notification in the current batch and is g
 - `category` . exactly `"matters"` or `"noise"`
 - `reason` . a short explanation (snake_case, like `personal_message` or `promotional_email`)
 
-The system prompt includes the user's **focus text** (if set in Tune settings). This shapes the model's decisions. For example, if you wrote "Track my UPI spends from GPay and PhonePe," the model knows to classify UPI payment notifications as matters.
+The system prompt includes the user's **focus text** (if set in Tune settings). This shapes the model's decisions. For example, if you wrote "Track my UPI spends from payment apps," the model knows to classify UPI payment notifications as matters.
 
 **Automatic tool calling** is **disabled** for classification. The model is required to explicitly write out each tool call . this gives us a reliable way to check that it classified every notification in the batch. After the stream completes, `BatchClassificationResultMapper` identifies any missing indices and marks them `"pending"` for the next cycle.
 
@@ -80,10 +80,10 @@ Five extraction tools are available:
 | Tool | What it extracts | Example notification |
 |---|---|---|
 | `extractFinance` | Amount, merchant, category, direction | "Paid ₹450 to Swiggy" |
-| `extractWork` | Entity, sender, action, repo | "PR #342 opened by Aisha in focal-glint" |
-| `extractPersonal` | Sender name, channel, count, snippet | "Shruti: Call me when free" |
-| `extractLogistics` | Item, merchant, status, ETA | "Your Amazon order is out for delivery" |
-| `extractBankTransaction` | Amount, direction, account, bank, merchant | "₹5,000 debited from HDFC a/c *3371" |
+| `extractWork` | Entity, sender, action, repo | "PR #342 opened by a teammate in a repository" |
+| `extractPersonal` | Sender name, channel, count, snippet | "A contact: Call me when free" |
+| `extractLogistics` | Item, merchant, status, ETA | "Your order is out for delivery" |
+| `extractBankTransaction` | Amount, direction, account, bank, merchant | "₹5,000 debited from bank account" |
 
 The model calls these tools only when it determines a notification has extractable data. Results are saved to the `extracted_data` table and later power widgets.
 
@@ -108,7 +108,7 @@ Once notifications are classified, the ones marked "matters" need to be embedded
 
 Only **unembedded** notifications are processed. If the embedding provider isn't ready (model not yet loaded), the notification waits for the next worker cycle.
 
-**Why C++?** The embedding pipeline uses native code because the LiteRT C API requires direct memory access to tensor buffers and the SentencePiece library only has C++ bindings. Both are compiled into a single `libfocal_intelligence.so` shared library. The embedding model always runs on **CPU** . even when the LLM runs on GPU . because GPU inference starves the render pipeline when called in rapid succession.
+**Why native code?** Both LiteRT-LM (for the LLM) and LiteRT (for embeddings) ship `libLiteRt.so`. When both are declared as Gradle dependencies, the build system picks one `.so` non-deterministically, causing runtime crashes. The solution was to statically link the embedding pipeline into a single `libfocal_intelligence.so` that uses the same `libLiteRt.so` from the LiteRT-LM AAR at runtime. Same approach as SentencePiece . use the `.so` directly rather than adding a conflicting dependency. The embedding model always runs on **CPU** . even when the LLM runs on GPU . because GPU inference starves the render pipeline when called in rapid succession.
 
 > **Deep dive:** [Embeddings & clustering](embeddings-and-clustering.html) covers the full JNI bridge, the CMake build configuration, tensor buffer management, and vector math.
 
@@ -139,7 +139,7 @@ A topic with just raw notifications and a provisional headline isn't very readab
 The model is given `GenerateTopicCardTool` with **automatic tool calling enabled**. The tool definition asks for:
 - `title` . a short, scannable headline
 - `summary` . 1–3 sentences about what happened
-- `actions` . suggested quick actions like "Open WhatsApp" or "View in GPay"
+- `actions` . suggested quick actions like "Open Chat" or "View in payment app"
 
 The model sees all notifications in the topic, along with context about which apps are involved and their package names (so it can suggest real launchable actions).
 
@@ -159,9 +159,9 @@ Extracted data from step 4 doesn't just sit in the database. It powers **Pulse**
 |---|---|---|
 | `SUM` | Totals a numeric field | "₹1,250" (total spending today) |
 | `COUNT` | Counts distinct items | "5 people reached out" |
-| `LATEST` | Shows the most recent entry | "Shruti: Call me when free" |
-| `LIST` | Groups by a field and shows top groups | "3 orders · Amazon most active" |
-| `MAX` | Finds the maximum value | "₹5,000 · HDFC Bank" |
+| `LATEST` | Shows the most recent entry | "A contact: Call me when free" |
+| `LIST` | Groups by a field and shows top groups | "3 orders · most active merchant" |
+| `MAX` | Finds the maximum value | "₹5,000 · Bank transaction" |
 | `STATUS` | Groups by status field | "2 shipped, 1 delivered, 1 delayed" |
 
 Finance widgets get special treatment . they merge bank transactions with extracted finance data for a complete picture of spending.

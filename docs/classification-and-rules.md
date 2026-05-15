@@ -56,7 +56,7 @@ Matches a sender pattern within a specific app. Checks notification title agains
 {
   "type": "sender_match",
   "app": "com.google.android.apps.messaging",
-  "pattern": "HDFC",
+  "pattern": "BANK-CODE",
   "category": "matters",
   "confidence": 0.95
 }
@@ -94,7 +94,7 @@ A rule can specify `"auto"` as its category. This doesn't classify the notificat
 Focal ships with default rules in `DefaultRules.kt` that apply sensible defaults:
 
 - Messaging apps (WhatsApp, Messages) → auto (let model decide which conversations matter)
-- Banking apps (GPay, PhonePe, bank apps) → auto (model catches payment notifications)
+- Banking apps (payment apps, bank apps) → auto (model catches payment notifications)
 - News apps, YouTube, game apps → noise
 - System apps with spammy notifications → noise
 
@@ -108,7 +108,7 @@ In Tune settings, users can write (or speak) freeform text describing what they 
 
 ```
 User focus:
-"Track my UPI spends from GPay and PhonePe. Show me when Shruti or Amma messages. Flag HDFC and ICICI bank alerts."
+"Track my UPI spends from payment apps. Show me when family members message. Flag bank alerts for my accounts."
 ```
 
 The model uses this to personalize classification. It knows to flag UPI payment notifications, prioritize specific contacts, and surface specific bank alerts . even without explicit rules.

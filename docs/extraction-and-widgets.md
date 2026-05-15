@@ -61,9 +61,9 @@ fun extractWork(
 ```json
 {
   "entity": "#342",
-  "sender": "Aisha",
+  "sender": "a teammate",
   "action": "review_requested",
-  "repo": "focal-glint"
+  "repo": "a repository"
 }
 ```
 
@@ -87,7 +87,7 @@ fun extractPersonal(
 **Extracted data shape:**
 ```json
 {
-  "sender": "Shruti",
+  "sender": "A Contact",
   "channel": "message",
   "count": 3,
   "snippet": "Call me when free"
@@ -139,8 +139,8 @@ fun extractBankTransaction(
     @ToolParam("1-based index of the notification") index: Int,
     @ToolParam("Transaction amount as a number") amount: Double,
     @ToolParam("Transaction direction: debit or credit") direction: String,
-    @ToolParam("Masked bank account number e.g. *3371 or XX023") account: String,
-    @ToolParam("Bank name e.g. HDFC Bank, ICICI Bank") bank: String,
+    @ToolParam("Masked bank account number e.g. XX023") account: String,
+    @ToolParam("Bank name e.g. HDFC, ICICI") bank: String,
     @ToolParam("Merchant or payee name from SMS, empty if not present") merchant: String
 ): Map<String, Any>
 ```
@@ -150,8 +150,8 @@ fun extractBankTransaction(
 {
   "amount": 5000.0,
   "direction": "debit",
-  "account": "*3371",
-  "bank": "HDFC Bank",
+  "account": "XX123",
+  "bank": "Sample Bank",
   "merchant": ""
 }
 ```
@@ -162,7 +162,7 @@ Before extraction, `BankSmsDetector` pre-screens notifications:
 
 ```kotlin
 object BankSmsDetector {
-    // Pattern: sender shortcode like "AX-ICICIB", "JD-HDFCBNK"
+    // Pattern: sender shortcode like "AX-BANKCD", "JD-BANKNM"
     private val BANK_SENDER_PATTERN = Regex("^[A-Z]{2}-[A-Za-z]{3,}")
 
     // Keywords: debited, credited, sent rs, withdrawn, transferred, etc.
@@ -289,12 +289,12 @@ Matches bank transaction merchants to known apps:
 class TransactionCorrelator(private val transactionRepository: TransactionRepository) {
     suspend fun correlate() {
         // Match raw merchants from bank SMS to UPI apps
-        // e.g., "SWIGGY" → "com.google.android.apps.nbu.paisa.user" (GPay)
+        // e.g., a food delivery merchant matching to its payment app
     }
 }
 ```
 
-This enables the Pulse detail screen to show "paid via GPay" next to a bank transaction.
+This enables the Pulse detail screen to show "paid via payment app" next to a bank transaction.
 
 ---
 
