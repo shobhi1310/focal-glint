@@ -98,9 +98,12 @@ Push them to the device:
 
 ```bash
 adb shell mkdir -p /sdcard/Android/data/com.focal/files/models/embeddings
+adb shell chmod 777 /sdcard/Android/data/com.focal/files/models/embeddings
 adb push embeddinggemma-300M_seq1024_mixed-precision.tflite /sdcard/Android/data/com.focal/files/models/embeddings/
 adb push sentencepiece.model /sdcard/Android/data/com.focal/files/models/embeddings/
 ```
+
+The `chmod` step matters when the folder is created through `adb shell`: otherwise Android may leave the directory owned by `shell`, and Focal can report `Model not found` even though the files are present.
 
 **4. Verify**
 
