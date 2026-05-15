@@ -104,7 +104,7 @@ adb push sentencepiece.model /sdcard/Android/data/com.focal/files/models/embeddi
 
 **4. Verify**
 
-Reopen Focal. The **Embedding Model** indicator should show `Model found`.
+Close Focal completely (kill it from recent apps too), then reopen. The **Embedding Model** indicator should show `Model found`.
 
 ---
 
