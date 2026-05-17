@@ -108,7 +108,7 @@ fun DigestScreen(
                 SectionHeader(title = "MATTERS TO YOU", count = state.mattersCount)
             }
 
-            if (state.isProcessing) {
+            if (state.isProcessing && state.stories.isEmpty()) {
                 item {
                     Text(
                         text = "Refreshing your digest...",
@@ -117,32 +117,30 @@ fun DigestScreen(
                         modifier = Modifier.padding(top = 32.dp)
                     )
                 }
+            } else if (state.stories.isEmpty() && state.totalNotifications == 0) {
+                item {
+                    Text(
+                        text = "No notifications yet. Make sure notification access is enabled in Settings.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 32.dp)
+                    )
+                }
+            } else if (state.stories.isEmpty()) {
+                item {
+                    Text(
+                        text = "Processing notifications into stories...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 32.dp)
+                    )
+                }
             } else {
-                if (state.stories.isEmpty() && state.totalNotifications == 0) {
-                    item {
-                        Text(
-                            text = "No notifications yet. Make sure notification access is enabled in Settings.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 32.dp)
-                        )
-                    }
-                } else if (state.stories.isEmpty()) {
-                    item {
-                        Text(
-                            text = "Processing notifications into stories...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 32.dp)
-                        )
-                    }
-                } else {
-                    items(state.stories, key = { it.id }) { topic ->
-                        TopicCard(
-                            topic = topic,
-                            onClick = { onTopicClick(topic.id) }
-                        )
-                    }
+                items(state.stories, key = { it.id }) { topic ->
+                    TopicCard(
+                        topic = topic,
+                        onClick = { onTopicClick(topic.id) }
+                    )
                 }
             }
         }
