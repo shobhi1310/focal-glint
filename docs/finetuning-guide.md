@@ -272,6 +272,11 @@ Run it whenever system prompts or tool definitions change upstream in the Kotlin
 
 Fine-tuning was done via Unsloth Studio on a Colab GPU instance.
 
+<figure>
+  <img src="assets/unsloth-training-history.png" alt="Unsloth Studio training history showing the completed Gemma 4 E2B fine-tuning run">
+  <figcaption>Unsloth Studio training history for the completed Gemma 4 E2B LoRA fine-tuning run.</figcaption>
+</figure>
+
 ### Model and dataset
 
 - Base model: Gemma 4 E2B (2.58 GB)
